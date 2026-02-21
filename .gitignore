@@ -5,3 +5,5 @@ typechain-types/
 .env
 frontend/node_modules/
 frontend/dist/
+frontend/node_modules/
+frontend/.next/
