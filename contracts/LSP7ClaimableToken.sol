@@ -25,6 +25,7 @@ contract LSP7ClaimableToken is LSP7DigitalAsset {
     uint256 public amountPerClaim;
     uint256 public maxSupply;
     uint256 public totalClaimedAmount;
+    uint256 public claimerCount;
 
     address public requiredToken;
     uint256 public requiredTokenAmount;
@@ -59,7 +60,7 @@ contract LSP7ClaimableToken is LSP7DigitalAsset {
             symbol_,
             owner_,
             _LSP4_TOKEN_TYPE_TOKEN,
-            decimals_ == 0 ? false : true
+            decimals_ == 0 ? true : false
         )
     {
         amountPerClaim = amountPerClaim_;
@@ -81,6 +82,7 @@ contract LSP7ClaimableToken is LSP7DigitalAsset {
     }
 
     function setAmountPerClaim(uint256 amount_) external onlyOwner {
+        require(amount_ > 0, "Must be > 0");
         amountPerClaim = amount_;
     }
 
@@ -116,6 +118,7 @@ contract LSP7ClaimableToken is LSP7DigitalAsset {
 
         hasClaimed[msg.sender] = true;
         totalClaimedAmount += amountPerClaim;
+        claimerCount++;
 
         _mint(msg.sender, amountPerClaim, false, "");
 
@@ -133,8 +136,7 @@ contract LSP7ClaimableToken is LSP7DigitalAsset {
     }
 
     function totalClaimers() external view returns (uint256) {
-        if (amountPerClaim == 0) return 0;
-        return totalClaimedAmount / amountPerClaim;
+        return claimerCount;
     }
 
     function meetsRequirements(address addr) external view returns (bool tokenOk, bool followersOk) {

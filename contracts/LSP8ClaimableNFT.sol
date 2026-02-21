@@ -69,6 +69,7 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
         )
     {
         maxSupply = maxSupply_;
+        require(amountPerClaim_ <= 50, "Max 50 per claim");
         amountPerClaim = amountPerClaim_ == 0 ? 1 : amountPerClaim_;
         _nextTokenId = 1;
     }
@@ -88,7 +89,7 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
     }
 
     function setAmountPerClaim(uint256 amount_) external onlyOwner {
-        require(amount_ > 0, "Must be > 0");
+        require(amount_ > 0 && amount_ <= 50, "Must be 1-50");
         amountPerClaim = amount_;
     }
 
