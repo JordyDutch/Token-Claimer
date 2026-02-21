@@ -1,0 +1,22 @@
+{
+  "name": "lukso-token-claimer",
+  "version": "1.0.0",
+  "description": "Claimable NFT drops for LUKSO — built for artists, livestreams, and events",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:testnet": "hardhat run scripts/deploy.ts --network luksoTestnet",
+    "deploy:mainnet": "hardhat run scripts/deploy.ts --network lukso",
+    "dev": "cd frontend && npm run dev"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "dotenv": "^16.4.5",
+    "hardhat": "^2.22.0",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "@lukso/lsp4-contracts": "^0.16.7",
+    "@lukso/lsp8-contracts": "^0.16.7"
+  }
+}
