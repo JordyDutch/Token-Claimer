@@ -233,9 +233,9 @@ export default function ClaimPage() {
           <h1 className="text-xl sm:text-2xl font-bold mb-1">{dropName}</h1>
 
           {/* Connected profile */}
-          {address && profile ? (
+          {address ? (
             <div className="flex items-center justify-center gap-2 mb-2">
-              {profile.image && (
+              {profile?.image && (
                 <img
                   src={profile.image}
                   alt=""
@@ -243,14 +243,18 @@ export default function ClaimPage() {
                 />
               )}
               <span className="text-zinc-300 text-xs sm:text-sm font-medium">
-                {profile.name || `${address.slice(0, 6)}...${address.slice(-4)}`}
+                {profile?.name || `${address.slice(0, 6)}...${address.slice(-4)}`}
               </span>
+              <button
+                onClick={() => { setAddress(null); setProfile(null); setAlreadyClaimed(false); setEligibility(null); }}
+                className="text-zinc-600 hover:text-zinc-400 text-[10px] sm:text-xs ml-1 transition-colors"
+              >
+                Disconnect
+              </button>
             </div>
           ) : (
             <p className="text-zinc-500 mb-2 text-xs sm:text-sm">
-              {address
-                ? `${address.slice(0, 6)}...${address.slice(-4)}`
-                : "Connect your Universal Profile to claim"}
+              Connect your Universal Profile to claim
             </p>
           )}
 

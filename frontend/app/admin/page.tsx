@@ -202,6 +202,12 @@ export default function AdminPage() {
               <span className="text-green-400 text-xs">
                 \u2713 {profile?.name || `${address.slice(0, 6)}...${address.slice(-4)}`}
               </span>
+              <button
+                onClick={() => { setAddress(null); setProfile(null); setIsOwner(false); }}
+                className="text-zinc-600 hover:text-zinc-400 text-[10px] sm:text-xs ml-1 transition-colors"
+              >
+                Disconnect
+              </button>
             </div>
           )}
         </div>

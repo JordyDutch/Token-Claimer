@@ -1,10 +1,11 @@
-import { Contract, JsonRpcProvider, toUtf8String, dataSlice, toNumber } from "ethers";
+import { Contract, JsonRpcProvider, getBytes } from "ethers";
 
 const LUKSO_RPC = "https://rpc.mainnet.lukso.network";
 const IPFS_GATEWAY = "https://api.universalprofile.cloud/ipfs/";
 
 // LSP3Profile data key: keccak256("LSP3Profile")
-const LSP3_PROFILE_KEY = "0x5ef83ad9559033e6e941db7d7c495acdce616347d28e90c7ce47cbfcfcad3bc5";
+const LSP3_PROFILE_KEY =
+  "0x5ef83ad9559033e6e941db7d7c495acdce616347d28e90c7ce47cbfcfcad3bc5";
 
 const UP_ABI = ["function getData(bytes32) view returns (bytes)"];
 
@@ -22,20 +23,24 @@ function ipfsToHttp(url: string): string {
 }
 
 /**
- * Decode VerifiableURI from raw bytes.
- * Format: 0x0000 (2 bytes verification method) + hash length (2 bytes) + hash + url (utf8)
- * Simplified: skip verification, extract URL from the end.
+ * Extract URL from VerifiableURI raw bytes.
+ * Format: 0x0000 + 4 bytes verification method + 32 bytes hash + URL
+ * We find the URL by looking for ipfs:// or https:// in the decoded string.
  */
-function decodeVerifiableURI(data: string): string | null {
-  if (!data || data === "0x" || data.length < 10) return null;
+function extractUrlFromVerifiableURI(hexData: string): string | null {
+  if (!hexData || hexData === "0x" || hexData.length < 10) return null;
   try {
-    // Verification method: bytes 0-1 (after 0x prefix)
-    // Hash length: bytes at position 2-3 (uint16)
-    const hashLength = toNumber(dataSlice(data, 2, 4));
-    // URL starts after: 2 (method) + 2 (hash length) + hashLength bytes
-    const urlOffset = 4 + hashLength;
-    const urlBytes = dataSlice(data, urlOffset);
-    return toUtf8String(urlBytes);
+    // Convert hex to bytes then to string, find URL
+    const bytes = getBytes(hexData);
+    const text = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+
+    // Find ipfs:// or https://
+    let idx = text.indexOf("ipfs://");
+    if (idx === -1) idx = text.indexOf("https://");
+    if (idx === -1) idx = text.indexOf("http://");
+    if (idx === -1) return null;
+
+    return text.slice(idx);
   } catch {
     return null;
   }
@@ -49,11 +54,11 @@ export async function fetchProfile(address: string): Promise<ProfileInfo> {
     const up = new Contract(address, UP_ABI, rpc);
     const rawData = await up.getData(LSP3_PROFILE_KEY);
 
-    const jsonUrl = decodeVerifiableURI(rawData);
+    const jsonUrl = extractUrlFromVerifiableURI(rawData);
     if (!jsonUrl) return result;
 
     const httpUrl = ipfsToHttp(jsonUrl);
-    const res = await fetch(httpUrl, { signal: AbortSignal.timeout(5000) });
+    const res = await fetch(httpUrl, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) return result;
 
     const json = await res.json();
@@ -64,11 +69,12 @@ export async function fetchProfile(address: string): Promise<ProfileInfo> {
     }
 
     if (profile.profileImage && profile.profileImage.length > 0) {
-      // Pick smallest image >= 64px, or just the first one
-      const images = profile.profileImage.sort(
+      // Pick smallest image >= 64px wide, or first
+      const images = [...profile.profileImage].sort(
         (a: any, b: any) => (a.width || 0) - (b.width || 0)
       );
-      const suitable = images.find((img: any) => (img.width || 0) >= 64) || images[0];
+      const suitable =
+        images.find((img: any) => (img.width || 0) >= 64) || images[0];
       if (suitable?.url) {
         result.image = ipfsToHttp(suitable.url);
       }
