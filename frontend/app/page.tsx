@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { BrowserProvider, Contract, JsonRpcProvider, formatUnits } from "ethers";
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "";
-const TOKEN_TYPE = process.env.NEXT_PUBLIC_TOKEN_TYPE || "LSP8"; // "LSP7" or "LSP8"
+const TOKEN_TYPE = process.env.NEXT_PUBLIC_TOKEN_TYPE || "LSP8";
 const LUKSO_RPC = "https://rpc.mainnet.lukso.network";
 const LUKSO_CHAIN_ID = "0x2a";
 
@@ -18,6 +18,10 @@ const SHARED_ABI = [
   "function hasClaimed(address) view returns (bool)",
   "function name() view returns (string)",
   "function amountPerClaim() view returns (uint256)",
+  "function requiredToken() view returns (address)",
+  "function requiredTokenAmount() view returns (uint256)",
+  "function requiredFollowers() view returns (uint256)",
+  "function meetsRequirements(address) view returns (bool tokenOk, bool followersOk)",
 ];
 
 const LSP8_ABI = [
@@ -32,7 +36,21 @@ const LSP7_ABI = [
   "function decimals() view returns (uint8)",
 ];
 
+const TOKEN_NAME_ABI = ["function name() view returns (string)"];
+
 type Status = { message: string; type: "success" | "error" | "loading" } | null;
+
+interface Requirements {
+  token: string;
+  tokenAmount: bigint;
+  tokenName: string;
+  followers: bigint;
+}
+
+interface UserEligibility {
+  tokenOk: boolean;
+  followersOk: boolean;
+}
 
 export default function ClaimPage() {
   const [address, setAddress] = useState<string | null>(null);
@@ -44,6 +62,8 @@ export default function ClaimPage() {
   const [alreadyClaimed, setAlreadyClaimed] = useState(false);
   const [status, setStatus] = useState<Status>(null);
   const [claiming, setClaiming] = useState(false);
+  const [requirements, setRequirements] = useState<Requirements | null>(null);
+  const [eligibility, setEligibility] = useState<UserEligibility | null>(null);
 
   const abi = TOKEN_TYPE === "LSP7" ? LSP7_ABI : LSP8_ABI;
   const isLSP7 = TOKEN_TYPE === "LSP7";
@@ -58,15 +78,46 @@ export default function ClaimPage() {
       const contract = new Contract(CONTRACT_ADDRESS, abi, rpc);
 
       try {
-        const [name, supply, active, amount] = await Promise.all([
-          contract.name(),
-          contract.maxSupply(),
-          contract.isClaimActive(),
-          contract.amountPerClaim(),
-        ]);
+        const [name, supply, active, amount, reqToken, reqAmount, reqFollowers] =
+          await Promise.all([
+            contract.name(),
+            contract.maxSupply(),
+            contract.isClaimActive(),
+            contract.amountPerClaim(),
+            contract.requiredToken(),
+            contract.requiredTokenAmount(),
+            contract.requiredFollowers(),
+          ]);
 
         setDropName(name);
         setIsActive(active);
+
+        // Load requirement token name
+        const zeroAddr = "0x0000000000000000000000000000000000000000";
+        let tokenName = "";
+        if (reqToken !== zeroAddr && reqAmount > BigInt(0)) {
+          try {
+            const tokenContract = new Contract(reqToken, TOKEN_NAME_ABI, rpc);
+            tokenName = await tokenContract.name();
+          } catch {
+            tokenName = `${reqToken.slice(0, 6)}...${reqToken.slice(-4)}`;
+          }
+        }
+
+        const hasRequirements =
+          (reqToken !== zeroAddr && reqAmount > BigInt(0)) ||
+          reqFollowers > BigInt(0);
+
+        if (hasRequirements) {
+          setRequirements({
+            token: reqToken,
+            tokenAmount: reqAmount,
+            tokenName,
+            followers: reqFollowers,
+          });
+        } else {
+          setRequirements(null);
+        }
 
         if (isLSP7) {
           const [totalAmount, claimers, decimals] = await Promise.all([
@@ -77,21 +128,30 @@ export default function ClaimPage() {
           const dec = Number(decimals);
           setClaimedDisplay(claimers.toString());
           setSupplyDisplay(
-            supply === BigInt(0)
-              ? "∞"
-              : formatUnits(supply, dec)
+            supply === BigInt(0) ? "\u221e" : formatUnits(supply, dec)
           );
           setAmountDisplay(formatUnits(amount, dec) + " tokens");
         } else {
           const totalClaimed = await contract.totalClaimed();
           setClaimedDisplay(totalClaimed.toString());
-          setSupplyDisplay(supply === BigInt(0) ? "∞" : supply.toString());
-          setAmountDisplay(amount.toString() + (amount === BigInt(1) ? " NFT" : " NFTs"));
+          setSupplyDisplay(supply === BigInt(0) ? "\u221e" : supply.toString());
+          setAmountDisplay(
+            amount.toString() + (amount === BigInt(1) ? " NFT" : " NFTs")
+          );
         }
 
         if (userAddress) {
-          const claimed = await contract.hasClaimed(userAddress);
+          const [claimed, meets] = await Promise.all([
+            contract.hasClaimed(userAddress),
+            hasRequirements
+              ? contract.meetsRequirements(userAddress)
+              : Promise.resolve({ tokenOk: true, followersOk: true }),
+          ]);
           setAlreadyClaimed(claimed);
+          setEligibility({
+            tokenOk: meets.tokenOk,
+            followersOk: meets.followersOk,
+          });
         }
       } catch (e) {
         console.error("Failed to load contract:", e);
@@ -176,8 +236,8 @@ export default function ClaimPage() {
       await tx.wait();
       setStatus({
         message: isLSP7
-          ? "🎉 Tokens Claimed! Check your Universal Profile"
-          : "🎉 NFT Claimed! Check your Universal Profile",
+          ? "\ud83c\udf89 Tokens Claimed! Check your Universal Profile"
+          : "\ud83c\udf89 NFT Claimed! Check your Universal Profile",
         type: "success",
       });
       setAlreadyClaimed(true);
@@ -190,13 +250,19 @@ export default function ClaimPage() {
     }
   }
 
+  const canClaim =
+    isActive &&
+    !alreadyClaimed &&
+    !claiming &&
+    (!eligibility || (eligibility.tokenOk && eligibility.followersOk));
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="max-w-md w-full">
         <div className="bg-[#12121a] rounded-3xl p-8 text-center border border-purple-500/10">
           {/* Artwork */}
           <div className="w-48 h-48 rounded-2xl mx-auto mb-6 bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-6xl">
-            {isLSP7 ? "🪙" : "🎵"}
+            {isLSP7 ? "\ud83e\ude99" : "\ud83c\udfb5"}
           </div>
 
           <h1 className="text-2xl font-bold mb-1">{dropName}</h1>
@@ -210,6 +276,54 @@ export default function ClaimPage() {
           {amountDisplay && (
             <div className="inline-block bg-purple-500/10 border border-purple-500/20 text-purple-400 px-3 py-1 rounded-full text-xs font-medium mb-4">
               {amountDisplay} per claim
+            </div>
+          )}
+
+          {/* Requirements */}
+          {requirements && (
+            <div className="bg-zinc-800/50 rounded-xl p-4 mb-4 text-left text-sm">
+              <div className="text-zinc-400 text-xs uppercase tracking-wider mb-2 text-center font-medium">
+                Requirements
+              </div>
+              {requirements.token !==
+                "0x0000000000000000000000000000000000000000" &&
+                requirements.tokenAmount > BigInt(0) && (
+                  <div className="flex items-center justify-between py-1">
+                    <span className="text-zinc-300">
+                      Hold {requirements.tokenAmount.toString()}{" "}
+                      {requirements.tokenName}
+                    </span>
+                    {eligibility && (
+                      <span
+                        className={
+                          eligibility.tokenOk
+                            ? "text-green-400"
+                            : "text-red-400"
+                        }
+                      >
+                        {eligibility.tokenOk ? "\u2713" : "\u2717"}
+                      </span>
+                    )}
+                  </div>
+                )}
+              {requirements.followers > BigInt(0) && (
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-zinc-300">
+                    {requirements.followers.toString()}+ followers
+                  </span>
+                  {eligibility && (
+                    <span
+                      className={
+                        eligibility.followersOk
+                          ? "text-green-400"
+                          : "text-red-400"
+                      }
+                    >
+                      {eligibility.followersOk ? "\u2713" : "\u2717"}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -253,15 +367,22 @@ export default function ClaimPage() {
               disabled
               className="w-full py-4 rounded-2xl text-lg font-semibold bg-purple-400/50 text-white cursor-not-allowed"
             >
-              Already Claimed ✓
+              Already Claimed \u2713
             </button>
           ) : (
             <button
               onClick={claim}
-              disabled={!isActive || claiming}
+              disabled={!canClaim}
               className="w-full py-4 rounded-2xl text-lg font-semibold bg-purple-400 text-white hover:bg-purple-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer hover:-translate-y-0.5"
             >
-              {claiming ? "Claiming..." : isLSP7 ? "Claim Tokens" : "Claim NFT"}
+              {claiming
+                ? "Claiming..."
+                : !eligibility ||
+                  (eligibility.tokenOk && eligibility.followersOk)
+                ? isLSP7
+                  ? "Claim Tokens"
+                  : "Claim NFT"
+                : "Requirements not met"}
             </button>
           )}
 

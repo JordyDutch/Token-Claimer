@@ -4,36 +4,47 @@ pragma solidity ^0.8.17;
 import {LSP7DigitalAsset} from "@lukso/lsp7-contracts/contracts/LSP7DigitalAsset.sol";
 import {_LSP4_TOKEN_TYPE_TOKEN} from "@lukso/lsp4-contracts/contracts/LSP4Constants.sol";
 
+interface ILSP7Balance {
+    function balanceOf(address account) external view returns (uint256);
+}
+
+interface ILSP26Followers {
+    function followerCount(address addr) external view returns (uint256);
+}
+
 /**
  * @title LSP7ClaimableToken
- * @notice A claimable fungible token drop for LUKSO.
- *         Each Universal Profile can claim a fixed amount once.
- *
- * Features:
- * - On/off toggle (owner only)
- * - Optional time window (startTime / endTime)
- * - One claim per Universal Profile
- * - Configurable amount per claim (e.g. 100, 1_000_000)
- * - Optional max total supply
+ * @notice Claimable fungible token drop for LUKSO with optional requirements:
+ *         - Hold X amount of an LSP7/LSP8 token
+ *         - Have X followers (LSP26)
  */
 contract LSP7ClaimableToken is LSP7DigitalAsset {
     bool public claimEnabled;
     uint256 public startTime;
     uint256 public endTime;
     uint256 public amountPerClaim;
-    uint256 public maxSupply; // 0 = unlimited
+    uint256 public maxSupply;
     uint256 public totalClaimedAmount;
+
+    address public requiredToken;
+    uint256 public requiredTokenAmount;
+    uint256 public requiredFollowers;
+
+    address public constant LSP26_REGISTRY = 0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA;
 
     mapping(address => bool) public hasClaimed;
 
     event ClaimToggled(bool enabled);
     event ClaimWindowSet(uint256 startTime, uint256 endTime);
     event TokensClaimed(address indexed claimer, uint256 amount);
+    event RequirementsUpdated(address token, uint256 amount, uint256 followers);
 
     error ClaimNotActive();
     error AlreadyClaimed();
     error OutsideClaimWindow();
     error MaxSupplyReached();
+    error InsufficientTokenBalance();
+    error InsufficientFollowers();
 
     constructor(
         string memory name_,
@@ -73,6 +84,17 @@ contract LSP7ClaimableToken is LSP7DigitalAsset {
         amountPerClaim = amount_;
     }
 
+    function setRequirements(
+        address token_,
+        uint256 tokenAmount_,
+        uint256 followers_
+    ) external onlyOwner {
+        requiredToken = token_;
+        requiredTokenAmount = tokenAmount_;
+        requiredFollowers = followers_;
+        emit RequirementsUpdated(token_, tokenAmount_, followers_);
+    }
+
     // --- Claim ---
 
     function claim() external {
@@ -81,6 +103,16 @@ contract LSP7ClaimableToken is LSP7DigitalAsset {
         if (startTime > 0 && block.timestamp < startTime) revert OutsideClaimWindow();
         if (endTime > 0 && block.timestamp > endTime) revert OutsideClaimWindow();
         if (maxSupply > 0 && totalClaimedAmount + amountPerClaim > maxSupply) revert MaxSupplyReached();
+
+        if (requiredToken != address(0) && requiredTokenAmount > 0) {
+            uint256 bal = ILSP7Balance(requiredToken).balanceOf(msg.sender);
+            if (bal < requiredTokenAmount) revert InsufficientTokenBalance();
+        }
+
+        if (requiredFollowers > 0) {
+            uint256 followers = ILSP26Followers(LSP26_REGISTRY).followerCount(msg.sender);
+            if (followers < requiredFollowers) revert InsufficientFollowers();
+        }
 
         hasClaimed[msg.sender] = true;
         totalClaimedAmount += amountPerClaim;
@@ -103,5 +135,17 @@ contract LSP7ClaimableToken is LSP7DigitalAsset {
     function totalClaimers() external view returns (uint256) {
         if (amountPerClaim == 0) return 0;
         return totalClaimedAmount / amountPerClaim;
+    }
+
+    function meetsRequirements(address addr) external view returns (bool tokenOk, bool followersOk) {
+        tokenOk = true;
+        followersOk = true;
+
+        if (requiredToken != address(0) && requiredTokenAmount > 0) {
+            tokenOk = ILSP7Balance(requiredToken).balanceOf(addr) >= requiredTokenAmount;
+        }
+        if (requiredFollowers > 0) {
+            followersOk = ILSP26Followers(LSP26_REGISTRY).followerCount(addr) >= requiredFollowers;
+        }
     }
 }
