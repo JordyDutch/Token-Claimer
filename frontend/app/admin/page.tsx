@@ -1,12 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { BrowserProvider, Contract, JsonRpcProvider } from "ethers";
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "";
 const TOKEN_TYPE = process.env.NEXT_PUBLIC_TOKEN_TYPE || "LSP8";
 const LUKSO_RPC = "https://rpc.mainnet.lukso.network";
 const LUKSO_CHAIN_ID = "0x2a";
+
+function getProvider() {
+  if (typeof window === "undefined") return null;
+  return (window as any).lukso || (window as any).ethereum || null;
+}
 
 const ADMIN_ABI = [
   "function owner() view returns (address)",
@@ -24,9 +29,7 @@ const ADMIN_ABI = [
   "function setClaimWindow(uint256,uint256)",
   "function setAmountPerClaim(uint256)",
   "function setRequirements(address,uint256,uint256)",
-  // LSP8
   "function totalClaimed() view returns (uint256)",
-  // LSP7
   "function totalClaimedAmount() view returns (uint256)",
   "function totalClaimers() view returns (uint256)",
 ];
@@ -38,7 +41,6 @@ export default function AdminPage() {
   const [isOwner, setIsOwner] = useState(false);
   const [status, setStatus] = useState<Status>(null);
 
-  // Contract state
   const [dropName, setDropName] = useState("");
   const [claimEnabled, setClaimEnabled] = useState(false);
   const [startTime, setStartTime] = useState("");
@@ -47,7 +49,6 @@ export default function AdminPage() {
   const [totalClaimed, setTotalClaimed] = useState("0");
   const [maxSupply, setMaxSupply] = useState("0");
 
-  // Requirements
   const [reqToken, setReqToken] = useState("");
   const [reqTokenAmount, setReqTokenAmount] = useState("");
   const [reqFollowers, setReqFollowers] = useState("");
@@ -55,21 +56,18 @@ export default function AdminPage() {
   const isLSP7 = TOKEN_TYPE === "LSP7";
 
   async function connect() {
-    const ethereum = (window as any).ethereum;
-    if (!ethereum) {
+    const p = getProvider();
+    if (!p) {
       setStatus({ message: "Install UP Browser Extension", type: "error" });
       return;
     }
     try {
       setStatus({ message: "Connecting...", type: "loading" });
       try {
-        await ethereum.request({
-          method: "wallet_switchEthereumChain",
-          params: [{ chainId: LUKSO_CHAIN_ID }],
-        });
+        await p.request({ method: "wallet_switchEthereumChain", params: [{ chainId: LUKSO_CHAIN_ID }] });
       } catch (e: any) {
         if (e.code === 4902) {
-          await ethereum.request({
+          await p.request({
             method: "wallet_addEthereumChain",
             params: [{
               chainId: LUKSO_CHAIN_ID,
@@ -81,7 +79,7 @@ export default function AdminPage() {
           });
         }
       }
-      const accounts = await ethereum.request({ method: "eth_requestAccounts" });
+      const accounts = await p.request({ method: "eth_requestAccounts" });
       setAddress(accounts[0]);
       setStatus(null);
       await loadState(accounts[0]);
@@ -121,15 +119,9 @@ export default function AdminPage() {
       setReqTokenAmount(rAmount > BigInt(0) ? rAmount.toString() : "");
       setReqFollowers(rFollowers > BigInt(0) ? rFollowers.toString() : "");
 
-      // Time display
-      if (start > BigInt(0)) {
-        setStartTime(new Date(Number(start) * 1000).toISOString().slice(0, 16));
-      }
-      if (end > BigInt(0)) {
-        setEndTime(new Date(Number(end) * 1000).toISOString().slice(0, 16));
-      }
+      if (start > BigInt(0)) setStartTime(new Date(Number(start) * 1000).toISOString().slice(0, 16));
+      if (end > BigInt(0)) setEndTime(new Date(Number(end) * 1000).toISOString().slice(0, 16));
 
-      // Stats
       try {
         if (isLSP7) {
           const claimers = await contract.totalClaimers();
@@ -138,20 +130,18 @@ export default function AdminPage() {
           const claimed = await contract.totalClaimed();
           setTotalClaimed(claimed.toString());
         }
-      } catch {
-        setTotalClaimed("?");
-      }
+      } catch { setTotalClaimed("?"); }
     } catch (e) {
       console.error("Failed to load state:", e);
     }
   }
 
   async function sendTx(fn: (contract: Contract) => Promise<any>, msg: string) {
-    const ethereum = (window as any).ethereum;
-    if (!ethereum || !address) return;
+    const p = getProvider();
+    if (!p || !address) return;
     try {
       setStatus({ message: msg, type: "loading" });
-      const provider = new BrowserProvider(ethereum);
+      const provider = new BrowserProvider(p);
       const signer = await provider.getSigner();
       const contract = new Contract(CONTRACT_ADDRESS, ADMIN_ABI, signer);
       const tx = await fn(contract);
@@ -164,99 +154,74 @@ export default function AdminPage() {
     }
   }
 
-  async function toggleClaim() {
-    await sendTx(
-      (c) => c.setClaimEnabled(!claimEnabled),
-      claimEnabled ? "Disabling claims..." : "Enabling claims..."
-    );
-  }
-
-  async function updateWindow() {
-    const start = startTime ? Math.floor(new Date(startTime).getTime() / 1000) : 0;
-    const end = endTime ? Math.floor(new Date(endTime).getTime() / 1000) : 0;
-    await sendTx((c) => c.setClaimWindow(start, end), "Setting claim window...");
-  }
-
-  async function updateAmount() {
-    await sendTx(
-      (c) => c.setAmountPerClaim(amountPerClaim),
-      "Updating amount per claim..."
-    );
-  }
-
-  async function updateRequirements() {
-    const token = reqToken || "0x0000000000000000000000000000000000000000";
-    const amount = reqTokenAmount || "0";
-    const followers = reqFollowers || "0";
-    await sendTx(
-      (c) => c.setRequirements(token, amount, followers),
-      "Updating requirements..."
-    );
-  }
+  const inputClass =
+    "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-purple-400 transition-colors";
+  const labelClass = "text-[11px] sm:text-xs text-zinc-500";
+  const btnClass =
+    "w-full py-2.5 sm:py-3 rounded-xl text-sm font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition-all cursor-pointer active:scale-[0.97]";
+  const cardClass = "bg-[#12121a] rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-purple-500/10";
 
   if (!CONTRACT_ADDRESS) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="bg-[#12121a] rounded-3xl p-8 text-center border border-purple-500/10 max-w-md">
-          <h1 className="text-2xl font-bold mb-4">Admin Panel</h1>
-          <p className="text-zinc-400">Set NEXT_PUBLIC_CONTRACT_ADDRESS in .env</p>
+      <div className="min-h-dvh flex items-center justify-center p-4">
+        <div className={cardClass + " max-w-md text-center"}>
+          <h1 className="text-xl sm:text-2xl font-bold mb-4">Admin Panel</h1>
+          <p className="text-zinc-400 text-sm">Set NEXT_PUBLIC_CONTRACT_ADDRESS in .env</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="max-w-lg w-full space-y-4">
+    <div className="min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4">
+      <div className="max-w-lg w-full space-y-3 sm:space-y-4">
         {/* Header */}
-        <div className="bg-[#12121a] rounded-3xl p-6 border border-purple-500/10">
-          <h1 className="text-2xl font-bold mb-1">Admin Panel</h1>
-          <p className="text-zinc-500 text-sm">{dropName || CONTRACT_ADDRESS}</p>
+        <div className={cardClass}>
+          <h1 className="text-xl sm:text-2xl font-bold mb-1">Admin Panel</h1>
+          <p className="text-zinc-500 text-xs sm:text-sm truncate">{dropName || CONTRACT_ADDRESS}</p>
 
           {!address ? (
             <button
               onClick={connect}
-              className="mt-4 w-full py-3 rounded-xl text-sm font-semibold border-2 border-purple-400 text-purple-400 hover:bg-purple-400/10 transition-all cursor-pointer"
+              className="mt-4 w-full py-3 rounded-xl text-sm font-semibold border-2 border-purple-400 text-purple-400 hover:bg-purple-400/10 transition-all cursor-pointer active:scale-[0.97]"
             >
               Connect Universal Profile
             </button>
           ) : !isOwner ? (
-            <div className="mt-4 bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm">
+            <div className="mt-4 bg-red-500/10 border border-red-500/20 text-red-400 px-3 py-2.5 rounded-xl text-xs sm:text-sm">
               Connected wallet is not the contract owner
             </div>
           ) : (
-            <p className="text-green-400 text-xs mt-2">
-              ✓ Connected as owner
-            </p>
+            <p className="text-green-400 text-xs mt-2">\u2713 Connected as owner</p>
           )}
         </div>
 
         {address && isOwner && (
           <>
-            {/* Stats */}
-            <div className="bg-[#12121a] rounded-3xl p-6 border border-purple-500/10">
-              <div className="flex justify-between items-center">
-                <div>
-                  <div className="text-xs text-zinc-500 uppercase tracking-wider">Status</div>
-                  <div className={`text-lg font-semibold ${claimEnabled ? "text-green-400" : "text-red-400"}`}>
+            {/* Stats + Toggle */}
+            <div className={cardClass}>
+              <div className="flex flex-wrap justify-between items-center gap-3">
+                <div className="min-w-[60px]">
+                  <div className={labelClass + " uppercase tracking-wider"}>Status</div>
+                  <div className={`text-base sm:text-lg font-semibold ${claimEnabled ? "text-green-400" : "text-red-400"}`}>
                     {claimEnabled ? "Live" : "Paused"}
                   </div>
                 </div>
-                <div>
-                  <div className="text-xs text-zinc-500 uppercase tracking-wider">Claimed</div>
-                  <div className="text-lg font-semibold text-purple-400">{totalClaimed}</div>
+                <div className="min-w-[60px]">
+                  <div className={labelClass + " uppercase tracking-wider"}>Claimed</div>
+                  <div className="text-base sm:text-lg font-semibold text-purple-400">{totalClaimed}</div>
                 </div>
-                <div>
-                  <div className="text-xs text-zinc-500 uppercase tracking-wider">Supply</div>
-                  <div className="text-lg font-semibold text-purple-400">
+                <div className="min-w-[60px]">
+                  <div className={labelClass + " uppercase tracking-wider"}>Supply</div>
+                  <div className="text-base sm:text-lg font-semibold text-purple-400">
                     {maxSupply === "0" ? "\u221e" : maxSupply}
                   </div>
                 </div>
               </div>
 
               <button
-                onClick={toggleClaim}
-                className={`mt-4 w-full py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+                onClick={() => sendTx((c) => c.setClaimEnabled(!claimEnabled), claimEnabled ? "Disabling..." : "Enabling...")}
+                className={`mt-4 w-full py-2.5 sm:py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer active:scale-[0.97] ${
                   claimEnabled
                     ? "bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
                     : "bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30"
@@ -267,93 +232,90 @@ export default function AdminPage() {
             </div>
 
             {/* Time Window */}
-            <div className="bg-[#12121a] rounded-3xl p-6 border border-purple-500/10">
-              <h2 className="text-sm font-semibold text-zinc-300 mb-3">Claim Window</h2>
+            <div className={cardClass}>
+              <h2 className="text-xs sm:text-sm font-semibold text-zinc-300 mb-3">Claim Window</h2>
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-zinc-500">Start (leave empty = immediate)</label>
-                  <input
-                    type="datetime-local"
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                    className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-purple-400"
-                  />
+                  <label className={labelClass}>Start (leave empty = immediate)</label>
+                  <input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} className={inputClass + " mt-1"} />
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-500">End (leave empty = no end)</label>
-                  <input
-                    type="datetime-local"
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                    className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-purple-400"
-                  />
+                  <label className={labelClass}>End (leave empty = no end)</label>
+                  <input type="datetime-local" value={endTime} onChange={(e) => setEndTime(e.target.value)} className={inputClass + " mt-1"} />
                 </div>
                 <button
-                  onClick={updateWindow}
-                  className="w-full py-2 rounded-xl text-sm font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition-all cursor-pointer"
+                  onClick={() => {
+                    const s = startTime ? Math.floor(new Date(startTime).getTime() / 1000) : 0;
+                    const e = endTime ? Math.floor(new Date(endTime).getTime() / 1000) : 0;
+                    sendTx((c) => c.setClaimWindow(s, e), "Setting window...");
+                  }}
+                  className={btnClass}
                 >
                   Set Window
                 </button>
               </div>
             </div>
 
-            {/* Amount Per Claim */}
-            <div className="bg-[#12121a] rounded-3xl p-6 border border-purple-500/10">
-              <h2 className="text-sm font-semibold text-zinc-300 mb-3">
+            {/* Amount */}
+            <div className={cardClass}>
+              <h2 className="text-xs sm:text-sm font-semibold text-zinc-300 mb-3">
                 {isLSP7 ? "Tokens" : "NFTs"} Per Claim
               </h2>
               <input
                 type="number"
                 value={amountPerClaim}
                 onChange={(e) => setAmountPerClaim(e.target.value)}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-purple-400"
+                className={inputClass}
                 min="1"
               />
               <button
-                onClick={updateAmount}
-                className="mt-3 w-full py-2 rounded-xl text-sm font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition-all cursor-pointer"
+                onClick={() => sendTx((c) => c.setAmountPerClaim(amountPerClaim), "Updating...")}
+                className={btnClass + " mt-3"}
               >
                 Update Amount
               </button>
             </div>
 
             {/* Requirements */}
-            <div className="bg-[#12121a] rounded-3xl p-6 border border-purple-500/10">
-              <h2 className="text-sm font-semibold text-zinc-300 mb-3">Requirements (optional)</h2>
+            <div className={cardClass}>
+              <h2 className="text-xs sm:text-sm font-semibold text-zinc-300 mb-3">Requirements (optional)</h2>
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-zinc-500">Required token (LSP7/LSP8 address)</label>
+                  <label className={labelClass}>Required token (LSP7/LSP8 address)</label>
                   <input
                     type="text"
                     value={reqToken}
                     onChange={(e) => setReqToken(e.target.value)}
                     placeholder="0x..."
-                    className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-purple-400 font-mono"
+                    className={inputClass + " mt-1 font-mono text-xs"}
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-500">Min token balance</label>
+                  <label className={labelClass}>Min token balance</label>
                   <input
                     type="number"
                     value={reqTokenAmount}
                     onChange={(e) => setReqTokenAmount(e.target.value)}
                     placeholder="0"
-                    className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-purple-400"
+                    className={inputClass + " mt-1"}
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-500">Min followers (LSP26)</label>
+                  <label className={labelClass}>Min followers (LSP26)</label>
                   <input
                     type="number"
                     value={reqFollowers}
                     onChange={(e) => setReqFollowers(e.target.value)}
                     placeholder="0"
-                    className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-purple-400"
+                    className={inputClass + " mt-1"}
                   />
                 </div>
                 <button
-                  onClick={updateRequirements}
-                  className="w-full py-2 rounded-xl text-sm font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition-all cursor-pointer"
+                  onClick={() => {
+                    const token = reqToken || "0x0000000000000000000000000000000000000000";
+                    sendTx((c) => c.setRequirements(token, reqTokenAmount || "0", reqFollowers || "0"), "Updating requirements...");
+                  }}
+                  className={btnClass}
                 >
                   Update Requirements
                 </button>
@@ -364,24 +326,26 @@ export default function AdminPage() {
 
         {/* Status toast */}
         {status && (
-          <div
-            className={`px-4 py-3 rounded-xl text-sm ${
-              status.type === "success"
-                ? "bg-green-500/10 border border-green-500/20 text-green-400"
-                : status.type === "error"
-                ? "bg-red-500/10 border border-red-500/20 text-red-400"
-                : "bg-purple-500/10 border border-purple-500/20 text-purple-400"
-            }`}
-          >
+          <div className={`px-3 py-2.5 sm:px-4 sm:py-3 rounded-xl text-xs sm:text-sm ${
+            status.type === "success"
+              ? "bg-green-500/10 border border-green-500/20 text-green-400"
+              : status.type === "error"
+              ? "bg-red-500/10 border border-red-500/20 text-red-400"
+              : "bg-purple-500/10 border border-purple-500/20 text-purple-400"
+          }`}>
             {status.message}
           </div>
         )}
 
-        <p className="text-center text-zinc-600 text-xs pb-4">
-          <a href="/" className="text-purple-400 hover:underline">
-            ← Back to claim page
+        <div className="flex justify-between items-center px-2 pb-4">
+          <a href="/" className="text-zinc-600 text-[10px] sm:text-xs hover:text-purple-400 transition-colors">
+            ← Claim page
           </a>
-        </p>
+          <p className="text-zinc-600 text-[10px] sm:text-xs">
+            Powered by{" "}
+            <a href="https://lukso.network" target="_blank" className="text-purple-400 hover:underline">LUKSO</a>
+          </p>
+        </div>
       </div>
     </div>
   );
