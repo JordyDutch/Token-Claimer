@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { BrowserProvider, Contract, JsonRpcProvider } from "ethers";
+import { fetchProfile, ProfileInfo } from "../lib/profile";
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "";
 const TOKEN_TYPE = process.env.NEXT_PUBLIC_TOKEN_TYPE || "LSP8";
@@ -52,6 +53,7 @@ export default function AdminPage() {
   const [reqToken, setReqToken] = useState("");
   const [reqTokenAmount, setReqTokenAmount] = useState("");
   const [reqFollowers, setReqFollowers] = useState("");
+  const [profile, setProfile] = useState<ProfileInfo | null>(null);
 
   const isLSP7 = TOKEN_TYPE === "LSP7";
 
@@ -83,6 +85,7 @@ export default function AdminPage() {
       setAddress(accounts[0]);
       setStatus(null);
       await loadState(accounts[0]);
+      fetchProfile(accounts[0]).then(setProfile);
     } catch (e: any) {
       setStatus({ message: e.message || "Failed to connect", type: "error" });
     }
@@ -192,7 +195,14 @@ export default function AdminPage() {
               Connected wallet is not the contract owner
             </div>
           ) : (
-            <p className="text-green-400 text-xs mt-2">\u2713 Connected as owner</p>
+            <div className="flex items-center gap-2 mt-2">
+              {profile?.image && (
+                <img src={profile.image} alt="" className="w-5 h-5 rounded-full object-cover" />
+              )}
+              <span className="text-green-400 text-xs">
+                \u2713 {profile?.name || `${address.slice(0, 6)}...${address.slice(-4)}`}
+              </span>
+            </div>
           )}
         </div>
 

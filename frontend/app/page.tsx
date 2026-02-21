@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { BrowserProvider, Contract, JsonRpcProvider, formatUnits } from "ethers";
+import { fetchProfile, ProfileInfo } from "./lib/profile";
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "";
 const TOKEN_TYPE = process.env.NEXT_PUBLIC_TOKEN_TYPE || "LSP8";
@@ -67,6 +68,7 @@ export default function ClaimPage() {
   const [claiming, setClaiming] = useState(false);
   const [requirements, setRequirements] = useState<Requirements | null>(null);
   const [eligibility, setEligibility] = useState<UserEligibility | null>(null);
+  const [profile, setProfile] = useState<ProfileInfo | null>(null);
 
   const abi = TOKEN_TYPE === "LSP7" ? LSP7_ABI : LSP8_ABI;
   const isLSP7 = TOKEN_TYPE === "LSP7";
@@ -182,6 +184,7 @@ export default function ClaimPage() {
       setAddress(accounts[0]);
       setStatus(null);
       await loadState(accounts[0]);
+      fetchProfile(accounts[0]).then(setProfile);
     } catch (e: any) {
       setStatus({ message: e.message || "Failed to connect", type: "error" });
     }
@@ -228,11 +231,28 @@ export default function ClaimPage() {
           </div>
 
           <h1 className="text-xl sm:text-2xl font-bold mb-1">{dropName}</h1>
-          <p className="text-zinc-500 mb-2 text-xs sm:text-sm">
-            {address
-              ? `${address.slice(0, 6)}...${address.slice(-4)}`
-              : "Connect your Universal Profile to claim"}
-          </p>
+
+          {/* Connected profile */}
+          {address && profile ? (
+            <div className="flex items-center justify-center gap-2 mb-2">
+              {profile.image && (
+                <img
+                  src={profile.image}
+                  alt=""
+                  className="w-6 h-6 rounded-full object-cover"
+                />
+              )}
+              <span className="text-zinc-300 text-xs sm:text-sm font-medium">
+                {profile.name || `${address.slice(0, 6)}...${address.slice(-4)}`}
+              </span>
+            </div>
+          ) : (
+            <p className="text-zinc-500 mb-2 text-xs sm:text-sm">
+              {address
+                ? `${address.slice(0, 6)}...${address.slice(-4)}`
+                : "Connect your Universal Profile to claim"}
+            </p>
+          )}
 
           {/* Amount badge */}
           {amountDisplay && (
