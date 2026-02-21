@@ -13,24 +13,23 @@ import {_LSP4_TOKEN_TYPE_NFT} from "@lukso/lsp4-contracts/contracts/LSP4Constant
  * - On/off toggle (owner only)
  * - Optional time window (startTime / endTime)
  * - One claim per Universal Profile
- * - Gasless via LSP25 relay (frontend handles this)
+ * - Configurable NFTs per claim (e.g. 1, 10, 50)
+ * - Optional max total supply
  */
 contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
-    // --- State ---
     bool public claimEnabled;
     uint256 public startTime;
-    uint256 public endTime; // 0 = no end time
+    uint256 public endTime;
     uint256 private _nextTokenId;
     uint256 public maxSupply; // 0 = unlimited
+    uint256 public amountPerClaim; // number of NFTs per claim
 
     mapping(address => bool) public hasClaimed;
 
-    // --- Events ---
     event ClaimToggled(bool enabled);
     event ClaimWindowSet(uint256 startTime, uint256 endTime);
-    event NFTClaimed(address indexed claimer, bytes32 tokenId);
+    event NFTsClaimed(address indexed claimer, uint256 firstTokenId, uint256 amount);
 
-    // --- Errors ---
     error ClaimNotActive();
     error AlreadyClaimed();
     error OutsideClaimWindow();
@@ -40,7 +39,8 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
         string memory name_,
         string memory symbol_,
         address owner_,
-        uint256 maxSupply_
+        uint256 maxSupply_,
+        uint256 amountPerClaim_
     )
         LSP8IdentifiableDigitalAsset(
             name_,
@@ -51,6 +51,7 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
         )
     {
         maxSupply = maxSupply_;
+        amountPerClaim = amountPerClaim_ == 0 ? 1 : amountPerClaim_;
         _nextTokenId = 1;
     }
 
@@ -68,25 +69,30 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
         emit ClaimWindowSet(start_, end_);
     }
 
+    function setAmountPerClaim(uint256 amount_) external onlyOwner {
+        require(amount_ > 0, "Must be > 0");
+        amountPerClaim = amount_;
+    }
+
     // --- Claim ---
 
     function claim() external {
         if (!claimEnabled) revert ClaimNotActive();
         if (hasClaimed[msg.sender]) revert AlreadyClaimed();
-
         if (startTime > 0 && block.timestamp < startTime) revert OutsideClaimWindow();
         if (endTime > 0 && block.timestamp > endTime) revert OutsideClaimWindow();
-
-        if (maxSupply > 0 && _nextTokenId > maxSupply) revert MaxSupplyReached();
+        if (maxSupply > 0 && _nextTokenId + amountPerClaim - 1 > maxSupply) revert MaxSupplyReached();
 
         hasClaimed[msg.sender] = true;
-        bytes32 tokenId = bytes32(_nextTokenId);
-        _nextTokenId++;
+        uint256 firstId = _nextTokenId;
 
-        // force=false: only mint to UPs with LSP1 (safe default for LUKSO)
-        _mint(msg.sender, tokenId, false, "");
+        for (uint256 i = 0; i < amountPerClaim; i++) {
+            bytes32 tokenId = bytes32(_nextTokenId);
+            _nextTokenId++;
+            _mint(msg.sender, tokenId, false, "");
+        }
 
-        emit NFTClaimed(msg.sender, tokenId);
+        emit NFTsClaimed(msg.sender, firstId, amountPerClaim);
     }
 
     // --- Views ---
@@ -99,7 +105,7 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
         if (!claimEnabled) return false;
         if (startTime > 0 && block.timestamp < startTime) return false;
         if (endTime > 0 && block.timestamp > endTime) return false;
-        if (maxSupply > 0 && _nextTokenId > maxSupply) return false;
+        if (maxSupply > 0 && _nextTokenId + amountPerClaim - 1 > maxSupply) return false;
         return true;
     }
 

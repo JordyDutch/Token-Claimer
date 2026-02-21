@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@lukso/lsp4-contracts": "^0.16.7",
+    "@lukso/lsp7-contracts": "^0.16.8",
     "@lukso/lsp8-contracts": "^0.16.7"
   }
 }
