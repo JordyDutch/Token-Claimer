@@ -163,6 +163,33 @@ export async function uploadAndSetLSP4Metadata(
 }
 
 // ---------------------------------------------------------------------------
+// LSP4Creators — set creator on an existing contract (manage page use case)
+// ---------------------------------------------------------------------------
+
+export async function setLSP4Creators(
+  contractAddress: string,
+  creatorAddress: string,
+  signer: Signer,
+  onProgress?: (msg: string) => void
+): Promise<void> {
+  const log = onProgress ?? (() => {});
+  log("Setting LSP4Creators on contract... confirm in wallet");
+  const contract = new Contract(
+    contractAddress,
+    ["function setDataBatch(bytes32[] calldata dataKeys, bytes[] calldata dataValues) external payable"],
+    signer
+  );
+  const creatorLengthVal = "0x00000000000000000000000000000001";
+  const creatorAddrVal = "0x" + creatorAddress.toLowerCase().replace("0x", "");
+  const tx = await contract.setDataBatch(
+    [LSP4_CREATORS_ARRAY_KEY, LSP4_CREATORS_ELEMENT_0_KEY],
+    [creatorLengthVal, creatorAddrVal]
+  );
+  log("Waiting for confirmation...");
+  await tx.wait();
+}
+
+// ---------------------------------------------------------------------------
 // LSP12 — add a newly deployed asset to the creator's UP's IssuedAssets list
 // ---------------------------------------------------------------------------
 

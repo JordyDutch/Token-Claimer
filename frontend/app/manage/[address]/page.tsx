@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { BrowserProvider, Contract, JsonRpcProvider } from "ethers";
-import { uploadAndSetLSP4Metadata, type Lsp4Link } from "../../lib/lsp4";
+import { uploadAndSetLSP4Metadata, setLSP4Creators, addToLSP12IssuedAssets, type Lsp4Link } from "../../lib/lsp4";
 import {
   CLAIM_ABI, LSP7_EXTRA_ABI, LSP8_EXTRA_ABI, LUKSO_RPC, ZERO,
   LSP4_TOKEN_NAME_KEY,
@@ -42,6 +42,7 @@ export default function ManagePage() {
   const [metaIconPreview, setMetaIconPreview] = useState<string | null>(null);
   const [metaLinks, setMetaLinks] = useState<Lsp4Link[]>([{ title: "", url: "" }]);
   const [metaSaving, setMetaSaving] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const metaIconRef = useRef<HTMLInputElement>(null);
 
   const loadState = useCallback(async (userAddr: string) => {
@@ -146,6 +147,35 @@ export default function ManagePage() {
       setStatus({ message: e.reason || e.message?.slice(0, 100) || "Metadata update failed", type: "error" });
     } finally {
       setMetaSaving(false);
+    }
+  }
+
+  async function verifyCreator() {
+    const p = getProvider();
+    if (!p || !address) return;
+    try {
+      setVerifying(true);
+      const provider = new BrowserProvider(p);
+      const signer = await provider.getSigner();
+      // Step 1: set LSP4Creators[] on the contract
+      await setLSP4Creators(
+        contractAddress,
+        address,
+        signer,
+        (msg) => setStatus({ message: msg, type: "loading" })
+      );
+      // Step 2: add to LSP12IssuedAssets[] on the creator's UP
+      await addToLSP12IssuedAssets(
+        address,
+        contractAddress,
+        signer,
+        (msg) => setStatus({ message: msg, type: "loading" })
+      );
+      setStatus({ message: "Creator verified! Badge should appear on marketplaces.", type: "success" });
+    } catch (e: any) {
+      setStatus({ message: e.reason || e.message?.slice(0, 100) || "Verification failed", type: "error" });
+    } finally {
+      setVerifying(false);
     }
   }
 
@@ -482,6 +512,21 @@ export default function ManagePage() {
                   {metaSaving ? "Saving..." : "Save Metadata"}
                 </button>
               </div>
+            </div>
+
+            {/* Verified creator */}
+            <div className={card}>
+              <h2 className="text-sm font-semibold mb-1">Verified Creator</h2>
+              <p className="text-zinc-500 text-xs mb-3">
+                Sets <span className="text-zinc-300">LSP4Creators[]</span> on this contract and adds it to your UP&apos;s <span className="text-zinc-300">LSP12IssuedAssets[]</span>. Removes the &quot;Un-verified creators&quot; badge on marketplaces. Requires 2 wallet confirmations.
+              </p>
+              <button
+                onClick={verifyCreator}
+                disabled={verifying}
+                className={btn + " disabled:opacity-50 disabled:cursor-not-allowed"}
+              >
+                {verifying ? "Verifying..." : "✓ Set as Verified Creator"}
+              </button>
             </div>
           </>
         )}
