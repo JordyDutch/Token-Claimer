@@ -47,6 +47,14 @@ export default function ManagePage() {
   const metaIconRef = useRef<HTMLInputElement>(null);
   const metaAssetRef = useRef<HTMLInputElement>(null);
 
+  // Auto-dismiss success toasts after 3s
+  useEffect(() => {
+    if (status?.type === "success") {
+      const t = setTimeout(() => setStatus(null), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [status]);
+
   function handleMetaAssetFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const newFiles = Array.from(e.target.files ?? []);
     if (newFiles.length === 0) return;
@@ -624,15 +632,15 @@ export default function ManagePage() {
           </>
         )}
 
-        {/* Status toast */}
+        {/* Status toast — fixed overlay, visible regardless of scroll position */}
         {status && (
           <div
-            className={`px-3 py-2.5 rounded-xl text-xs sm:text-sm ${
+            className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-sm px-4 py-3 rounded-xl text-xs sm:text-sm shadow-xl shadow-black/40 transition-all ${
               status.type === "success"
-                ? "bg-green-500/10 border border-green-500/20 text-green-400"
+                ? "bg-green-950 border border-green-500/30 text-green-400"
                 : status.type === "error"
-                ? "bg-red-500/10 border border-red-500/20 text-red-400"
-                : "bg-purple-500/10 border border-purple-500/20 text-purple-400"
+                ? "bg-red-950 border border-red-500/30 text-red-400"
+                : "bg-zinc-900 border border-purple-500/30 text-purple-400"
             }`}
           >
             {status.message}
