@@ -65,7 +65,7 @@ export default function ManagePage() {
       setStatus({ message: "Connecting...", type: "loading" });
       await ensureLuksoNetwork();
       const accounts = await p.request({ method: "eth_requestAccounts" });
-      alert("Connected: " + accounts[0]);
+      alert("Addr length: " + accounts[0].length + " | Hex: " + Array.from(accounts[0]).map((c: string) => c.charCodeAt(0)).join(","));
       setAddress(accounts[0]); setStatus(null);
       await loadState(accounts[0]);
       fetchProfile(accounts[0]).then(setProfile);
