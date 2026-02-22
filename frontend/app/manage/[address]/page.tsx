@@ -13,6 +13,7 @@ import Link from "next/link";
 import CopyButton from "../../components/CopyButton";
 import Footer from "../../components/Footer";
 import { useWallet } from "../../components/WalletProvider";
+import TokenSearchInput from "../../components/TokenSearchInput";
 
 type Status = { message: string; type: "success" | "error" | "loading" } | null;
 
@@ -383,15 +384,11 @@ export default function ManagePage() {
                 Set conditions users must meet before they can claim. Leave empty for no requirements.
               </p>
               <div className="space-y-3">
-                <div>
-                  <label className={lbl}>Required token address (LSP7/LSP8)</label>
-                  <input
-                    value={reqToken}
-                    onChange={(e) => setReqToken(e.target.value)}
-                    placeholder="0x..."
-                    className={inp + " mt-1 font-mono text-xs"}
-                  />
-                </div>
+                <TokenSearchInput
+                  label="Required token (LSP7/LSP8)"
+                  value={reqToken}
+                  onChange={setReqToken}
+                />
                 <div>
                   <label className={lbl}>Minimum token balance</label>
                   <input
