@@ -41,9 +41,22 @@ export default function ManagePage() {
   const [metaIconFile, setMetaIconFile] = useState<File | null>(null);
   const [metaIconPreview, setMetaIconPreview] = useState<string | null>(null);
   const [metaLinks, setMetaLinks] = useState<Lsp4Link[]>([{ title: "", url: "" }]);
+  const [metaAssetFiles, setMetaAssetFiles] = useState<File[]>([]);
   const [metaSaving, setMetaSaving] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const metaIconRef = useRef<HTMLInputElement>(null);
+  const metaAssetRef = useRef<HTMLInputElement>(null);
+
+  function handleMetaAssetFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files) return;
+    setMetaAssetFiles((prev) => [...prev, ...Array.from(files)]);
+    if (metaAssetRef.current) metaAssetRef.current.value = "";
+  }
+
+  function removeMetaAsset(index: number) {
+    setMetaAssetFiles((prev) => prev.filter((_, i) => i !== index));
+  }
 
   const loadState = useCallback(async (userAddr: string) => {
     const rpc = new JsonRpcProvider(LUKSO_RPC);
@@ -139,7 +152,13 @@ export default function ManagePage() {
       await uploadAndSetLSP4Metadata(
         contractAddress,
         signer,
-        { name: dropName, description: metaDescription.trim(), iconFile: metaIconFile, links: validLinks },
+        {
+          name: dropName,
+          description: metaDescription.trim(),
+          iconFile: metaIconFile,
+          links: validLinks,
+          assetFiles: metaAssetFiles.length > 0 ? metaAssetFiles : undefined,
+        },
         (msg) => setStatus({ message: msg, type: "loading" })
       );
       setStatus({ message: "Metadata updated!", type: "success" });
@@ -502,6 +521,52 @@ export default function ManagePage() {
                   >
                     + Add link
                   </button>
+                </div>
+
+                {/* Assets */}
+                <div>
+                  <label className={lbl}>Assets</label>
+                  <span className="text-[10px] text-zinc-600 block mb-1.5">
+                    Attach files to the token (images, documents, media). Uploaded to IPFS.
+                  </span>
+                  {metaAssetFiles.length > 0 && (
+                    <div className="space-y-1.5 mb-2">
+                      {metaAssetFiles.map((file, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center justify-between bg-zinc-800/40 rounded-lg px-3 py-2"
+                        >
+                          <span className="text-xs text-zinc-300 truncate flex-1 mr-2">
+                            {file.name}
+                          </span>
+                          <span className="text-[10px] text-zinc-600 mr-2 flex-shrink-0">
+                            {(file.size / 1024).toFixed(0)} KB
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => removeMetaAsset(i)}
+                            className="text-[10px] text-zinc-600 hover:text-red-400 transition-colors cursor-pointer flex-shrink-0"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => metaAssetRef.current?.click()}
+                    className="text-xs text-purple-400 hover:text-purple-300 border border-purple-500/30 rounded-lg px-3 py-1.5 transition-colors cursor-pointer"
+                  >
+                    + Add asset file
+                  </button>
+                  <input
+                    ref={metaAssetRef}
+                    type="file"
+                    multiple
+                    onChange={handleMetaAssetFiles}
+                    className="hidden"
+                  />
                 </div>
 
                 <button
