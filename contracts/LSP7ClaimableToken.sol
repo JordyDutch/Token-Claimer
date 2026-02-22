@@ -53,6 +53,9 @@ contract LSP7ClaimableToken is LSP7DigitalAsset {
     /// @notice Tracks whether an address has already claimed.
     mapping(address => bool) public hasClaimed;
 
+    /// @notice keccak256 hash of the codeword (0x0 = no codeword required).
+    bytes32 private _codewordHash;
+
     /// @dev Reentrancy guard using the 1/2 pattern.
     uint256 private _guardStatus = 1;
 
@@ -77,6 +80,7 @@ contract LSP7ClaimableToken is LSP7DigitalAsset {
 
     /// @notice Emitted when the owner rescues LYX accidentally sent to this contract.
     event LYXRescued(address indexed to, uint256 amount);
+    event CodewordUpdated(bool hasCodeword);
 
     // ──────────────────── Errors ────────────────────
 
@@ -88,6 +92,7 @@ contract LSP7ClaimableToken is LSP7DigitalAsset {
     error InsufficientFollowers();
     error ReentrancyGuard();
     error RescueFailed();
+    error WrongCodeword();
 
     // ──────────────────── Constructor ────────────────────
 
@@ -172,6 +177,22 @@ contract LSP7ClaimableToken is LSP7DigitalAsset {
         return (_reqTokens, _reqMinBalances);
     }
 
+    /// @notice Sets a codeword required to claim. Stored as a keccak256 hash — the
+    ///         plaintext is never stored on-chain. Pass an empty string to clear.
+    function setCodeword(string calldata word) external onlyOwner {
+        if (bytes(word).length == 0) {
+            _codewordHash = bytes32(0);
+        } else {
+            _codewordHash = keccak256(abi.encodePacked(word));
+        }
+        emit CodewordUpdated(_codewordHash != bytes32(0));
+    }
+
+    /// @notice Whether a codeword is currently required to claim.
+    function codewordEnabled() external view returns (bool) {
+        return _codewordHash != bytes32(0);
+    }
+
     function rescueLYX(address payable to_, uint256 amount_) external onlyOwner {
         (bool ok, ) = to_.call{value: amount_}("");
         if (!ok) revert RescueFailed();
@@ -180,7 +201,17 @@ contract LSP7ClaimableToken is LSP7DigitalAsset {
 
     // ──────────────────── Claim ────────────────────
 
+    /// @notice Claim without a codeword. Reverts if a codeword is currently set.
     function claim() external {
+        _doClaim("");
+    }
+
+    /// @notice Claim with a codeword. Works whether or not a codeword is set.
+    function claimWithCode(string calldata codeword) external {
+        _doClaim(codeword);
+    }
+
+    function _doClaim(string memory codeword) internal {
         if (_guardStatus != 1) revert ReentrancyGuard();
         _guardStatus = 2;
 
@@ -189,6 +220,11 @@ contract LSP7ClaimableToken is LSP7DigitalAsset {
         if (startTime > 0 && block.timestamp < startTime) revert OutsideClaimWindow();
         if (endTime > 0 && block.timestamp > endTime) revert OutsideClaimWindow();
         if (maxSupply > 0 && totalClaimedAmount + amountPerClaim > maxSupply) revert MaxSupplyReached();
+
+        // Codeword check — only if a codeword is set
+        if (_codewordHash != bytes32(0)) {
+            if (keccak256(abi.encodePacked(codeword)) != _codewordHash) revert WrongCodeword();
+        }
 
         (bool tokenOk, bool followersOk) = _checkRequirements(msg.sender);
         if (!tokenOk) revert InsufficientTokenBalance();

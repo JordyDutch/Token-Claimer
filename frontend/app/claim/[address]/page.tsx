@@ -46,6 +46,8 @@ export default function ClaimPage() {
   const [endTime, setEndTime] = useState<number>(0);
   const [pageLoading, setPageLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [codewordRequired, setCodewordRequired] = useState(false);
+  const [codewordInput, setCodewordInput] = useState("");
 
   const loadState = useCallback(async (userAddr?: string) => {
     if (!contractAddress) return;
@@ -68,7 +70,7 @@ export default function ClaimPage() {
           return new TextDecoder().decode(bytes);
         } catch { return ""; }
       };
-      const [nameRaw, symbolRaw, supply, active, enabled, amount, reqResult, rFollowers, ownerAddr, start, end] = await Promise.all([
+      const [nameRaw, symbolRaw, supply, active, enabled, amount, reqResult, rFollowers, ownerAddr, start, end, codeEnabled] = await Promise.all([
         safe(c.getData(LSP4_TOKEN_NAME_KEY), null),
         safe(c.getData(LSP4_TOKEN_SYMBOL_KEY), null),
         safe(c.maxSupply(), BigInt(0)),
@@ -80,7 +82,9 @@ export default function ClaimPage() {
         safe(c.owner(), ZERO),
         safe(c.startTime(), BigInt(0)),
         safe(c.endTime(), BigInt(0)),
+        safe(c.codewordEnabled(), false),
       ]);
+      setCodewordRequired(Boolean(codeEnabled));
       setDropName(decodeBytes(nameRaw) || "Unknown");
       setDropSymbol(decodeBytes(symbolRaw));
 
@@ -180,20 +184,29 @@ export default function ClaimPage() {
   async function claim() {
     const p = getProvider();
     if (!p || !address) return;
+    if (codewordRequired && !codewordInput.trim()) {
+      setStatus({ message: "Enter the codeword to claim", type: "error" });
+      return;
+    }
     try {
       setClaiming(true);
       setStatus({ message: "Confirm in your wallet...", type: "loading" });
       const provider = new BrowserProvider(p);
       const signer = await provider.getSigner();
       const c = new Contract(contractAddress, CLAIM_ABI, signer);
-      const tx = await c.claim();
+      // Use claimWithCode when codeword is required (or always — backward compat)
+      const tx = codewordRequired
+        ? await c.claimWithCode(codewordInput.trim())
+        : await c.claim();
       setStatus({ message: "Waiting for confirmation...", type: "loading" });
       await tx.wait();
       setStatus({ message: tokenType === "LSP7" ? "Tokens claimed successfully!" : "NFT claimed successfully!", type: "success" });
       setAlreadyClaimed(true);
       await loadState(address);
     } catch (e: any) {
-      setStatus({ message: e.reason || e.message?.slice(0, 100) || "Failed", type: "error" });
+      const msg = e.reason || e.message?.slice(0, 100) || "Failed";
+      const friendly = msg.includes("WrongCodeword") ? "Incorrect codeword" : msg;
+      setStatus({ message: friendly, type: "error" });
     } finally {
       setClaiming(false);
     }
@@ -224,7 +237,8 @@ export default function ClaimPage() {
     });
   }
 
-  const canClaim = isActive && !alreadyClaimed && !claiming && (!eligibility || (eligibility.tokenOk && eligibility.followersOk));
+  const codewordOk = !codewordRequired || codewordInput.trim().length > 0;
+  const canClaim = isActive && !alreadyClaimed && !claiming && codewordOk && (!eligibility || (eligibility.tokenOk && eligibility.followersOk));
   const explorerUrl = `https://explorer.execution.mainnet.lukso.network/address/${contractAddress}`;
   const hasTimeWindow = startTime > 0 || endTime > 0;
 
@@ -436,6 +450,24 @@ export default function ClaimPage() {
               Already Claimed ✓
             </button>
           ) : (
+            <>
+              {codewordRequired && (
+                <div className="mb-3">
+                  <label className="text-[10px] text-zinc-500 uppercase tracking-wider block mb-1.5 text-center">
+                    🔑 Codeword required
+                  </label>
+                  <input
+                    type="text"
+                    value={codewordInput}
+                    onChange={(e) => setCodewordInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && canClaim && claim()}
+                    placeholder="Enter codeword..."
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 focus:outline-none focus:border-purple-400 transition-colors text-center tracking-widest placeholder:tracking-normal"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </div>
+              )}
             <button
               onClick={claim}
               disabled={!canClaim}
@@ -447,6 +479,7 @@ export default function ClaimPage() {
                 ? tokenType === "LSP7" ? "Claim Tokens" : "Claim NFT"
                 : "Requirements not met"}
             </button>
+            </>
           )}
 
           {/* Status message */}

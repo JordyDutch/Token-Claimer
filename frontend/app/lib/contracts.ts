@@ -4,9 +4,9 @@ export const LUKSO_CHAIN_ID = "0x2a";
 export const ZERO = "0x0000000000000000000000000000000000000000";
 
 export const LSP7_FACTORY =
-  process.env.NEXT_PUBLIC_LSP7_FACTORY ?? "0xecA5f7179d70E3f3A8583838206dBd319f13BF8B";
+  process.env.NEXT_PUBLIC_LSP7_FACTORY ?? "0x9b132E764f92c6E6F5E91E276E310758C33dB08F";
 export const LSP8_FACTORY =
-  process.env.NEXT_PUBLIC_LSP8_FACTORY ?? "0x3C1958D2C6a5736F87AC4FC08fFEbCAC4312458c";
+  process.env.NEXT_PUBLIC_LSP8_FACTORY ?? "0xBd545E98F133282bD79dc4a6ac422437478A58b6";
 
 // LSP7DropFactory ABI
 export const LSP7_FACTORY_ABI = [
@@ -54,6 +54,9 @@ export const CLAIM_ABI = [
   "function setClaimWindow(uint256,uint256)",
   "function setAmountPerClaim(uint256)",
   "function setRequirements(address[],uint256[],uint256)",
+  "function claimWithCode(string calldata codeword) external",
+  "function setCodeword(string calldata word) external",
+  "function codewordEnabled() view returns (bool)",
 ];
 
 export const LSP7_EXTRA_ABI = [

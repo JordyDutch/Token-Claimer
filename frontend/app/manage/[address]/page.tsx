@@ -44,6 +44,8 @@ export default function ManagePage() {
   const [metaAssetFiles, setMetaAssetFiles] = useState<File[]>([]);
   const [metaSaving, setMetaSaving] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [codewordEnabled, setCodewordEnabled] = useState(false);
+  const [codewordInput, setCodewordInput] = useState("");
   const metaIconRef = useRef<HTMLInputElement>(null);
   const metaAssetRef = useRef<HTMLInputElement>(null);
 
@@ -78,7 +80,7 @@ export default function ManagePage() {
       const owner = await c.owner();
       setIsOwner(owner.toLowerCase() === userAddr.toLowerCase());
       const safe = (p: Promise<any>, fallback: any = null) => p.catch(() => fallback);
-      const [nameRaw, enabled, start, end, amount, supply, reqResult, rF] = await Promise.all([
+      const [nameRaw, enabled, start, end, amount, supply, reqResult, rF, codeEnabled] = await Promise.all([
         safe(c.getData(LSP4_TOKEN_NAME_KEY), null),
         safe(c.claimEnabled(), false),
         safe(c.startTime(), BigInt(0)),
@@ -87,7 +89,9 @@ export default function ManagePage() {
         safe(c.maxSupply(), BigInt(0)),
         safe(c.getTokenRequirements(), { tokens: [], minBalances: [] }),
         safe(c.requiredFollowers(), BigInt(0)),
+        safe(c.codewordEnabled(), false),
       ]);
+      setCodewordEnabled(Boolean(codeEnabled));
       setDropName(nameRaw && nameRaw !== "0x" ? Buffer.from(nameRaw.replace(/^0x/, ""), "hex").toString("utf8") : "");
       setClaimEnabled(enabled);
       setAmountPerClaim(amount ? amount.toString() : "0");
@@ -467,6 +471,55 @@ export default function ManagePage() {
                 </button>
               </div>
             </div>
+            {/* Codeword */}
+            <div className={card}>
+              <h2 className="text-xs font-semibold text-zinc-300 mb-1">Codeword</h2>
+              <p className="text-[10px] text-zinc-600 mb-3">
+                Require claimers to enter a secret word — say it in a livestream. Only the keccak256 hash is stored on-chain, not the plaintext.
+              </p>
+              <div className="flex items-center gap-2 mb-3">
+                <span className={`text-xs font-semibold ${codewordEnabled ? "text-green-400" : "text-zinc-500"}`}>
+                  {codewordEnabled ? "🔑 Codeword active" : "No codeword set"}
+                </span>
+              </div>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={codewordInput}
+                  onChange={(e) => setCodewordInput(e.target.value)}
+                  placeholder="e.g. LUKSOAGENT"
+                  className={inp + " tracking-widest"}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <p className="text-[10px] text-zinc-600">
+                  Use a longer passphrase for better security. Empty = clear codeword.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      if (!codewordInput.trim()) {
+                        setStatus({ message: "Enter a codeword or use Clear to remove it", type: "error" });
+                        return;
+                      }
+                      sendTx((c) => c.setCodeword(codewordInput.trim()), "Setting codeword...");
+                    }}
+                    className={btn + " flex-1"}
+                  >
+                    Set Codeword
+                  </button>
+                  {codewordEnabled && (
+                    <button
+                      onClick={() => sendTx((c) => c.setCodeword(""), "Clearing codeword...")}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-zinc-700 text-zinc-400 hover:border-red-500/30 hover:text-red-400 transition-all cursor-pointer"
+                    >
+                      Clear Codeword
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* LSP4 Metadata */}
             <div className={card}>
               <h2 className="text-xs font-semibold text-zinc-300 mb-1">Metadata (LSP4)</h2>
