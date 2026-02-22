@@ -1,9 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { BrowserProvider, Contract } from "ethers";
-import { LSP7_FACTORY, LSP8_FACTORY, FACTORY_ABI, getProvider, ensureLuksoNetwork } from "../lib/contracts";
+import {
+  LSP7_FACTORY,
+  LSP8_FACTORY,
+  FACTORY_ABI,
+  getProvider,
+  ensureLuksoNetwork,
+} from "../lib/contracts";
 import { fetchProfile, ProfileInfo } from "../lib/profile";
+import { uploadAndSetLSP4Metadata, Lsp4Link } from "../lib/lsp4";
 import Link from "next/link";
 
 type Status = { message: string; type: "success" | "error" | "loading" } | null;
@@ -21,9 +28,32 @@ export default function CreatePage() {
   const [deployedAddress, setDeployedAddress] = useState<string | null>(null);
   const [deploying, setDeploying] = useState(false);
 
+  // LSP4 metadata fields
+  const [description, setDescription] = useState("");
+  const [iconFile, setIconFile] = useState<File | null>(null);
+  const [iconPreview, setIconPreview] = useState<string | null>(null);
+  const [websiteTitle, setWebsiteTitle] = useState("Website");
+  const [websiteUrl, setWebsiteUrl] = useState("");
+  const [showMeta, setShowMeta] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function handleIconChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    setIconFile(file);
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setIconPreview(url);
+    } else {
+      setIconPreview(null);
+    }
+  }
+
   async function connect() {
     const p = getProvider();
-    if (!p) { setStatus({ message: "Install the Universal Profile Browser Extension", type: "error" }); return; }
+    if (!p) {
+      setStatus({ message: "Install the Universal Profile Browser Extension", type: "error" });
+      return;
+    }
     try {
       setStatus({ message: "Connecting...", type: "loading" });
       await ensureLuksoNetwork();
@@ -31,13 +61,16 @@ export default function CreatePage() {
       setAddress(accounts[0]);
       setStatus(null);
       fetchProfile(accounts[0]).then(setProfile);
-    } catch (e: any) { setStatus({ message: e.message || "Connection failed", type: "error" }); }
+    } catch (e: any) {
+      setStatus({ message: e.message || "Connection failed", type: "error" });
+    }
   }
 
   async function deploy() {
     const p = getProvider();
     if (!p || !address || !name || !symbol) {
-      setStatus({ message: "Name and symbol are required", type: "error" }); return;
+      setStatus({ message: "Name and symbol are required", type: "error" });
+      return;
     }
     try {
       setDeploying(true);
@@ -65,14 +98,32 @@ export default function CreatePage() {
         const items = await fr.getCampaigns(t - BigInt(1), 1);
         deployedAddr = items[0].contractAddr;
       }
+
+      // LSP4 metadata — only if the user filled something in
+      const hasMetadata = description.trim() || iconFile || websiteUrl.trim();
+      if (hasMetadata) {
+        const links: Lsp4Link[] = [];
+        if (websiteUrl.trim()) links.push({ title: websiteTitle || "Website", url: websiteUrl.trim() });
+
+        await uploadAndSetLSP4Metadata(deployedAddr, signer, {
+          name,
+          description: description.trim(),
+          iconFile,
+          links,
+        }, (msg) => setStatus({ message: msg, type: "loading" }));
+      }
+
       setDeployedAddress(deployedAddr);
       setStatus({ message: "Drop created!", type: "success" });
     } catch (e: any) {
       setStatus({ message: e.reason || e.message?.slice(0, 120) || "Deploy failed", type: "error" });
-    } finally { setDeploying(false); }
+    } finally {
+      setDeploying(false);
+    }
   }
 
-  const inp = "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-purple-400 transition-colors";
+  const inp =
+    "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-purple-400 transition-colors";
   const lbl = "text-[11px] sm:text-xs text-zinc-500 mb-1 block";
   const card = "bg-[#12121a] rounded-2xl sm:rounded-3xl p-5 sm:p-8 border border-purple-500/10";
 
@@ -82,19 +133,29 @@ export default function CreatePage() {
         <div className={card + " max-w-md w-full text-center"}>
           <div className="text-5xl mb-4">🎉</div>
           <h1 className="text-xl sm:text-2xl font-bold mb-2">Drop Created!</h1>
-          <p className="text-zinc-400 text-sm mb-6">Your {dropType === "nft" ? "NFT" : "token"} drop is live on LUKSO</p>
+          <p className="text-zinc-400 text-sm mb-6">
+            Your {dropType === "nft" ? "NFT" : "token"} drop is live on LUKSO
+          </p>
           <div className="bg-zinc-800/50 rounded-xl p-3 mb-6">
             <p className="text-[10px] text-zinc-500 mb-1">Contract Address</p>
             <p className="text-xs font-mono text-purple-400 break-all">{deployedAddress}</p>
           </div>
           <div className="space-y-3">
-            <Link href={`/manage/${deployedAddress}`} className="block w-full py-3 rounded-xl text-sm font-semibold bg-purple-500 text-white hover:bg-purple-600 transition-all active:scale-[0.97]">
+            <Link
+              href={`/manage/${deployedAddress}`}
+              className="block w-full py-3 rounded-xl text-sm font-semibold bg-purple-500 text-white hover:bg-purple-600 transition-all active:scale-[0.97]"
+            >
               Manage Drop →
             </Link>
-            <Link href={`/claim/${deployedAddress}`} className="block w-full py-3 rounded-xl text-sm font-semibold border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 transition-all active:scale-[0.97]">
+            <Link
+              href={`/claim/${deployedAddress}`}
+              className="block w-full py-3 rounded-xl text-sm font-semibold border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 transition-all active:scale-[0.97]"
+            >
               View Claim Page →
             </Link>
-            <Link href="/" className="block text-zinc-500 text-xs hover:text-purple-400 mt-4">← All drops</Link>
+            <Link href="/" className="block text-zinc-500 text-xs hover:text-purple-400 mt-4">
+              ← All drops
+            </Link>
           </div>
         </div>
       </div>
@@ -105,40 +166,213 @@ export default function CreatePage() {
     <div className="min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4">
       <div className="max-w-md w-full space-y-4">
         <div className={card}>
-          <Link href="/" className="text-zinc-500 text-xs hover:text-purple-400">← Back</Link>
+          <Link href="/" className="text-zinc-500 text-xs hover:text-purple-400">
+            ← Back
+          </Link>
           <h1 className="text-xl sm:text-2xl font-bold mt-2 mb-1">Create a Drop</h1>
-          <p className="text-zinc-500 text-xs sm:text-sm mb-6">Deploy your own token or NFT claim campaign</p>
+          <p className="text-zinc-500 text-xs sm:text-sm mb-6">
+            Deploy your own token or NFT claim campaign
+          </p>
 
           {!address ? (
-            <button onClick={connect} className="w-full py-3.5 rounded-xl text-sm font-semibold border-2 border-purple-400 text-purple-400 hover:bg-purple-400/10 transition-all cursor-pointer active:scale-[0.97]">
+            <button
+              onClick={connect}
+              className="w-full py-3.5 rounded-xl text-sm font-semibold border-2 border-purple-400 text-purple-400 hover:bg-purple-400/10 transition-all cursor-pointer active:scale-[0.97]"
+            >
               Connect Universal Profile
             </button>
           ) : (
             <>
               <div className="flex items-center gap-2 mb-6">
-                {profile?.image && <img src={profile.image} alt="" className="w-5 h-5 rounded-full object-cover" />}
-                <span className="text-zinc-300 text-xs">{profile?.name || `${address.slice(0, 6)}...${address.slice(-4)}`}</span>
-                <button onClick={() => { setAddress(null); setProfile(null); }} className="text-zinc-600 text-[10px] hover:text-zinc-400 ml-1">Disconnect</button>
+                {profile?.image && (
+                  <img src={profile.image} alt="" className="w-5 h-5 rounded-full object-cover" />
+                )}
+                <span className="text-zinc-300 text-xs">
+                  {profile?.name || `${address.slice(0, 6)}...${address.slice(-4)}`}
+                </span>
+                <button
+                  onClick={() => { setAddress(null); setProfile(null); }}
+                  className="text-zinc-600 text-[10px] hover:text-zinc-400 ml-1"
+                >
+                  Disconnect
+                </button>
               </div>
 
+              {/* Drop type */}
               <div className="flex gap-2 mb-4">
-                <button onClick={() => setDropType("nft")} className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${dropType === "nft" ? "bg-purple-500/20 text-purple-400 border border-purple-500/30" : "bg-zinc-800 text-zinc-400 border border-zinc-700"}`}>
+                <button
+                  onClick={() => setDropType("nft")}
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${dropType === "nft" ? "bg-purple-500/20 text-purple-400 border border-purple-500/30" : "bg-zinc-800 text-zinc-400 border border-zinc-700"}`}
+                >
                   🎵 NFT Drop
                 </button>
-                <button onClick={() => setDropType("token")} className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${dropType === "token" ? "bg-purple-500/20 text-purple-400 border border-purple-500/30" : "bg-zinc-800 text-zinc-400 border border-zinc-700"}`}>
+                <button
+                  onClick={() => setDropType("token")}
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${dropType === "token" ? "bg-purple-500/20 text-purple-400 border border-purple-500/30" : "bg-zinc-800 text-zinc-400 border border-zinc-700"}`}
+                >
                   🪙 Token Drop
                 </button>
               </div>
 
+              {/* Core fields */}
               <div className="space-y-3">
-                <div><label className={lbl}>Name *</label><input value={name} onChange={e => setName(e.target.value)} placeholder="My Awesome Drop" className={inp} /></div>
-                <div><label className={lbl}>Symbol *</label><input value={symbol} onChange={e => setSymbol(e.target.value.toUpperCase())} placeholder="DROP" className={inp} maxLength={10} /></div>
-                <div><label className={lbl}>Max Supply (0 = unlimited)</label><input type="number" value={maxSupply} onChange={e => setMaxSupply(e.target.value)} className={inp} min="0" /></div>
-                <div><label className={lbl}>{dropType === "nft" ? "NFTs per claim" : "Tokens per claim"}</label><input type="number" value={amountPerClaim} onChange={e => setAmountPerClaim(e.target.value)} className={inp} min="1" /></div>
+                <div>
+                  <label className={lbl}>Name *</label>
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="My Awesome Drop"
+                    className={inp}
+                  />
+                </div>
+                <div>
+                  <label className={lbl}>Symbol *</label>
+                  <input
+                    value={symbol}
+                    onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                    placeholder="DROP"
+                    className={inp}
+                    maxLength={10}
+                  />
+                </div>
+                <div>
+                  <label className={lbl}>Max Supply (0 = unlimited)</label>
+                  <input
+                    type="number"
+                    value={maxSupply}
+                    onChange={(e) => setMaxSupply(e.target.value)}
+                    className={inp}
+                    min="0"
+                  />
+                </div>
+                <div>
+                  <label className={lbl}>
+                    {dropType === "nft" ? "NFTs per claim" : "Tokens per claim"}
+                  </label>
+                  <input
+                    type="number"
+                    value={amountPerClaim}
+                    onChange={(e) => setAmountPerClaim(e.target.value)}
+                    className={inp}
+                    min="1"
+                  />
+                </div>
                 {dropType === "token" && (
-                  <div><label className={lbl}>Decimals (0 = whole, 18 = standard)</label><input type="number" value={decimals} onChange={e => setDecimals(e.target.value)} className={inp} min="0" max="18" /></div>
+                  <div>
+                    <label className={lbl}>Decimals (0 = whole, 18 = standard)</label>
+                    <input
+                      type="number"
+                      value={decimals}
+                      onChange={(e) => setDecimals(e.target.value)}
+                      className={inp}
+                      min="0"
+                      max="18"
+                    />
+                  </div>
                 )}
-                <button onClick={deploy} disabled={deploying || !name || !symbol} className="w-full py-3.5 rounded-xl text-sm font-semibold bg-purple-500 text-white hover:bg-purple-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.97] mt-2">
+
+                {/* LSP4 Metadata — collapsible */}
+                <div className="border border-zinc-700/50 rounded-xl overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setShowMeta((v) => !v)}
+                    className="w-full flex items-center justify-between px-3 py-2.5 text-xs text-zinc-400 hover:text-zinc-200 bg-zinc-800/40 transition-colors"
+                  >
+                    <span>Metadata (optional — sets LSP4 on-chain)</span>
+                    <span className="text-zinc-600">{showMeta ? "▲" : "▼"}</span>
+                  </button>
+
+                  {showMeta && (
+                    <div className="p-3 space-y-3 border-t border-zinc-700/50">
+                      {/* Icon upload */}
+                      <div>
+                        <label className={lbl}>Icon</label>
+                        <div className="flex items-center gap-3">
+                          {iconPreview ? (
+                            <img
+                              src={iconPreview}
+                              alt="Icon preview"
+                              className="w-10 h-10 rounded-lg object-cover border border-zinc-700"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-600 text-lg">
+                              🖼️
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => fileRef.current?.click()}
+                            className="text-xs text-purple-400 hover:text-purple-300 border border-purple-500/30 rounded-lg px-3 py-1.5 transition-colors"
+                          >
+                            {iconFile ? "Change image" : "Upload image"}
+                          </button>
+                          {iconFile && (
+                            <button
+                              type="button"
+                              onClick={() => { setIconFile(null); setIconPreview(null); if (fileRef.current) fileRef.current.value = ""; }}
+                              className="text-xs text-zinc-500 hover:text-red-400 transition-colors"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          ref={fileRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleIconChange}
+                          className="hidden"
+                        />
+                        {iconFile && (
+                          <p className="text-[10px] text-zinc-600 mt-1">{iconFile.name}</p>
+                        )}
+                      </div>
+
+                      {/* Description */}
+                      <div>
+                        <label className={lbl}>Description</label>
+                        <textarea
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                          placeholder="What is this drop about?"
+                          rows={3}
+                          className={inp + " resize-none"}
+                        />
+                      </div>
+
+                      {/* Website link */}
+                      <div>
+                        <label className={lbl}>Website / Link</label>
+                        <div className="flex gap-2">
+                          <input
+                            value={websiteTitle}
+                            onChange={(e) => setWebsiteTitle(e.target.value)}
+                            placeholder="Label"
+                            className={inp + " w-24 flex-shrink-0"}
+                            maxLength={30}
+                          />
+                          <input
+                            value={websiteUrl}
+                            onChange={(e) => setWebsiteUrl(e.target.value)}
+                            placeholder="https://..."
+                            className={inp + " flex-1"}
+                          />
+                        </div>
+                      </div>
+
+                      <p className="text-[10px] text-zinc-600">
+                        Metadata is uploaded to IPFS and stored on-chain via a second wallet
+                        confirmation after deployment.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={deploy}
+                  disabled={deploying || !name || !symbol}
+                  className="w-full py-3.5 rounded-xl text-sm font-semibold bg-purple-500 text-white hover:bg-purple-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.97] mt-2"
+                >
                   {deploying ? "Deploying..." : `Create ${dropType === "nft" ? "NFT" : "Token"} Drop`}
                 </button>
               </div>
@@ -147,7 +381,15 @@ export default function CreatePage() {
         </div>
 
         {status && (
-          <div className={`px-3 py-2.5 rounded-xl text-xs sm:text-sm ${status.type === "success" ? "bg-green-500/10 border border-green-500/20 text-green-400" : status.type === "error" ? "bg-red-500/10 border border-red-500/20 text-red-400" : "bg-purple-500/10 border border-purple-500/20 text-purple-400"}`}>
+          <div
+            className={`px-3 py-2.5 rounded-xl text-xs sm:text-sm ${
+              status.type === "success"
+                ? "bg-green-500/10 border border-green-500/20 text-green-400"
+                : status.type === "error"
+                ? "bg-red-500/10 border border-red-500/20 text-red-400"
+                : "bg-purple-500/10 border border-purple-500/20 text-purple-400"
+            }`}
+          >
             {status.message}
           </div>
         )}
