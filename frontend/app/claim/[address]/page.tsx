@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { BrowserProvider, Contract, JsonRpcProvider, formatUnits } from "ethers";
 import {
   CLAIM_ABI, LSP7_EXTRA_ABI, LSP8_EXTRA_ABI, LUKSO_RPC, ZERO,
+  LSP4_TOKEN_NAME_KEY, LSP4_TOKEN_SYMBOL_KEY,
   getProvider, detectTokenType,
 } from "../../lib/contracts";
 import { fetchProfile, ProfileInfo } from "../../lib/profile";
@@ -53,9 +54,19 @@ export default function ClaimPage() {
       setTokenType(type);
 
       const safe = (p: Promise<any>, fallback: any = null) => p.catch(() => fallback);
-      const [name, symbol, supply, active, enabled, amount, rToken, rAmount, rFollowers, ownerAddr, start, end] = await Promise.all([
-        safe(c.name(), "Unknown"),
-        safe(c.symbol(), ""),
+      // LSP7/LSP8 v0.16+ store name/symbol in ERC725Y — no name()/symbol() view functions
+      const decodeBytes = (raw: Uint8Array | string | null): string => {
+        if (!raw) return "";
+        try {
+          const bytes = typeof raw === "string"
+            ? Uint8Array.from(Buffer.from(raw.replace(/^0x/, ""), "hex"))
+            : raw;
+          return new TextDecoder().decode(bytes);
+        } catch { return ""; }
+      };
+      const [nameRaw, symbolRaw, supply, active, enabled, amount, rToken, rAmount, rFollowers, ownerAddr, start, end] = await Promise.all([
+        safe(c.getData(LSP4_TOKEN_NAME_KEY), null),
+        safe(c.getData(LSP4_TOKEN_SYMBOL_KEY), null),
         safe(c.maxSupply(), BigInt(0)),
         safe(c.isClaimActive(), false),
         safe(c.claimEnabled(), false),
@@ -67,8 +78,8 @@ export default function ClaimPage() {
         safe(c.startTime(), BigInt(0)),
         safe(c.endTime(), BigInt(0)),
       ]);
-      setDropName(name);
-      setDropSymbol(symbol);
+      setDropName(decodeBytes(nameRaw) || "Unknown");
+      setDropSymbol(decodeBytes(symbolRaw));
       setIsActive(active);
       setClaimEnabled(enabled);
       setOwner(ownerAddr);

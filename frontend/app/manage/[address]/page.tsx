@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { BrowserProvider, Contract, JsonRpcProvider } from "ethers";
 import {
   CLAIM_ABI, LSP7_EXTRA_ABI, LSP8_EXTRA_ABI, LUKSO_RPC, ZERO,
+  LSP4_TOKEN_NAME_KEY,
   getProvider, detectTokenType,
 } from "../../lib/contracts";
 import Link from "next/link";
@@ -44,8 +45,8 @@ export default function ManagePage() {
       const owner = await c.owner();
       setIsOwner(owner.toLowerCase() === userAddr.toLowerCase());
       const safe = (p: Promise<any>, fallback: any = null) => p.catch(() => fallback);
-      const [name, enabled, start, end, amount, supply, rT, rA, rF] = await Promise.all([
-        safe(c.name(), ""),
+      const [nameRaw, enabled, start, end, amount, supply, rT, rA, rF] = await Promise.all([
+        safe(c.getData(LSP4_TOKEN_NAME_KEY), null),
         safe(c.claimEnabled(), false),
         safe(c.startTime(), BigInt(0)),
         safe(c.endTime(), BigInt(0)),
@@ -55,7 +56,7 @@ export default function ManagePage() {
         safe(c.requiredTokenAmount(), BigInt(0)),
         safe(c.requiredFollowers(), BigInt(0)),
       ]);
-      setDropName(name);
+      setDropName(nameRaw && nameRaw !== "0x" ? Buffer.from(nameRaw.replace(/^0x/, ""), "hex").toString("utf8") : "");
       setClaimEnabled(enabled);
       setAmountPerClaim(amount ? amount.toString() : "0");
       setMaxSupply(supply ? supply.toString() : "0");

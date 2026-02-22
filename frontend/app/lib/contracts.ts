@@ -27,6 +27,14 @@ export const LSP8_FACTORY_ABI = [
 // @deprecated — use LSP7_FACTORY_ABI / LSP8_FACTORY_ABI
 export const FACTORY_ABI = [...LSP7_FACTORY_ABI, ...LSP8_FACTORY_ABI];
 
+// LSP4 ERC725Y data keys for token name/symbol
+// LSP8 and LSP7 (v0.16+) do NOT expose name() / symbol() as view functions.
+// Name and symbol are stored in ERC725Y under these keys.
+export const LSP4_TOKEN_NAME_KEY =
+  "0xdeba1e292f8ba88238e10ab3c7f88bd4be4fac56cad5194b6ecceaf653468af1";
+export const LSP4_TOKEN_SYMBOL_KEY =
+  "0x2f0a68ab07768e01943a599e73362a0e17a63a72e94dd2e384d2c1d4db932756";
+
 export const CLAIM_ABI = [
   "function claim() external",
   "function owner() view returns (address)",
@@ -36,8 +44,7 @@ export const CLAIM_ABI = [
   "function maxSupply() view returns (uint256)",
   "function isClaimActive() view returns (bool)",
   "function hasClaimed(address) view returns (bool)",
-  "function name() view returns (string)",
-  "function symbol() view returns (string)",
+  "function getData(bytes32) view returns (bytes)",
   "function amountPerClaim() view returns (uint256)",
   "function requiredToken() view returns (address)",
   "function requiredTokenAmount() view returns (uint256)",
