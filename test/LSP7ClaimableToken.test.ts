@@ -632,7 +632,64 @@ describe("LSP7ClaimableToken", function () {
     });
   });
 
-  // ── 13. batchMeetsRequirements() ────────────────────────────────────────
+  // ── 13. batchHasClaimed() ────────────────────────────────────────────────
+
+  describe("batchHasClaimed()", function () {
+    it("returns empty array for empty input", async function () {
+      const results = await token.batchHasClaimed([]);
+      expect(results).to.deep.equal([]);
+    });
+
+    it("returns [false] for an address that has not claimed", async function () {
+      const addr = await claimer1.getAddress();
+      const results = await token.batchHasClaimed([addr]);
+      expect(results.length).to.equal(1);
+      expect(results[0]).to.be.false;
+    });
+
+    it("returns [true] for an address that has claimed", async function () {
+      await token.setClaimEnabled(true);
+      const addr = await claimer1.getAddress();
+      await claimer1.doClaim(await token.getAddress());
+      const results = await token.batchHasClaimed([addr]);
+      expect(results[0]).to.be.true;
+    });
+
+    it("returns mixed results for a batch of addresses", async function () {
+      await token.setClaimEnabled(true);
+      await claimer1.doClaim(await token.getAddress());
+      // claimer2 has NOT claimed
+
+      const addr1 = await claimer1.getAddress();
+      const addr2 = await claimer2.getAddress();
+      const addr3 = await claimer3.getAddress();
+
+      const results = await token.batchHasClaimed([addr1, addr2, addr3]);
+      expect(results[0]).to.be.true;  // claimed
+      expect(results[1]).to.be.false; // not claimed
+      expect(results[2]).to.be.false; // not claimed
+    });
+
+    it("reflects state change after a second claimer claims", async function () {
+      await token.setClaimEnabled(true);
+      await claimer1.doClaim(await token.getAddress());
+
+      const addr1 = await claimer1.getAddress();
+      const addr2 = await claimer2.getAddress();
+
+      const before = await token.batchHasClaimed([addr1, addr2]);
+      expect(before[0]).to.be.true;
+      expect(before[1]).to.be.false;
+
+      await claimer2.doClaim(await token.getAddress());
+
+      const after = await token.batchHasClaimed([addr1, addr2]);
+      expect(after[0]).to.be.true;
+      expect(after[1]).to.be.true;
+    });
+  });
+
+  // ── 14. batchMeetsRequirements() ────────────────────────────────────────
 
   describe("batchMeetsRequirements()", function () {
     it("returns empty arrays for empty input", async function () {

@@ -269,6 +269,22 @@ contract LSP7ClaimableToken is LSP7DigitalAsset {
         return _checkRequirements(addr);
     }
 
+    /// @notice Batch-checks whether multiple addresses have already claimed.
+    /// @dev Saves front-ends from making N individual `hasClaimed` RPC calls when
+    ///      rendering a list of participants or checking bulk eligibility.
+    /// @param addrs Array of addresses to check.
+    /// @return results Array of booleans — true if the address has claimed.
+    function batchHasClaimed(address[] calldata addrs)
+        external
+        view
+        returns (bool[] memory results)
+    {
+        results = new bool[](addrs.length);
+        for (uint256 i = 0; i < addrs.length; i++) {
+            results[i] = hasClaimed[addrs[i]];
+        }
+    }
+
     /// @notice Batch-checks requirements for multiple addresses in a single call.
     /// @dev Useful for front-ends that want to pre-check a list of potential claimers.
     /// @param addrs Array of addresses to check.

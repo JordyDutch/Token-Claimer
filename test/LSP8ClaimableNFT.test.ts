@@ -633,7 +633,58 @@ describe("LSP8ClaimableNFT", function () {
     });
   });
 
-  // ── 15. batchMeetsRequirements() ─────────────────────────────────────────
+  // ── 15. batchHasClaimed() ─────────────────────────────────────────────────
+
+  describe("batchHasClaimed()", function () {
+    it("returns empty array for empty input", async function () {
+      expect(await nft.batchHasClaimed([])).to.deep.equal([]);
+    });
+
+    it("returns [false] for an address that has not claimed", async function () {
+      const addr = await claimer1.getAddress();
+      const results = await nft.batchHasClaimed([addr]);
+      expect(results[0]).to.be.false;
+    });
+
+    it("returns [true] for an address that has claimed", async function () {
+      await nft.setClaimEnabled(true);
+      const addr = await claimer1.getAddress();
+      await claimer1.doClaim(await nft.getAddress());
+      const results = await nft.batchHasClaimed([addr]);
+      expect(results[0]).to.be.true;
+    });
+
+    it("returns mixed results for a batch of addresses", async function () {
+      await nft.setClaimEnabled(true);
+      await claimer1.doClaim(await nft.getAddress());
+
+      const addr1 = await claimer1.getAddress();
+      const addr2 = await claimer2.getAddress();
+      const addr3 = await claimer3.getAddress();
+
+      const results = await nft.batchHasClaimed([addr1, addr2, addr3]);
+      expect(results[0]).to.be.true;
+      expect(results[1]).to.be.false;
+      expect(results[2]).to.be.false;
+    });
+
+    it("reflects state after multiple claims", async function () {
+      await nft.setClaimEnabled(true);
+      await claimer1.doClaim(await nft.getAddress());
+      await claimer2.doClaim(await nft.getAddress());
+
+      const addr1 = await claimer1.getAddress();
+      const addr2 = await claimer2.getAddress();
+      const addr3 = await claimer3.getAddress();
+
+      const results = await nft.batchHasClaimed([addr1, addr2, addr3]);
+      expect(results[0]).to.be.true;
+      expect(results[1]).to.be.true;
+      expect(results[2]).to.be.false;
+    });
+  });
+
+  // ── 16. batchMeetsRequirements() ─────────────────────────────────────────
 
   describe("batchMeetsRequirements()", function () {
     it("returns empty arrays for empty input", async function () {

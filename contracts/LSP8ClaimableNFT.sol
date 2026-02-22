@@ -228,15 +228,14 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
         if (!tokenOk) revert InsufficientTokenBalance();
         if (!followersOk) revert InsufficientFollowers();
 
-        // --- Effects (state mutations before minting interaction) ---
+        // --- Effects (all state mutations completed before any interaction) ---
         hasClaimed[msg.sender] = true;
         uint256 firstId = _nextTokenId;
+        _nextTokenId += toMint; // advance counter fully before minting (strict CEI)
 
         // --- Interaction (mint NFTs to claimer) ---
         for (uint256 i = 0; i < toMint; i++) {
-            bytes32 tokenId = bytes32(_nextTokenId);
-            _nextTokenId++;
-            _mint(msg.sender, tokenId, false, "");
+            _mint(msg.sender, bytes32(firstId + i), false, "");
         }
 
         emit NFTsClaimed(msg.sender, firstId, toMint);
@@ -281,6 +280,22 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
     /// @return followersOk True if the follower count requirement is met (or not set).
     function meetsRequirements(address addr) external view returns (bool tokenOk, bool followersOk) {
         return _checkRequirements(addr);
+    }
+
+    /// @notice Batch-checks whether multiple addresses have already claimed.
+    /// @dev Saves front-ends from making N individual `hasClaimed` RPC calls when
+    ///      rendering participant lists or eligibility checks in bulk.
+    /// @param addrs Array of addresses to check.
+    /// @return results Array of booleans — true if the address has claimed.
+    function batchHasClaimed(address[] calldata addrs)
+        external
+        view
+        returns (bool[] memory results)
+    {
+        results = new bool[](addrs.length);
+        for (uint256 i = 0; i < addrs.length; i++) {
+            results[i] = hasClaimed[addrs[i]];
+        }
     }
 
     /// @notice Batch-checks requirements for multiple addresses in a single call.
