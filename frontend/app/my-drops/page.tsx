@@ -7,6 +7,30 @@ import {
   LSP7_EXTRA_ABI, LSP8_EXTRA_ABI, LUKSO_RPC,
   detectTokenType,
 } from "../lib/contracts";
+import { LSP4_METADATA_KEY } from "../lib/lsp4";
+
+const IPFS_GATEWAY = "https://api.universalprofile.cloud/ipfs";
+const GET_DATA_ABI = ["function getData(bytes32 key) view returns (bytes memory)"];
+
+async function fetchDropIcon(contractAddr: string, provider: JsonRpcProvider): Promise<string | null> {
+  try {
+    const c = new Contract(contractAddr, GET_DATA_ABI, provider);
+    const raw: string = await c.getData(LSP4_METADATA_KEY);
+    if (!raw || raw === "0x" || raw.length < 10) return null;
+    const urlHex = raw.slice(2 + 8 + 64);
+    if (!urlHex || urlHex.length < 8) return null;
+    const ipfsUrl = Buffer.from(urlHex, "hex").toString("utf8");
+    const cid = ipfsUrl.replace("ipfs://", "");
+    const res = await fetch(`${IPFS_GATEWAY}/${cid}`);
+    if (!res.ok) return null;
+    const json = await res.json();
+    const icon = json?.LSP4Metadata?.icon?.[0]?.url;
+    if (!icon) return null;
+    return `${IPFS_GATEWAY}/${icon.replace("ipfs://", "")}`;
+  } catch {
+    return null;
+  }
+}
 import Link from "next/link";
 import CopyButton from "../components/CopyButton";
 import Footer from "../components/Footer";
@@ -22,6 +46,7 @@ interface MyDrop {
   isActive: boolean;
   totalClaimed: string;
   maxSupply: string;
+  icon?: string | null;
 }
 
 export default function MyDropsPage() {
@@ -131,6 +156,16 @@ export default function MyDropsPage() {
       );
 
       setDrops(withStats);
+
+      // Fetch icons in background
+      withStats.forEach(async (drop) => {
+        const icon = await fetchDropIcon(drop.contractAddr, rpc);
+        if (icon) {
+          setDrops((prev) =>
+            prev.map((d) => d.contractAddr === drop.contractAddr ? { ...d, icon } : d)
+          );
+        }
+      });
     } catch (e) {
       console.error(e);
       setError("Failed to load drops");
@@ -258,8 +293,12 @@ export default function MyDropsPage() {
               <div key={drop.contractAddr} className={card}>
                 <div className="flex items-start gap-4">
                   {/* Icon */}
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-2xl flex-shrink-0">
-                    {drop.isNFT ? "🖼" : "🪙"}
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden">
+                    {drop.icon ? (
+                      <img src={drop.icon} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      drop.isNFT ? "🖼" : "🪙"
+                    )}
                   </div>
 
                   {/* Info */}
