@@ -36,17 +36,20 @@ export default function ManagePage() {
     try {
       const type = await detectTokenType(c);
       setTokenType(type);
-      const [owner, name, enabled, start, end, amount, supply, rT, rA, rF] = await Promise.all([
-        c.owner(), c.name(), c.claimEnabled(), c.startTime(), c.endTime(),
-        c.amountPerClaim(), c.maxSupply(), c.requiredToken(), c.requiredTokenAmount(), c.requiredFollowers(),
+      // Owner check first — must not fail
+      const owner = await c.owner();
+      setIsOwner(owner.toLowerCase() === userAddr.toLowerCase());
+      // Load remaining state with safe fallbacks
+      const safe = (p: Promise<any>, fallback: any = null) => p.catch(() => fallback);
+      const [name, enabled, start, end, amount, supply, rT, rA, rF] = await Promise.all([
+        safe(c.name(), ""), safe(c.claimEnabled(), false), safe(c.startTime(), BigInt(0)), safe(c.endTime(), BigInt(0)),
+        safe(c.amountPerClaim(), BigInt(0)), safe(c.maxSupply(), BigInt(0)),
+        safe(c.requiredToken(), ZERO), safe(c.requiredTokenAmount(), BigInt(0)), safe(c.requiredFollowers(), BigInt(0)),
       ]);
-      const ownerLower = owner.toLowerCase();
-      const userLower = userAddr.toLowerCase();
-      console.log("OWNER CHECK:", ownerLower, "vs", userLower, "match:", ownerLower === userLower);
-      if (ownerLower !== userLower) alert(`Owner: ${ownerLower}\nYou: ${userLower}`);
-      setIsOwner(ownerLower === userLower);
-      setDropName(name); setClaimEnabled(enabled); setAmountPerClaim(amount.toString()); setMaxSupply(supply.toString());
-      setReqToken(rT === ZERO ? "" : rT);
+      setDropName(name); setClaimEnabled(enabled);
+      setAmountPerClaim(amount ? amount.toString() : "0");
+      setMaxSupply(supply ? supply.toString() : "0");
+      setReqToken(!rT || rT === ZERO ? "" : rT);
       setReqTokenAmount(rA > BigInt(0) ? rA.toString() : "");
       setReqFollowers(rF > BigInt(0) ? rF.toString() : "");
       if (start > BigInt(0)) setStartTime(new Date(Number(start) * 1000).toISOString().slice(0, 16));
@@ -65,7 +68,6 @@ export default function ManagePage() {
       setStatus({ message: "Connecting...", type: "loading" });
       await ensureLuksoNetwork();
       const accounts = await p.request({ method: "eth_requestAccounts" });
-      alert("Addr length: " + accounts[0].length + " | Hex: " + Array.from(accounts[0] as string).map((c) => (c as string).charCodeAt(0)).join(","));
       setAddress(accounts[0]); setStatus(null);
       await loadState(accounts[0]);
       fetchProfile(accounts[0]).then(setProfile);
