@@ -9,10 +9,6 @@ interface ILSP7Balance {
     function balanceOf(address account) external view returns (uint256);
 }
 
-interface ILSP8Balance {
-    function balanceOf(address account) external view returns (uint256);
-}
-
 interface ILSP26Followers {
     function followerCount(address addr) external view returns (uint256);
 }
@@ -41,6 +37,8 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
 
     mapping(address => bool) public hasClaimed;
 
+    bool private _claiming; // reentrancy guard
+
     event ClaimToggled(bool enabled);
     event ClaimWindowSet(uint256 startTime, uint256 endTime);
     event NFTsClaimed(address indexed claimer, uint256 firstTokenId, uint256 amount);
@@ -52,6 +50,7 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
     error MaxSupplyReached();
     error InsufficientTokenBalance();
     error InsufficientFollowers();
+    error ReentrancyGuard();
 
     constructor(
         string memory name_,
@@ -107,34 +106,47 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
     // --- Claim ---
 
     function claim() external {
+        if (_claiming) revert ReentrancyGuard();
+        _claiming = true;
+
         if (!claimEnabled) revert ClaimNotActive();
         if (hasClaimed[msg.sender]) revert AlreadyClaimed();
         if (startTime > 0 && block.timestamp < startTime) revert OutsideClaimWindow();
         if (endTime > 0 && block.timestamp > endTime) revert OutsideClaimWindow();
-        if (maxSupply > 0 && _nextTokenId + amountPerClaim - 1 > maxSupply) revert MaxSupplyReached();
 
-        // Token requirement check
+        // Calculate actual mint amount (partial claim at supply boundary)
+        uint256 toMint = amountPerClaim;
+        if (maxSupply > 0) {
+            uint256 remaining = maxSupply >= _nextTokenId ? maxSupply - _nextTokenId + 1 : 0;
+            if (remaining == 0) revert MaxSupplyReached();
+            if (remaining < toMint) toMint = remaining;
+        }
+
+        // Effects BEFORE interactions (CEI pattern)
+        hasClaimed[msg.sender] = true;
+        uint256 firstId = _nextTokenId;
+
+        // Interactions: requirement checks (external calls)
         if (requiredToken != address(0) && requiredTokenAmount > 0) {
             uint256 bal = ILSP7Balance(requiredToken).balanceOf(msg.sender);
             if (bal < requiredTokenAmount) revert InsufficientTokenBalance();
         }
 
-        // Follower requirement check
         if (requiredFollowers > 0) {
             uint256 followers = ILSP26Followers(LSP26_REGISTRY).followerCount(msg.sender);
             if (followers < requiredFollowers) revert InsufficientFollowers();
         }
 
-        hasClaimed[msg.sender] = true;
-        uint256 firstId = _nextTokenId;
-
-        for (uint256 i = 0; i < amountPerClaim; i++) {
+        // Mint NFTs
+        for (uint256 i = 0; i < toMint; i++) {
             bytes32 tokenId = bytes32(_nextTokenId);
             _nextTokenId++;
             _mint(msg.sender, tokenId, false, "");
         }
 
-        emit NFTsClaimed(msg.sender, firstId, amountPerClaim);
+        emit NFTsClaimed(msg.sender, firstId, toMint);
+
+        _claiming = false;
     }
 
     // --- Views ---
@@ -147,7 +159,7 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
         if (!claimEnabled) return false;
         if (startTime > 0 && block.timestamp < startTime) return false;
         if (endTime > 0 && block.timestamp > endTime) return false;
-        if (maxSupply > 0 && _nextTokenId + amountPerClaim - 1 > maxSupply) return false;
+        if (maxSupply > 0 && _nextTokenId > maxSupply) return false;
         return true;
     }
 

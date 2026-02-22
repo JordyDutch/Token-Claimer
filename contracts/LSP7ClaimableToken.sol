@@ -35,6 +35,8 @@ contract LSP7ClaimableToken is LSP7DigitalAsset {
 
     mapping(address => bool) public hasClaimed;
 
+    bool private _claiming; // reentrancy guard
+
     event ClaimToggled(bool enabled);
     event ClaimWindowSet(uint256 startTime, uint256 endTime);
     event TokensClaimed(address indexed claimer, uint256 amount);
@@ -46,6 +48,7 @@ contract LSP7ClaimableToken is LSP7DigitalAsset {
     error MaxSupplyReached();
     error InsufficientTokenBalance();
     error InsufficientFollowers();
+    error ReentrancyGuard();
 
     constructor(
         string memory name_,
@@ -63,6 +66,7 @@ contract LSP7ClaimableToken is LSP7DigitalAsset {
             decimals_ == 0 ? true : false
         )
     {
+        require(amountPerClaim_ > 0, "amountPerClaim must be > 0");
         amountPerClaim = amountPerClaim_;
         maxSupply = maxSupply_;
     }
@@ -82,7 +86,7 @@ contract LSP7ClaimableToken is LSP7DigitalAsset {
     }
 
     function setAmountPerClaim(uint256 amount_) external onlyOwner {
-        require(amount_ > 0, "Must be > 0");
+        require(amount_ > 0 && amount_ <= 1e24, "Out of range");
         amountPerClaim = amount_;
     }
 
@@ -100,12 +104,21 @@ contract LSP7ClaimableToken is LSP7DigitalAsset {
     // --- Claim ---
 
     function claim() external {
+        if (_claiming) revert ReentrancyGuard();
+        _claiming = true;
+
         if (!claimEnabled) revert ClaimNotActive();
         if (hasClaimed[msg.sender]) revert AlreadyClaimed();
         if (startTime > 0 && block.timestamp < startTime) revert OutsideClaimWindow();
         if (endTime > 0 && block.timestamp > endTime) revert OutsideClaimWindow();
         if (maxSupply > 0 && totalClaimedAmount + amountPerClaim > maxSupply) revert MaxSupplyReached();
 
+        // Effects BEFORE interactions (CEI pattern)
+        hasClaimed[msg.sender] = true;
+        totalClaimedAmount += amountPerClaim;
+        claimerCount++;
+
+        // Interactions: external calls
         if (requiredToken != address(0) && requiredTokenAmount > 0) {
             uint256 bal = ILSP7Balance(requiredToken).balanceOf(msg.sender);
             if (bal < requiredTokenAmount) revert InsufficientTokenBalance();
@@ -116,13 +129,11 @@ contract LSP7ClaimableToken is LSP7DigitalAsset {
             if (followers < requiredFollowers) revert InsufficientFollowers();
         }
 
-        hasClaimed[msg.sender] = true;
-        totalClaimedAmount += amountPerClaim;
-        claimerCount++;
-
         _mint(msg.sender, amountPerClaim, false, "");
 
         emit TokensClaimed(msg.sender, amountPerClaim);
+
+        _claiming = false;
     }
 
     // --- Views ---
