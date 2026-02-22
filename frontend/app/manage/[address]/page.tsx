@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { BrowserProvider, Contract, JsonRpcProvider } from "ethers";
+import { uploadAndSetLSP4Metadata, type Lsp4Link } from "../../lib/lsp4";
 import {
   CLAIM_ABI, LSP7_EXTRA_ABI, LSP8_EXTRA_ABI, LUKSO_RPC, ZERO,
   LSP4_TOKEN_NAME_KEY,
@@ -34,6 +35,14 @@ export default function ManagePage() {
   const [reqTokenAmount, setReqTokenAmount] = useState("");
   const [reqFollowers, setReqFollowers] = useState("");
   const [linkCopied, setLinkCopied] = useState(false);
+
+  // LSP4 metadata state
+  const [metaDescription, setMetaDescription] = useState("");
+  const [metaIconFile, setMetaIconFile] = useState<File | null>(null);
+  const [metaIconPreview, setMetaIconPreview] = useState<string | null>(null);
+  const [metaLinks, setMetaLinks] = useState<Lsp4Link[]>([{ title: "", url: "" }]);
+  const [metaSaving, setMetaSaving] = useState(false);
+  const metaIconRef = useRef<HTMLInputElement>(null);
 
   const loadState = useCallback(async (userAddr: string) => {
     const rpc = new JsonRpcProvider(LUKSO_RPC);
@@ -115,6 +124,29 @@ export default function ManagePage() {
     navigator.clipboard.writeText(url);
     setLinkCopied(true);
     setTimeout(() => setLinkCopied(false), 2000);
+  }
+
+  async function updateMetadata() {
+    const p = getProvider();
+    if (!p || !address) return;
+    try {
+      setMetaSaving(true);
+      setStatus({ message: "Uploading to IPFS...", type: "loading" });
+      const provider = new BrowserProvider(p);
+      const signer = await provider.getSigner();
+      const validLinks = metaLinks.filter((l) => l.title.trim() && l.url.trim());
+      await uploadAndSetLSP4Metadata(
+        contractAddress,
+        signer,
+        { name: dropName, description: metaDescription.trim(), iconFile: metaIconFile, links: validLinks },
+        (msg) => setStatus({ message: msg, type: "loading" })
+      );
+      setStatus({ message: "Metadata updated!", type: "success" });
+    } catch (e: any) {
+      setStatus({ message: e.reason || e.message?.slice(0, 100) || "Metadata update failed", type: "error" });
+    } finally {
+      setMetaSaving(false);
+    }
   }
 
   const inp = "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-purple-400 transition-colors";
@@ -341,6 +373,113 @@ export default function ManagePage() {
                   className={btn}
                 >
                   Update Requirements
+                </button>
+              </div>
+            </div>
+            {/* LSP4 Metadata */}
+            <div className={card}>
+              <h2 className="text-xs font-semibold text-zinc-300 mb-1">Metadata (LSP4)</h2>
+              <p className="text-[10px] text-zinc-600 mb-3">
+                Set icon and description shown on the claim page. Uploaded to IPFS — requires Pinata JWT configured server-side.
+              </p>
+              <div className="space-y-3">
+                {/* Icon */}
+                <div>
+                  <label className={lbl}>Icon</label>
+                  <div className="flex items-center gap-3 mt-1">
+                    {metaIconPreview ? (
+                      <img src={metaIconPreview} alt="" className="w-10 h-10 rounded-lg object-cover border border-zinc-700" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-600 text-xs">IMG</div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => metaIconRef.current?.click()}
+                      className="text-xs text-purple-400 hover:text-purple-300 border border-purple-500/30 rounded-lg px-3 py-1.5 transition-colors cursor-pointer"
+                    >
+                      {metaIconFile ? "Change" : "Upload"}
+                    </button>
+                    {metaIconFile && (
+                      <button
+                        type="button"
+                        onClick={() => { setMetaIconFile(null); setMetaIconPreview(null); if (metaIconRef.current) metaIconRef.current.value = ""; }}
+                        className="text-xs text-zinc-500 hover:text-red-400 transition-colors cursor-pointer"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    ref={metaIconRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] ?? null;
+                      setMetaIconFile(file);
+                      if (file) setMetaIconPreview(URL.createObjectURL(file));
+                      else setMetaIconPreview(null);
+                    }}
+                  />
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className={lbl}>Description</label>
+                  <textarea
+                    value={metaDescription}
+                    onChange={(e) => setMetaDescription(e.target.value)}
+                    placeholder="What is this drop about?"
+                    rows={3}
+                    className={inp + " resize-none mt-1"}
+                  />
+                </div>
+
+                {/* Links */}
+                <div>
+                  <label className={lbl}>Links</label>
+                  <div className="space-y-2 mt-1">
+                    {metaLinks.map((link, i) => (
+                      <div key={i} className="bg-zinc-800/40 rounded-lg p-2 space-y-1.5">
+                        <input
+                          value={link.title}
+                          onChange={(e) => setMetaLinks((prev) => prev.map((l, j) => j === i ? { ...l, title: e.target.value } : l))}
+                          placeholder="Label (e.g. Website)"
+                          className={inp}
+                        />
+                        <input
+                          value={link.url}
+                          onChange={(e) => setMetaLinks((prev) => prev.map((l, j) => j === i ? { ...l, url: e.target.value } : l))}
+                          placeholder="https://..."
+                          className={inp}
+                        />
+                        {metaLinks.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setMetaLinks((prev) => prev.filter((_, j) => j !== i))}
+                            className="text-[10px] text-zinc-600 hover:text-red-400 transition-colors cursor-pointer"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMetaLinks((prev) => [...prev, { title: "", url: "" }])}
+                    className="text-xs text-purple-400 hover:text-purple-300 mt-2 cursor-pointer"
+                  >
+                    + Add link
+                  </button>
+                </div>
+
+                <button
+                  onClick={updateMetadata}
+                  disabled={metaSaving || !metaDescription.trim()}
+                  className={btn + " disabled:opacity-50 disabled:cursor-not-allowed"}
+                >
+                  {metaSaving ? "Saving..." : "Save Metadata"}
                 </button>
               </div>
             </div>
