@@ -61,15 +61,8 @@ export default function MyDropsPage() {
     setLoading(true);
     setError(null);
     const rpc = new JsonRpcProvider(networkConfig.rpc);
-    const lsp7 = new Contract(networkConfig.lsp7Factory, LSP7_FACTORY_ABI, rpc);
-    const lsp8 = new Contract(networkConfig.lsp8Factory, LSP8_FACTORY_ABI, rpc);
 
     try {
-      const [total7, total8] = await Promise.all([
-        lsp7.totalTokenCampaigns().catch(() => BigInt(0)),
-        lsp8.totalNFTCampaigns().catch(() => BigInt(0)),
-      ]);
-
       interface RawCampaign {
         contractAddr: string;
         creator: string;
@@ -79,39 +72,64 @@ export default function MyDropsPage() {
         isNFT: boolean;
       }
 
+      const seen = new Set<string>();
       const mine: RawCampaign[] = [];
 
-      if (total7 > BigInt(0)) {
-        const items = await lsp7.getTokenCampaigns(0, total7);
-        for (const c of items) {
-          if (c.creator.toLowerCase() === userAddr.toLowerCase()) {
-            mine.push({
-              contractAddr: c.contractAddr,
-              creator: c.creator,
-              name: c.name,
-              symbol: c.symbol,
-              createdAt: Number(c.createdAt),
-              isNFT: false,
-            });
+      // Query ALL historical LSP7 factories so drops survive redeployments
+      await Promise.all(
+        networkConfig.allLsp7Factories.map(async (factoryAddr) => {
+          try {
+            const lsp7 = new Contract(factoryAddr, LSP7_FACTORY_ABI, rpc);
+            const total = await lsp7.totalTokenCampaigns().catch(() => BigInt(0));
+            if (total <= BigInt(0)) return;
+            const items = await lsp7.getTokenCampaigns(0, total);
+            for (const c of items) {
+              if (c.creator.toLowerCase() !== userAddr.toLowerCase()) continue;
+              const addr = c.contractAddr.toLowerCase();
+              if (seen.has(addr)) continue;
+              seen.add(addr);
+              mine.push({
+                contractAddr: c.contractAddr,
+                creator: c.creator,
+                name: c.name,
+                symbol: c.symbol,
+                createdAt: Number(c.createdAt),
+                isNFT: false,
+              });
+            }
+          } catch {
+            // Skip unresponsive factories silently
           }
-        }
-      }
+        })
+      );
 
-      if (total8 > BigInt(0)) {
-        const items = await lsp8.getNFTCampaigns(0, total8);
-        for (const c of items) {
-          if (c.creator.toLowerCase() === userAddr.toLowerCase()) {
-            mine.push({
-              contractAddr: c.contractAddr,
-              creator: c.creator,
-              name: c.name,
-              symbol: c.symbol,
-              createdAt: Number(c.createdAt),
-              isNFT: true,
-            });
+      // Query ALL historical LSP8 factories
+      await Promise.all(
+        networkConfig.allLsp8Factories.map(async (factoryAddr) => {
+          try {
+            const lsp8 = new Contract(factoryAddr, LSP8_FACTORY_ABI, rpc);
+            const total = await lsp8.totalNFTCampaigns().catch(() => BigInt(0));
+            if (total <= BigInt(0)) return;
+            const items = await lsp8.getNFTCampaigns(0, total);
+            for (const c of items) {
+              if (c.creator.toLowerCase() !== userAddr.toLowerCase()) continue;
+              const addr = c.contractAddr.toLowerCase();
+              if (seen.has(addr)) continue;
+              seen.add(addr);
+              mine.push({
+                contractAddr: c.contractAddr,
+                creator: c.creator,
+                name: c.name,
+                symbol: c.symbol,
+                createdAt: Number(c.createdAt),
+                isNFT: true,
+              });
+            }
+          } catch {
+            // Skip unresponsive factories silently
           }
-        }
-      }
+        })
+      );
 
       mine.sort((a, b) => b.createdAt - a.createdAt);
 
