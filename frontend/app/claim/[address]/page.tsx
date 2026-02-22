@@ -208,8 +208,20 @@ export default function ClaimPage() {
       setAlreadyClaimed(true);
       await loadState(address);
     } catch (e: any) {
-      const msg = e.reason || e.message?.slice(0, 100) || "Failed";
-      const friendly = msg.includes("WrongCodeword") ? "Incorrect codeword" : msg;
+      const msg = e.data || e.reason || e.message?.slice(0, 200) || "Failed";
+      const errorMap: Record<string, string> = {
+        "0x4aa20f9c": "Incorrect codeword",
+        "0x646cf558": "You have already claimed this drop",
+        "0x24fbaa90": "Claiming is not active right now",
+        "0xcd3b2d03": "Outside the claim window",
+        "0xd05cb609": "Max supply has been reached",
+        "0xe4455cae": "You don't hold the required tokens",
+        "0x94303d52": "You don't have enough followers",
+      };
+      const selector = typeof msg === "string" ? msg.slice(0, 10) : "";
+      const friendly = errorMap[selector]
+        || (typeof msg === "string" && msg.includes("WrongCodeword") ? "Incorrect codeword" : null)
+        || (typeof msg === "string" ? msg.slice(0, 100) : "Transaction failed");
       setStatus({ message: friendly, type: "error" });
     } finally {
       setClaiming(false);
