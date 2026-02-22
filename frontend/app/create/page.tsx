@@ -12,6 +12,8 @@ import CopyButton from "../components/CopyButton";
 import Footer from "../components/Footer";
 import { useWallet } from "../components/WalletProvider";
 import { useNetwork } from "../components/NetworkProvider";
+import TokenSearchInput from "../components/TokenSearchInput";
+import UPSearchInput from "../components/UPSearchInput";
 
 type Status = { message: string; type: "success" | "error" | "loading" } | null;
 
@@ -26,6 +28,7 @@ export default function CreatePage() {
   const [secretDescription, setSecretDescription] = useState("");
   const [secretCodesRaw, setSecretCodesRaw] = useState(""); // newline-separated
   const [secretUsageLimit, setSecretUsageLimit] = useState("1");
+  // minBalance is display amount — multiplied by 10^18 on submit (assumes 18-decimal tokens)
   const [secretTokenReqs, setSecretTokenReqs] = useState<Array<{ address: string; minBalance: string }>>([]);
   const [secretMinFollowers, setSecretMinFollowers] = useState("0");
   const [secretFollowAddress, setSecretFollowAddress] = useState("");
@@ -182,7 +185,15 @@ export default function CreatePage() {
       const signature = await signer.signMessage(message);
       setStatus({ message: "Creating drop…", type: "loading" });
       const tokenRequirements = secretTokenReqs
-        .filter((r) => r.address.startsWith("0x") && r.address.length === 42);
+        .filter((r) => r.address.startsWith("0x") && r.address.length === 42)
+        .map((r) => ({
+          address: r.address,
+          // Convert display amount to raw token units (18 decimals assumed).
+          // Amount "0" means "just hold any".
+          minBalance: r.minBalance && Number(r.minBalance) > 0
+            ? (BigInt(Math.round(Number(r.minBalance) * 1e18))).toString()
+            : "0",
+        }));
       const followerRequirement = secretFollowAddress.startsWith("0x") && secretFollowAddress.length === 42
         ? { followAddress: secretFollowAddress }
         : null;
@@ -634,7 +645,7 @@ export default function CreatePage() {
               {dropType === "secret" && (
                 <div className="space-y-4 mt-2">
                   <div className="bg-violet-500/5 border border-violet-500/15 rounded-xl px-4 py-3 text-xs text-violet-300">
-                    Codes and links are stored off-chain (encrypted at rest). Only verified claimers receive them — nothing is visible on-chain.
+                    Codes and links are stored off-chain. Only verified claimers receive them — nothing is readable on-chain.
                   </div>
 
                   <div>
@@ -645,24 +656,24 @@ export default function CreatePage() {
                   </div>
 
                   <div>
-                    <label className={lbl}>Description (shown to claimers, not the codes)</label>
+                    <label className={lbl}>Description (shown to claimers — don&apos;t put the codes here)</label>
                     <textarea value={secretDescription} onChange={(e) => setSecretDescription(e.target.value)}
-                      placeholder="Claim your exclusive discount code for 30% off…"
+                      placeholder="Claim your exclusive 30% discount code…"
                       rows={2} className={`${inp} resize-none`} />
                   </div>
 
                   <div>
-                    <label className={lbl}>Codes / Links * (one per line)</label>
+                    <label className={lbl}>Codes / Links * — one per line</label>
                     <textarea value={secretCodesRaw} onChange={(e) => setSecretCodesRaw(e.target.value)}
-                      placeholder={"DISCOUNT-A1B2\nDISCOUNT-C3D4\nhttps://meet.example.com/secret-room"}
+                      placeholder={"DISCOUNT-A1B2\nDISCOUNT-C3D4\nhttps://meet.example.com/vip-room"}
                       rows={5} className={`${inp} font-mono text-xs resize-y`} />
                     <p className="text-[10px] text-zinc-600 mt-1">
-                      {secretCodesRaw.split("\n").filter((l) => l.trim()).length} code(s) — each given to one person by default
+                      {secretCodesRaw.split("\n").filter((l) => l.trim()).length} code(s)
                     </p>
                   </div>
 
                   <div>
-                    <label className={lbl}>Max uses per code (1 = unique, higher = shared)</label>
+                    <label className={lbl}>Max uses per code <span className="text-zinc-600">(1 = unique per person, higher = reusable)</span></label>
                     <input type="number" min="1" value={secretUsageLimit}
                       onChange={(e) => setSecretUsageLimit(e.target.value)}
                       className={inp} />
@@ -671,41 +682,57 @@ export default function CreatePage() {
                   {/* Token requirements */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <label className={lbl + " mb-0"}>Token Requirements</label>
+                      <label className={lbl + " mb-0"}>Token Requirements <span className="text-zinc-600">(optional)</span></label>
                       <button type="button"
                         onClick={() => setSecretTokenReqs((prev) => [...prev, { address: "", minBalance: "1" }])}
-                        className="text-[10px] text-purple-400 hover:text-purple-300 border border-purple-500/20 rounded px-1.5 py-0.5"
-                      >+ Add</button>
+                        className="text-[10px] text-purple-400 hover:text-purple-300 border border-purple-500/20 rounded-md px-2 py-1"
+                      >+ Add token</button>
                     </div>
+                    {secretTokenReqs.length === 0 && (
+                      <p className="text-[11px] text-zinc-600 mb-1">No token requirement — anyone with a UP can claim</p>
+                    )}
                     {secretTokenReqs.map((req, i) => (
-                      <div key={i} className="flex gap-2 mb-2">
-                        <input placeholder="0x… token address"
-                          value={req.address}
-                          onChange={(e) => setSecretTokenReqs((prev) => prev.map((r, j) => j === i ? { ...r, address: e.target.value } : r))}
-                          className={`${inp} flex-1 font-mono text-xs`} />
-                        <input type="number" min="0" placeholder="Min"
-                          value={req.minBalance}
-                          onChange={(e) => setSecretTokenReqs((prev) => prev.map((r, j) => j === i ? { ...r, minBalance: e.target.value } : r))}
-                          className={`${inp} w-20`} />
-                        <button type="button" onClick={() => setSecretTokenReqs((prev) => prev.filter((_, j) => j !== i))}
-                          className="text-red-400 text-xs px-2">✕</button>
+                      <div key={i} className="mb-3 bg-zinc-800/50 border border-zinc-700/50 rounded-xl p-3 space-y-2">
+                        <div>
+                          <label className={lbl}>Token</label>
+                          <TokenSearchInput
+                            value={req.address}
+                            onChange={(addr) => setSecretTokenReqs((prev) => prev.map((r, j) => j === i ? { ...r, address: addr } : r))}
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1">
+                            <label className={lbl}>Min amount to hold <span className="text-zinc-600">(0 = just hold any)</span></label>
+                            <input type="number" min="0" placeholder="0"
+                              value={req.minBalance}
+                              onChange={(e) => setSecretTokenReqs((prev) => prev.map((r, j) => j === i ? { ...r, minBalance: e.target.value } : r))}
+                              className={inp} />
+                          </div>
+                          <button type="button"
+                            onClick={() => setSecretTokenReqs((prev) => prev.filter((_, j) => j !== i))}
+                            className="mt-5 text-red-400 hover:text-red-300 text-xs border border-red-500/20 rounded-md px-2 py-1.5">
+                            Remove
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
 
                   {/* Follower requirements */}
-                  <div className="flex gap-3">
-                    <div className="flex-1">
-                      <label className={lbl}>Min followers (0 = no requirement)</label>
+                  <div className="space-y-3">
+                    <div>
+                      <label className={lbl}>Minimum followers <span className="text-zinc-600">(0 = no requirement)</span></label>
                       <input type="number" min="0" value={secretMinFollowers}
                         onChange={(e) => setSecretMinFollowers(e.target.value)}
                         className={inp} />
                     </div>
-                    <div className="flex-1">
-                      <label className={lbl}>Must follow address (optional)</label>
-                      <input value={secretFollowAddress} onChange={(e) => setSecretFollowAddress(e.target.value)}
-                        placeholder="0x…"
-                        className={`${inp} font-mono text-xs`} />
+                    <div>
+                      <label className={lbl}>Must follow UP <span className="text-zinc-600">(optional — search by name)</span></label>
+                      <UPSearchInput
+                        value={secretFollowAddress}
+                        onChange={setSecretFollowAddress}
+                        placeholder="Search by name or paste 0x address…"
+                      />
                     </div>
                   </div>
 
