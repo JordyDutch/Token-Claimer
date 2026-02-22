@@ -48,10 +48,12 @@ export default function ManagePage() {
   const metaAssetRef = useRef<HTMLInputElement>(null);
 
   function handleMetaAssetFiles(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
-    if (!files) return;
-    setMetaAssetFiles((prev) => [...prev, ...Array.from(files)]);
-    if (metaAssetRef.current) metaAssetRef.current.value = "";
+    const newFiles = Array.from(e.target.files ?? []);
+    if (newFiles.length === 0) return;
+    setMetaAssetFiles((prev) => [...prev, ...newFiles]);
+    // Reset input after state update to avoid sync interference
+    const input = e.target;
+    setTimeout(() => { input.value = ""; }, 0);
   }
 
   function removeMetaAsset(index: number) {

@@ -59,10 +59,12 @@ export default function CreatePage() {
   }
 
   function handleAssetFiles(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
-    if (!files) return;
-    setAssetFiles((prev) => [...prev, ...Array.from(files)]);
-    if (assetRef.current) assetRef.current.value = "";
+    const newFiles = Array.from(e.target.files ?? []);
+    if (newFiles.length === 0) return;
+    setAssetFiles((prev) => [...prev, ...newFiles]);
+    // Reset input after state update to avoid sync interference
+    const input = e.target;
+    setTimeout(() => { input.value = ""; }, 0);
   }
 
   function removeAsset(index: number) {
