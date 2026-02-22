@@ -68,44 +68,60 @@ export default function HomePage() {
 
   async function loadCampaigns(cfg: typeof networkConfig) {
     const rpc = new JsonRpcProvider(cfg.rpc);
-    const lsp7 = new Contract(cfg.lsp7Factory, LSP7_FACTORY_ABI, rpc);
-    const lsp8 = new Contract(cfg.lsp8Factory, LSP8_FACTORY_ABI, rpc);
 
     try {
-      const [total7, total8] = await Promise.all([
-        lsp7.totalTokenCampaigns().catch(() => BigInt(0)),
-        lsp8.totalNFTCampaigns().catch(() => BigInt(0)),
-      ]);
-
+      const seen = new Set<string>();
       const all: Campaign[] = [];
 
-      if (total7 > BigInt(0)) {
-        const items = await lsp7.getTokenCampaigns(0, total7);
-        for (const c of items) {
-          all.push({
-            contractAddr: c.contractAddr,
-            creator: c.creator,
-            name: c.name,
-            symbol: c.symbol,
-            createdAt: Number(c.createdAt),
-            isNFT: false,
-          });
-        }
-      }
+      // Query ALL historical LSP7 factories
+      await Promise.all(
+        cfg.allLsp7Factories.map(async (factoryAddr) => {
+          try {
+            const lsp7 = new Contract(factoryAddr, LSP7_FACTORY_ABI, rpc);
+            const total = await lsp7.totalTokenCampaigns().catch(() => BigInt(0));
+            if (total <= BigInt(0)) return;
+            const items = await lsp7.getTokenCampaigns(0, total);
+            for (const c of items) {
+              const addr = c.contractAddr.toLowerCase();
+              if (seen.has(addr)) continue;
+              seen.add(addr);
+              all.push({
+                contractAddr: c.contractAddr,
+                creator: c.creator,
+                name: c.name,
+                symbol: c.symbol,
+                createdAt: Number(c.createdAt),
+                isNFT: false,
+              });
+            }
+          } catch { /* skip unresponsive factory */ }
+        })
+      );
 
-      if (total8 > BigInt(0)) {
-        const items = await lsp8.getNFTCampaigns(0, total8);
-        for (const c of items) {
-          all.push({
-            contractAddr: c.contractAddr,
-            creator: c.creator,
-            name: c.name,
-            symbol: c.symbol,
-            createdAt: Number(c.createdAt),
-            isNFT: true,
-          });
-        }
-      }
+      // Query ALL historical LSP8 factories
+      await Promise.all(
+        cfg.allLsp8Factories.map(async (factoryAddr) => {
+          try {
+            const lsp8 = new Contract(factoryAddr, LSP8_FACTORY_ABI, rpc);
+            const total = await lsp8.totalNFTCampaigns().catch(() => BigInt(0));
+            if (total <= BigInt(0)) return;
+            const items = await lsp8.getNFTCampaigns(0, total);
+            for (const c of items) {
+              const addr = c.contractAddr.toLowerCase();
+              if (seen.has(addr)) continue;
+              seen.add(addr);
+              all.push({
+                contractAddr: c.contractAddr,
+                creator: c.creator,
+                name: c.name,
+                symbol: c.symbol,
+                createdAt: Number(c.createdAt),
+                isNFT: true,
+              });
+            }
+          } catch { /* skip unresponsive factory */ }
+        })
+      );
 
       all.sort((a, b) => b.createdAt - a.createdAt);
 
