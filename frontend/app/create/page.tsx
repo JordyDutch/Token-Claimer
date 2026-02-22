@@ -19,7 +19,17 @@ export default function CreatePage() {
   const { address, profile, connect: walletConnect, disconnect } = useWallet();
   const { config: networkConfig } = useNetwork();
   const [status, setStatus] = useState<Status>(null);
-  const [dropType, setDropType] = useState<"token" | "nft">("nft");
+  const [dropType, setDropType] = useState<"token" | "nft" | "secret">("nft");
+
+  // Secret Drop state
+  const [secretTitle, setSecretTitle] = useState("");
+  const [secretDescription, setSecretDescription] = useState("");
+  const [secretCodesRaw, setSecretCodesRaw] = useState(""); // newline-separated
+  const [secretUsageLimit, setSecretUsageLimit] = useState("1");
+  const [secretTokenReqs, setSecretTokenReqs] = useState<Array<{ address: string; minBalance: string }>>([]);
+  const [secretMinFollowers, setSecretMinFollowers] = useState("0");
+  const [secretFollowAddress, setSecretFollowAddress] = useState("");
+  const [secretDropId, setSecretDropId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
   const [maxSupply, setMaxSupply] = useState("100");
@@ -151,12 +161,94 @@ export default function CreatePage() {
     }
   }
 
+  // Secret Drop submit
+  async function createSecretDrop() {
+    const p = getProvider();
+    if (!p || !address) return;
+    const codes = secretCodesRaw
+      .split("\n")
+      .map((c) => c.trim())
+      .filter(Boolean);
+    if (!secretTitle.trim()) { setStatus({ message: "Title required", type: "error" }); return; }
+    if (codes.length === 0) { setStatus({ message: "Add at least one code", type: "error" }); return; }
+    try {
+      setDeploying(true);
+      setStatus({ message: "Sign in your wallet…", type: "loading" });
+      const { BrowserProvider } = await import("ethers");
+      const provider = new BrowserProvider(p);
+      const signer = await provider.getSigner();
+      const ts = Math.floor(Date.now() / 1000);
+      const message = `Create secret drop as ${address} at ${ts}`;
+      const signature = await signer.signMessage(message);
+      setStatus({ message: "Creating drop…", type: "loading" });
+      const tokenRequirements = secretTokenReqs
+        .filter((r) => r.address.startsWith("0x") && r.address.length === 42);
+      const followerRequirement = secretFollowAddress.startsWith("0x") && secretFollowAddress.length === 42
+        ? { followAddress: secretFollowAddress }
+        : null;
+      const res = await fetch("/api/secret-drop/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message,
+          signature,
+          title: secretTitle.trim(),
+          description: secretDescription.trim(),
+          codes,
+          codeUsageLimit: Number(secretUsageLimit) || 1,
+          network: networkConfig.id,
+          tokenRequirements,
+          followerRequirement,
+          minFollowers: Number(secretMinFollowers) || 0,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setStatus({ message: data.error ?? "Failed", type: "error" }); return; }
+      setSecretDropId(data.id);
+      setStatus(null);
+    } catch (e: any) {
+      if (e?.code === 4001 || e?.code === "ACTION_REJECTED") {
+        setStatus({ message: "Signature rejected", type: "error" });
+      } else {
+        setStatus({ message: e?.message ?? "Something went wrong", type: "error" });
+      }
+    } finally {
+      setDeploying(false);
+    }
+  }
+
   const inp =
     "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-purple-400 transition-colors";
   const lbl = "text-[11px] sm:text-xs text-zinc-500 mb-1 block";
   const card = "bg-[#12121a] rounded-2xl sm:rounded-3xl p-5 sm:p-8 border border-purple-500/10";
 
-  // Success screen
+  // Secret Drop success screen
+  if (secretDropId) {
+    const shareUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/secret-drop/${secretDropId}`;
+    return (
+      <div className="min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4">
+        <div className={card + " max-w-md w-full text-center"}>
+          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-violet-500/20 to-violet-400/10 border border-violet-500/20 flex items-center justify-center text-4xl mx-auto mb-4">
+            🔐
+          </div>
+          <h1 className="text-xl sm:text-2xl font-bold mb-2">Secret Drop Created!</h1>
+          <p className="text-zinc-400 text-sm mb-6">
+            Share the link — codes are safe off-chain and only revealed after verification
+          </p>
+          <div className="bg-zinc-800/50 rounded-xl p-3 mb-6">
+            <p className="text-[10px] text-zinc-500 mb-1">Claim Link</p>
+            <p className="text-xs font-mono text-violet-400 break-all mb-2">{shareUrl}</p>
+            <CopyButton text={shareUrl} label="Copy link" />
+          </div>
+          <Link href="/" className="block text-zinc-500 text-xs hover:text-purple-400 transition-colors">
+            ← All drops
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Regular on-chain success screen
   if (deployedAddress) {
     return (
       <div className="min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4">
@@ -285,10 +377,20 @@ export default function CreatePage() {
                 >
                   🪙 Token Drop
                 </button>
+                <button
+                  onClick={() => setDropType("secret")}
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                    dropType === "secret"
+                      ? "bg-violet-500/20 text-violet-400 border border-violet-500/30"
+                      : "bg-zinc-800 text-zinc-400 border border-zinc-700"
+                  }`}
+                >
+                  🔐 Secret Drop
+                </button>
               </div>
 
-              {/* Core fields */}
-              <div className="space-y-3">
+              {/* Core fields — NFT / Token only */}
+              {dropType !== "secret" && (<div className="space-y-3">
                 <div>
                   <label className={lbl}>Name *</label>
                   <input
@@ -526,6 +628,105 @@ export default function CreatePage() {
                   {deploying ? "Deploying..." : `Create ${dropType === "nft" ? "NFT" : "Token"} Drop`}
                 </button>
               </div>
+              )}
+
+              {/* ── Secret Drop Form ── */}
+              {dropType === "secret" && (
+                <div className="space-y-4 mt-2">
+                  <div className="bg-violet-500/5 border border-violet-500/15 rounded-xl px-4 py-3 text-xs text-violet-300">
+                    Codes and links are stored off-chain (encrypted at rest). Only verified claimers receive them — nothing is visible on-chain.
+                  </div>
+
+                  <div>
+                    <label className={lbl}>Title *</label>
+                    <input value={secretTitle} onChange={(e) => setSecretTitle(e.target.value)}
+                      placeholder="VIP Discount Code Drop"
+                      className={inp} />
+                  </div>
+
+                  <div>
+                    <label className={lbl}>Description (shown to claimers, not the codes)</label>
+                    <textarea value={secretDescription} onChange={(e) => setSecretDescription(e.target.value)}
+                      placeholder="Claim your exclusive discount code for 30% off…"
+                      rows={2} className={`${inp} resize-none`} />
+                  </div>
+
+                  <div>
+                    <label className={lbl}>Codes / Links * (one per line)</label>
+                    <textarea value={secretCodesRaw} onChange={(e) => setSecretCodesRaw(e.target.value)}
+                      placeholder={"DISCOUNT-A1B2\nDISCOUNT-C3D4\nhttps://meet.example.com/secret-room"}
+                      rows={5} className={`${inp} font-mono text-xs resize-y`} />
+                    <p className="text-[10px] text-zinc-600 mt-1">
+                      {secretCodesRaw.split("\n").filter((l) => l.trim()).length} code(s) — each given to one person by default
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className={lbl}>Max uses per code (1 = unique, higher = shared)</label>
+                    <input type="number" min="1" value={secretUsageLimit}
+                      onChange={(e) => setSecretUsageLimit(e.target.value)}
+                      className={inp} />
+                  </div>
+
+                  {/* Token requirements */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className={lbl + " mb-0"}>Token Requirements</label>
+                      <button type="button"
+                        onClick={() => setSecretTokenReqs((prev) => [...prev, { address: "", minBalance: "1" }])}
+                        className="text-[10px] text-purple-400 hover:text-purple-300 border border-purple-500/20 rounded px-1.5 py-0.5"
+                      >+ Add</button>
+                    </div>
+                    {secretTokenReqs.map((req, i) => (
+                      <div key={i} className="flex gap-2 mb-2">
+                        <input placeholder="0x… token address"
+                          value={req.address}
+                          onChange={(e) => setSecretTokenReqs((prev) => prev.map((r, j) => j === i ? { ...r, address: e.target.value } : r))}
+                          className={`${inp} flex-1 font-mono text-xs`} />
+                        <input type="number" min="0" placeholder="Min"
+                          value={req.minBalance}
+                          onChange={(e) => setSecretTokenReqs((prev) => prev.map((r, j) => j === i ? { ...r, minBalance: e.target.value } : r))}
+                          className={`${inp} w-20`} />
+                        <button type="button" onClick={() => setSecretTokenReqs((prev) => prev.filter((_, j) => j !== i))}
+                          className="text-red-400 text-xs px-2">✕</button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Follower requirements */}
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className={lbl}>Min followers (0 = no requirement)</label>
+                      <input type="number" min="0" value={secretMinFollowers}
+                        onChange={(e) => setSecretMinFollowers(e.target.value)}
+                        className={inp} />
+                    </div>
+                    <div className="flex-1">
+                      <label className={lbl}>Must follow address (optional)</label>
+                      <input value={secretFollowAddress} onChange={(e) => setSecretFollowAddress(e.target.value)}
+                        placeholder="0x…"
+                        className={`${inp} font-mono text-xs`} />
+                    </div>
+                  </div>
+
+                  {status && (
+                    <div className={`px-3 py-2 rounded-lg text-xs ${
+                      status.type === "error" ? "bg-red-500/10 text-red-400 border border-red-500/20" :
+                      status.type === "success" ? "bg-green-500/10 text-green-400 border border-green-500/20" :
+                      "bg-purple-500/10 text-purple-400 border border-purple-500/20"}`}>
+                      {status.message}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={createSecretDrop}
+                    disabled={deploying || !secretTitle.trim() || secretCodesRaw.split("\n").filter((l) => l.trim()).length === 0}
+                    className="w-full py-3.5 rounded-xl text-sm font-semibold bg-violet-600 text-white hover:bg-violet-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.97] mt-2"
+                  >
+                    {deploying ? "Creating…" : "Create Secret Drop"}
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
