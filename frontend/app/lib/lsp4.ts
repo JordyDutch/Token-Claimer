@@ -3,7 +3,8 @@ import { keccak256, toUtf8Bytes, concat, hexlify, Contract, Signer } from "ether
 export const LSP4_METADATA_KEY =
   "0x9afb95cacc9f95858ec44aa8c3b685511002e30ae54415823f406128b85b238e";
 
-const IPFS_GATEWAY_UPLOAD = "https://api.universalprofile.cloud/ipfs";
+// Proxied through /api/ipfs (Next.js API route → Pinata server-side)
+const IPFS_GATEWAY_UPLOAD = "/api/ipfs";
 
 export interface Lsp4Link {
   title: string;
