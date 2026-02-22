@@ -9,7 +9,7 @@ import {ILSP7Balance, ILSP26Followers} from "./ITokenClaimer.sol";
 /// @title LSP8ClaimableNFT
 /// @author Token Claimer
 /// @notice A claimable NFT drop for LUKSO. Creators deploy this via the
-///         TokenClaimerFactory. Each wallet can claim once, receiving `amountPerClaim`
+///         LSP8DropFactory. Each wallet can claim once, receiving `amountPerClaim`
 ///         NFTs with auto-incrementing numeric token IDs.
 /// @dev Inherits LSP8IdentifiableDigitalAsset (includes LSP14Ownable2Step).
 ///      Uses a uint256 reentrancy guard (1/2 pattern) for cheaper warm SSTOREs.
@@ -174,8 +174,12 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
 
     /// @notice Changes how many NFTs are minted per claim.
     /// @param amount_ New amount (must be 1–50).
+    /// @dev Also enforces the maxSupply >= amount invariant from the constructor.
+    ///      Without this check an owner could set amountPerClaim > maxSupply, causing
+    ///      the first claimer (via partial claim) to receive ALL remaining NFTs at once.
     function setAmountPerClaim(uint256 amount_) external onlyOwner {
         require(amount_ > 0 && amount_ <= 50, "Must be 1-50");
+        require(maxSupply == 0 || maxSupply >= amount_, "Would exceed maxSupply");
         amountPerClaim = amount_;
         emit AmountPerClaimUpdated(amount_);
     }

@@ -297,6 +297,22 @@ describe("LSP8ClaimableNFT", function () {
       await expect(nft.setAmountPerClaim(50n)).to.not.be.reverted;
     });
 
+    it("reverts when amount would exceed a non-zero maxSupply", async function () {
+      // maxSupply=10, amountPerClaim currently 1 — try to raise above maxSupply
+      const limited = await deployNFT(owner, { maxSupply: 10n, amountPerClaim: 1n });
+      await expect(limited.setAmountPerClaim(11n)).to.be.revertedWith("Would exceed maxSupply");
+    });
+
+    it("allows amount == maxSupply (single-claim supply)", async function () {
+      const limited = await deployNFT(owner, { maxSupply: 10n, amountPerClaim: 1n });
+      await expect(limited.setAmountPerClaim(10n)).to.not.be.reverted;
+    });
+
+    it("allows raising amount freely when maxSupply is unlimited (0)", async function () {
+      // nft fixture has maxSupply == 0
+      await expect(nft.setAmountPerClaim(50n)).to.not.be.reverted;
+    });
+
     it("reverts for non-owner", async function () {
       await expect(nft.connect(stranger).setAmountPerClaim(1n)).to.be.reverted;
     });

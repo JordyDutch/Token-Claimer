@@ -8,7 +8,7 @@ import {ILSP7Balance, ILSP26Followers} from "./ITokenClaimer.sol";
 /// @title LSP7ClaimableToken
 /// @author Token Claimer
 /// @notice A claimable fungible token drop for LUKSO. Creators deploy this via the
-///         TokenClaimerFactory. Each wallet can claim once, receiving `amountPerClaim`
+///         LSP7DropFactory. Each wallet can claim once, receiving `amountPerClaim`
 ///         tokens — provided it meets the optional token-holding and follower requirements.
 /// @dev Inherits LSP7DigitalAsset (which includes LSP14Ownable2Step for safe ownership
 ///      transfers). Uses a uint256 reentrancy guard (1/2 pattern) instead of a bool
@@ -176,8 +176,12 @@ contract LSP7ClaimableToken is LSP7DigitalAsset {
 
     /// @notice Changes how many tokens are minted per claim.
     /// @param amount_ New amount (must be 1–1e24 to prevent absurd values).
+    /// @dev Also enforces the maxSupply >= amount invariant established in the constructor,
+    ///      preventing a misconfiguration that would make all future claims revert with
+    ///      MaxSupplyReached (when maxSupply > 0 and amount > maxSupply).
     function setAmountPerClaim(uint256 amount_) external onlyOwner {
         require(amount_ > 0 && amount_ <= 1e24, "Out of range");
+        require(maxSupply == 0 || maxSupply >= amount_, "Would exceed maxSupply");
         amountPerClaim = amount_;
         emit AmountPerClaimUpdated(amount_);
     }

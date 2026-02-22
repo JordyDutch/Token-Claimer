@@ -314,6 +314,24 @@ describe("LSP7ClaimableToken", function () {
       await expect(token.setAmountPerClaim(max)).to.not.be.reverted;
     });
 
+    it("reverts when amount would exceed a non-zero maxSupply", async function () {
+      // Deploy a token with maxSupply = 100 tokens, then try to raise amountPerClaim above it
+      const Factory = await ethers.getContractFactory("LSP7ClaimableToken");
+      const limited = await Factory.deploy("L", "L", owner.address, 10n, 100n, false);
+      await expect(limited.setAmountPerClaim(101n)).to.be.revertedWith("Would exceed maxSupply");
+    });
+
+    it("allows amount == maxSupply (single-claim supply)", async function () {
+      const Factory = await ethers.getContractFactory("LSP7ClaimableToken");
+      const limited = await Factory.deploy("L", "L", owner.address, 10n, 100n, false);
+      await expect(limited.setAmountPerClaim(100n)).to.not.be.reverted;
+    });
+
+    it("allows raising amount freely when maxSupply is unlimited (0)", async function () {
+      // token fixture has maxSupply == 0
+      await expect(token.setAmountPerClaim(ethers.parseUnits("1", 24))).to.not.be.reverted;
+    });
+
     it("reverts when called by non-owner", async function () {
       await expect(
         token.connect(stranger).setAmountPerClaim(1n)
