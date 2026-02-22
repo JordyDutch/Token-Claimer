@@ -53,7 +53,17 @@ export async function fetchProfile(address: string, rpcUrl = LUKSO_RPC): Promise
   try {
     const rpc = new JsonRpcProvider(rpcUrl);
     const up = new Contract(address, UP_ABI, rpc);
-    const rawData = await up.getData(LSP3_PROFILE_KEY);
+
+    // Use provider.call() directly so we can check for empty return (EOA or
+    // non-UP address) before ethers tries to ABI-decode and throws BAD_DATA.
+    const callResult = await rpc.call({
+      to: address,
+      data: up.interface.encodeFunctionData("getData", [LSP3_PROFILE_KEY]),
+    });
+    if (!callResult || callResult === "0x") return result;
+
+    // Now safe to decode
+    const [rawData] = up.interface.decodeFunctionResult("getData", callResult);
 
     const jsonUrl = extractUrlFromVerifiableURI(rawData);
     if (!jsonUrl) return result;
@@ -80,8 +90,8 @@ export async function fetchProfile(address: string, rpcUrl = LUKSO_RPC): Promise
         result.image = ipfsToHttp(suitable.url);
       }
     }
-  } catch (e) {
-    console.error("Failed to fetch profile:", e);
+  } catch {
+    // Address is not a UP, has no profile data, or network error — return empty profile
   }
 
   return result;
