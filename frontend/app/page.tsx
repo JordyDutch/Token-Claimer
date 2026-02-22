@@ -4,6 +4,32 @@ import { useState, useEffect } from "react";
 import { JsonRpcProvider, Contract } from "ethers";
 import { LSP7_FACTORY, LSP8_FACTORY, LSP7_FACTORY_ABI, LSP8_FACTORY_ABI, LUKSO_RPC } from "./lib/contracts";
 import { fetchProfile, ProfileInfo } from "./lib/profile";
+import { LSP4_METADATA_KEY } from "./lib/lsp4";
+
+const IPFS_GATEWAY = "https://api.universalprofile.cloud/ipfs";
+const GET_DATA_ABI = ["function getData(bytes32 key) view returns (bytes memory)"];
+
+async function fetchCampaignIcon(contractAddr: string, provider: JsonRpcProvider): Promise<string | null> {
+  try {
+    const c = new Contract(contractAddr, GET_DATA_ABI, provider);
+    const raw: string = await c.getData(LSP4_METADATA_KEY);
+    if (!raw || raw === "0x" || raw.length < 10) return null;
+    // VerifiableURI: 0x + 4-byte methodId (8 hex) + 32-byte hash (64 hex) + ipfs:// url bytes
+    const urlHex = raw.slice(2 + 8 + 64); // skip 0x + methodId + hash
+    if (!urlHex || urlHex.length < 8) return null;
+    const ipfsUrl = Buffer.from(urlHex, "hex").toString("utf8");
+    const cid = ipfsUrl.replace("ipfs://", "");
+    const res = await fetch(`${IPFS_GATEWAY}/${cid}`);
+    if (!res.ok) return null;
+    const json = await res.json();
+    const icon = json?.LSP4Metadata?.icon?.[0]?.url;
+    if (!icon) return null;
+    const iconCid = icon.replace("ipfs://", "");
+    return `${IPFS_GATEWAY}/${iconCid}`;
+  } catch {
+    return null;
+  }
+}
 import Link from "next/link";
 import Footer from "./components/Footer";
 import { useWallet } from "./components/WalletProvider";
@@ -16,6 +42,7 @@ interface Campaign {
   createdAt: number;
   isNFT: boolean;
   creatorProfile?: ProfileInfo | null;
+  icon?: string | null;
 }
 
 type FilterTab = "all" | "tokens" | "nfts" | "mine";
@@ -83,20 +110,34 @@ export default function HomePage() {
       setCampaigns(all);
       setLoading(false);
 
-      // Fetch creator profiles in background
+      // Fetch creator profiles + drop icons in background (parallel)
       const uniqueCreators = [...new Set(all.map((c) => c.creator))];
       const profiles = new Map<string, ProfileInfo | null>();
-      await Promise.all(
-        uniqueCreators.map(async (addr) => {
+
+      await Promise.all([
+        // Creator profiles
+        ...uniqueCreators.map(async (addr) => {
           try {
             profiles.set(addr, await fetchProfile(addr));
           } catch {
             profiles.set(addr, null);
           }
-        })
-      );
+        }),
+      ]);
       setCampaigns((prev) =>
         prev.map((c) => ({ ...c, creatorProfile: profiles.get(c.creator) }))
+      );
+
+      // Fetch icons separately so they stream in as they resolve
+      await Promise.all(
+        all.map(async (c) => {
+          const icon = await fetchCampaignIcon(c.contractAddr, rpc);
+          if (icon) {
+            setCampaigns((prev) =>
+              prev.map((p) => p.contractAddr === c.contractAddr ? { ...p, icon } : p)
+            );
+          }
+        })
       );
     } catch (e) {
       console.error("Failed to load campaigns:", e);
@@ -243,8 +284,12 @@ export default function HomePage() {
               className="block bg-[#12121a] rounded-2xl p-4 sm:p-5 border border-purple-500/10 hover:border-purple-500/30 transition-all group"
             >
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-2xl flex-shrink-0">
-                  {c.isNFT ? "🖼" : "🪙"}
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden">
+                  {c.icon ? (
+                    <img src={c.icon} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    c.isNFT ? "🖼" : "🪙"
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
