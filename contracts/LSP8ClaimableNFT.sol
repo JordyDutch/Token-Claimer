@@ -32,7 +32,6 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
     uint256 private _nextTokenId;
 
     /// @notice Hard cap on total NFTs that can ever be minted (0 = unlimited).
-    /// @dev Immutable-by-design: no setter exists, so claimers can trust the cap.
     uint256 public maxSupply;
 
     /// @notice Number of NFTs minted per successful claim.
@@ -41,11 +40,11 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
     /// @notice Number of unique addresses that have claimed.
     uint256 public claimerCount;
 
-    /// @notice Address of the LSP7/LSP8 token contract a claimer must hold (address(0) = none).
-    address public requiredToken;
+    /// @dev List of token contract addresses required for claiming.
+    address[] private _reqTokens;
 
-    /// @notice Minimum balance of `requiredToken` a claimer must have.
-    uint256 public requiredTokenAmount;
+    /// @dev Corresponding minimum balances for each required token.
+    uint256[] private _reqMinBalances;
 
     /// @notice Minimum LSP26 follower count a claimer must have (0 = no requirement).
     uint256 public requiredFollowers;
@@ -61,70 +60,33 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
 
     // ──────────────────── Events ────────────────────
 
-    /// @notice Emitted when the owner enables or disables claiming.
-    /// @param enabled True if claiming was enabled, false if disabled.
     event ClaimToggled(bool enabled);
-
-    /// @notice Emitted when the owner sets or changes the claim time window.
-    /// @param startTime New start timestamp.
-    /// @param endTime   New end timestamp.
     event ClaimWindowSet(uint256 startTime, uint256 endTime);
 
     /// @notice Emitted when a user successfully claims NFTs.
-    /// @param claimer      Address that received the NFTs.
-    /// @param firstTokenId The first token ID in the minted batch.
-    /// @param amount       How many NFTs were minted (may be less than amountPerClaim for partial claims).
     event NFTsClaimed(address indexed claimer, uint256 firstTokenId, uint256 amount);
 
     /// @notice Emitted when the owner updates the claim requirements.
-    /// @param token     Required token address.
-    /// @param amount    Minimum required balance.
-    /// @param followers Minimum follower count.
-    event RequirementsUpdated(address token, uint256 amount, uint256 followers);
+    /// @param tokenCount Number of token requirements set.
+    /// @param followers  Minimum follower count.
+    event RequirementsUpdated(uint256 tokenCount, uint256 followers);
 
-    /// @notice Emitted when the owner changes the amount of NFTs given per claim.
-    /// @param newAmount The new amount per claim.
     event AmountPerClaimUpdated(uint256 newAmount);
-
-    /// @notice Emitted when the owner rescues LYX accidentally sent to this contract.
-    /// @param to     Recipient of the rescued LYX.
-    /// @param amount Amount of LYX rescued (in wei).
     event LYXRescued(address indexed to, uint256 amount);
 
     // ──────────────────── Errors ────────────────────
 
-    /// @notice Thrown when claiming is disabled or supply is exhausted.
     error ClaimNotActive();
-
-    /// @notice Thrown when a wallet tries to claim a second time.
     error AlreadyClaimed();
-
-    /// @notice Thrown when the current timestamp is outside the claim window.
     error OutsideClaimWindow();
-
-    /// @notice Thrown when minting would exceed maxSupply.
     error MaxSupplyReached();
-
-    /// @notice Thrown when the claimer doesn't hold enough of the required token.
     error InsufficientTokenBalance();
-
-    /// @notice Thrown when the claimer doesn't have enough LSP26 followers.
     error InsufficientFollowers();
-
-    /// @notice Thrown on reentrant calls.
     error ReentrancyGuard();
-
-    /// @notice Thrown when a rescue transfer fails.
     error RescueFailed();
 
     // ──────────────────── Constructor ────────────────────
 
-    /// @notice Deploys a new claimable LSP8 NFT collection.
-    /// @param name_           Human-readable collection name.
-    /// @param symbol_         Ticker symbol.
-    /// @param owner_          Initial owner (typically the creator's Universal Profile).
-    /// @param maxSupply_      Hard cap on total NFTs (0 = unlimited).
-    /// @param amountPerClaim_ NFTs minted per claim (capped at 50 to bound gas).
     constructor(
         string memory name_,
         string memory symbol_,
@@ -145,26 +107,20 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
         require(maxSupply_ == 0 || maxSupply_ >= apc, "maxSupply < amountPerClaim");
         maxSupply = maxSupply_;
         amountPerClaim = apc;
-        _nextTokenId = 1; // token IDs start at 1
+        _nextTokenId = 1;
     }
 
     // ──────────────────── Receive ────────────────────
 
-    /// @notice Allows the contract to receive LYX so it can be rescued by the owner.
     receive() external payable override {}
 
     // ──────────────────── Owner Controls ────────────────────
 
-    /// @notice Enables or disables claiming globally.
-    /// @param enabled_ True to allow claims, false to pause.
     function setClaimEnabled(bool enabled_) external onlyOwner {
         claimEnabled = enabled_;
         emit ClaimToggled(enabled_);
     }
 
-    /// @notice Sets the time window during which claims are accepted.
-    /// @param start_ Unix timestamp for the start (0 = no lower bound).
-    /// @param end_   Unix timestamp for the end (0 = no upper bound).
     function setClaimWindow(uint256 start_, uint256 end_) external onlyOwner {
         require(end_ == 0 || end_ > start_, "Invalid window");
         startTime = start_;
@@ -172,11 +128,6 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
         emit ClaimWindowSet(start_, end_);
     }
 
-    /// @notice Changes how many NFTs are minted per claim.
-    /// @param amount_ New amount (must be 1–50).
-    /// @dev Also enforces the maxSupply >= amount invariant from the constructor.
-    ///      Without this check an owner could set amountPerClaim > maxSupply, causing
-    ///      the first claimer (via partial claim) to receive ALL remaining NFTs at once.
     function setAmountPerClaim(uint256 amount_) external onlyOwner {
         require(amount_ > 0 && amount_ <= 50, "Must be 1-50");
         require(maxSupply == 0 || maxSupply >= amount_, "Would exceed maxSupply");
@@ -185,23 +136,38 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
     }
 
     /// @notice Configures the optional token-holding and follower requirements.
-    /// @param token_       LSP7/LSP8 contract claimers must hold (address(0) = none).
-    /// @param tokenAmount_ Minimum balance required.
+    /// @param tokens_      Array of LSP7/LSP8 contract addresses claimers must hold.
+    /// @param minBalances_ Corresponding minimum balances (must equal tokens_.length).
     /// @param followers_   Minimum LSP26 follower count (0 = none).
     function setRequirements(
-        address token_,
-        uint256 tokenAmount_,
+        address[] calldata tokens_,
+        uint256[] calldata minBalances_,
         uint256 followers_
     ) external onlyOwner {
-        requiredToken = token_;
-        requiredTokenAmount = tokenAmount_;
+        require(tokens_.length == minBalances_.length, "Length mismatch");
+        require(tokens_.length <= 10, "Max 10 token requirements");
+        delete _reqTokens;
+        delete _reqMinBalances;
+        for (uint256 i = 0; i < tokens_.length;) {
+            _reqTokens.push(tokens_[i]);
+            _reqMinBalances.push(minBalances_[i]);
+            unchecked { ++i; }
+        }
         requiredFollowers = followers_;
-        emit RequirementsUpdated(token_, tokenAmount_, followers_);
+        emit RequirementsUpdated(tokens_.length, followers_);
     }
 
-    /// @notice Allows the owner to rescue LYX accidentally sent to this contract.
-    /// @param to_     Payable address to receive the LYX.
-    /// @param amount_ Amount of LYX to send (in wei).
+    /// @notice Returns all token requirements.
+    /// @return tokens      Array of required token addresses.
+    /// @return minBalances Corresponding minimum balances.
+    function getTokenRequirements()
+        external
+        view
+        returns (address[] memory tokens, uint256[] memory minBalances)
+    {
+        return (_reqTokens, _reqMinBalances);
+    }
+
     function rescueLYX(address payable to_, uint256 amount_) external onlyOwner {
         (bool ok, ) = to_.call{value: amount_}("");
         if (!ok) revert RescueFailed();
@@ -210,40 +176,31 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
 
     // ──────────────────── Claim ────────────────────
 
-    /// @notice Claims NFTs for msg.sender. Each address can claim exactly once.
-    /// @dev Supports partial claims: if fewer NFTs remain than amountPerClaim,
-    ///      the claimer gets whatever is left instead of reverting.
     function claim() external {
-        // --- Reentrancy guard (set first) ---
         if (_guardStatus != 1) revert ReentrancyGuard();
         _guardStatus = 2;
 
-        // --- Checks (pure state reads) ---
         if (!claimEnabled) revert ClaimNotActive();
         if (hasClaimed[msg.sender]) revert AlreadyClaimed();
         if (startTime > 0 && block.timestamp < startTime) revert OutsideClaimWindow();
         if (endTime > 0 && block.timestamp > endTime) revert OutsideClaimWindow();
 
-        // Calculate actual mint amount (partial claim at supply boundary)
         uint256 toMint = amountPerClaim;
         if (maxSupply > 0) {
             uint256 remaining = maxSupply >= _nextTokenId ? maxSupply - _nextTokenId + 1 : 0;
             if (remaining == 0) revert MaxSupplyReached();
-            if (remaining < toMint) toMint = remaining; // partial claim: mint what's left
+            if (remaining < toMint) toMint = remaining;
         }
 
-        // --- Checks (external calls for requirements) ---
         (bool tokenOk, bool followersOk) = _checkRequirements(msg.sender);
         if (!tokenOk) revert InsufficientTokenBalance();
         if (!followersOk) revert InsufficientFollowers();
 
-        // --- Effects (all state mutations completed before any interaction) ---
         hasClaimed[msg.sender] = true;
         claimerCount++;
         uint256 firstId = _nextTokenId;
-        _nextTokenId += toMint; // advance counter fully before minting (strict CEI)
+        _nextTokenId += toMint;
 
-        // --- Interaction (mint NFTs to claimer) ---
         for (uint256 i = 0; i < toMint;) {
             _mint(msg.sender, bytes32(firstId + i), false, "");
             unchecked { ++i; }
@@ -251,59 +208,38 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
 
         emit NFTsClaimed(msg.sender, firstId, toMint);
 
-        // --- Release reentrancy guard ---
         _guardStatus = 1;
     }
 
     // ──────────────────── Views ────────────────────
 
-    /// @notice Returns the next token ID that will be minted.
-    /// @return The next token ID.
     function nextTokenId() external view returns (uint256) {
         return _nextTokenId;
     }
 
-    /// @notice Returns whether a claim would succeed right now (ignoring per-user state).
-    /// @dev Returns false when remaining supply is 0, even though partial claims are
-    ///      supported. This is because "active" means at least one NFT can be minted.
-    /// @return True if claiming is enabled, within the time window, and supply remains.
     function isClaimActive() external view returns (bool) {
         if (!claimEnabled) return false;
         if (startTime > 0 && block.timestamp < startTime) return false;
         if (endTime > 0 && block.timestamp > endTime) return false;
         if (maxSupply > 0) {
-            // Check if any supply remains at all (not just amountPerClaim worth)
             uint256 remaining = maxSupply >= _nextTokenId ? maxSupply - _nextTokenId + 1 : 0;
             if (remaining == 0) return false;
         }
         return true;
     }
 
-    /// @notice Returns the total number of NFTs minted so far.
-    /// @return The count of minted NFTs.
     function totalClaimed() external view returns (uint256) {
         return _nextTokenId - 1;
     }
 
-    /// @notice Returns the total number of unique claimers.
-    /// @return The claimer count.
     function totalClaimers() external view returns (uint256) {
         return claimerCount;
     }
 
-    /// @notice Checks if a single address meets the token-holding and follower requirements.
-    /// @param addr The address to check.
-    /// @return tokenOk     True if the token balance requirement is met (or not set).
-    /// @return followersOk True if the follower count requirement is met (or not set).
     function meetsRequirements(address addr) external view returns (bool tokenOk, bool followersOk) {
         return _checkRequirements(addr);
     }
 
-    /// @notice Batch-checks whether multiple addresses have already claimed.
-    /// @dev Saves front-ends from making N individual `hasClaimed` RPC calls when
-    ///      rendering participant lists or eligibility checks in bulk.
-    /// @param addrs Array of addresses to check.
-    /// @return results Array of booleans — true if the address has claimed.
     function batchHasClaimed(address[] calldata addrs)
         external
         view
@@ -316,10 +252,6 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
         }
     }
 
-    /// @notice Batch-checks requirements for multiple addresses in a single call.
-    /// @param addrs Array of addresses to check.
-    /// @return tokenOk     Array of booleans for token requirement.
-    /// @return followersOk Array of booleans for follower requirement.
     function batchMeetsRequirements(address[] calldata addrs)
         external
         view
@@ -336,18 +268,22 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
 
     // ──────────────────── Internal ────────────────────
 
-    /// @dev Shared requirement checking logic used by claim(), meetsRequirements(),
-    ///      and batchMeetsRequirements() to avoid code duplication.
-    /// @param addr The address to evaluate.
-    /// @return tokenOk     Whether the token requirement is satisfied.
-    /// @return followersOk Whether the follower requirement is satisfied.
+    /// @dev Checks all token requirements (ALL must pass) and follower requirement.
     function _checkRequirements(address addr) internal view returns (bool tokenOk, bool followersOk) {
         tokenOk = true;
         followersOk = true;
 
-        if (requiredToken != address(0) && requiredTokenAmount > 0) {
-            tokenOk = ILSP7Balance(requiredToken).balanceOf(addr) >= requiredTokenAmount;
+        uint256 len = _reqTokens.length;
+        for (uint256 i = 0; i < len;) {
+            if (_reqMinBalances[i] > 0) {
+                if (ILSP7Balance(_reqTokens[i]).balanceOf(addr) < _reqMinBalances[i]) {
+                    tokenOk = false;
+                    break;
+                }
+            }
+            unchecked { ++i; }
         }
+
         if (requiredFollowers > 0) {
             followersOk = ILSP26Followers(LSP26_REGISTRY).followerCount(addr) >= requiredFollowers;
         }

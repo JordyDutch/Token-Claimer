@@ -4,9 +4,9 @@ export const LUKSO_CHAIN_ID = "0x2a";
 export const ZERO = "0x0000000000000000000000000000000000000000";
 
 export const LSP7_FACTORY =
-  process.env.NEXT_PUBLIC_LSP7_FACTORY ?? "0xE618ddD88869E43E433eD103b0d896E1a05d5b40";
+  process.env.NEXT_PUBLIC_LSP7_FACTORY ?? "0xecA5f7179d70E3f3A8583838206dBd319f13BF8B";
 export const LSP8_FACTORY =
-  process.env.NEXT_PUBLIC_LSP8_FACTORY ?? "0x9bc9e8D57a94E0F88ab32CDC1865c3fdeF86f72E";
+  process.env.NEXT_PUBLIC_LSP8_FACTORY ?? "0x3C1958D2C6a5736F87AC4FC08fFEbCAC4312458c";
 
 // LSP7DropFactory ABI
 export const LSP7_FACTORY_ABI = [
@@ -46,15 +46,14 @@ export const CLAIM_ABI = [
   "function hasClaimed(address) view returns (bool)",
   "function getData(bytes32) view returns (bytes)",
   "function amountPerClaim() view returns (uint256)",
-  "function requiredToken() view returns (address)",
-  "function requiredTokenAmount() view returns (uint256)",
+  "function getTokenRequirements() view returns (address[] tokens, uint256[] minBalances)",
   "function requiredFollowers() view returns (uint256)",
   "function meetsRequirements(address) view returns (bool tokenOk, bool followersOk)",
   "function batchMeetsRequirements(address[]) view returns (bool[] tokenOk, bool[] followersOk)",
   "function setClaimEnabled(bool)",
   "function setClaimWindow(uint256,uint256)",
   "function setAmountPerClaim(uint256)",
-  "function setRequirements(address,uint256,uint256)",
+  "function setRequirements(address[],uint256[],uint256)",
 ];
 
 export const LSP7_EXTRA_ABI = [

@@ -9,14 +9,8 @@
  *   - isClaimActive() view
  *   - totalClaimers() view
  *   - meetsRequirements() / batchMeetsRequirements() views
- *
- * Key constraint: LSP7._mint with force=false reverts for EOAs and contracts that
- * don't support LSP1 (0x6bb56a14). Tests use MockLSP1Account contracts as claimers
- * — they implement universalReceiver() and report the LSP1 interface via supportsInterface.
- *
- * The LSP26 follower registry is hardcoded in the contract at
- * 0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA. We inject MockLSP26 bytecode
- * at that address via hardhat_setCode before each suite.
+ *   - getTokenRequirements() view
+ *   - Multi-token requirements (2+ tokens required, partial fail, all pass)
  */
 
 import { expect } from "chai";
@@ -33,7 +27,6 @@ import type {
 
 const LSP26_REGISTRY = "0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA";
 
-// LSP4 ERC725Y data keys for token name/symbol (LUKSO stores metadata via getData/setData)
 const LSP4_TOKEN_NAME_KEY =
   "0xdeba1e292f8ba88238e10ab3c7f88bd4be4fac56cad5194b6ecceaf653468af1";
 const LSP4_TOKEN_SYMBOL_KEY =
@@ -43,7 +36,6 @@ const MAX_SUPPLY_UNLIMITED = 0n;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-/** Inject MockLSP26 bytecode at the hardcoded registry address. */
 async function injectMockLSP26(): Promise<MockLSP26> {
   const Factory = await ethers.getContractFactory("MockLSP26");
   const temp = await Factory.deploy();
@@ -52,19 +44,16 @@ async function injectMockLSP26(): Promise<MockLSP26> {
   return Factory.attach(LSP26_REGISTRY) as unknown as MockLSP26;
 }
 
-/** Deploy a MockLSP1Account — used as a claimer that can receive LSP7 tokens. */
 async function deployAccount(): Promise<MockLSP1Account> {
   const Factory = await ethers.getContractFactory("MockLSP1Account");
   return (await Factory.deploy()) as MockLSP1Account;
 }
 
-/** Advance block timestamp by `seconds`. */
 async function timeTravel(seconds: number): Promise<void> {
   await ethers.provider.send("evm_increaseTime", [seconds]);
   await ethers.provider.send("evm_mine", []);
 }
 
-/** Return current block timestamp. */
 async function now(): Promise<number> {
   const block = await ethers.provider.getBlock("latest");
   return block!.timestamp;
@@ -78,6 +67,7 @@ describe("LSP7ClaimableToken", function () {
   let stranger: SignerWithAddress;
   let mockLSP26: MockLSP26;
   let mockToken: MockToken;
+  let mockToken2: MockToken;
   let claimer1: MockLSP1Account;
   let claimer2: MockLSP1Account;
   let claimer3: MockLSP1Account;
@@ -85,19 +75,16 @@ describe("LSP7ClaimableToken", function () {
   beforeEach(async function () {
     [owner, stranger] = await ethers.getSigners();
 
-    // Inject LSP26 mock at the hardcoded registry address
     mockLSP26 = await injectMockLSP26();
 
-    // Deploy required-token mock
     const MockTokenFactory = await ethers.getContractFactory("MockToken");
     mockToken = (await MockTokenFactory.deploy()) as MockToken;
+    mockToken2 = (await MockTokenFactory.deploy()) as MockToken;
 
-    // Deploy three mock LSP1 accounts (serve as claimers)
     claimer1 = await deployAccount();
     claimer2 = await deployAccount();
     claimer3 = await deployAccount();
 
-    // Deploy the main token contract
     const TokenFactory = await ethers.getContractFactory("LSP7ClaimableToken");
     token = (await TokenFactory.deploy(
       "Test Token",
@@ -105,7 +92,7 @@ describe("LSP7ClaimableToken", function () {
       owner.address,
       AMOUNT_PER_CLAIM,
       MAX_SUPPLY_UNLIMITED,
-      false // 18 decimals
+      false
     )) as LSP7ClaimableToken;
   });
 
@@ -113,7 +100,6 @@ describe("LSP7ClaimableToken", function () {
 
   describe("Deployment", function () {
     it("stores name correctly (via LSP4 ERC725Y getData)", async function () {
-      // LUKSO LSP7 stores name as ERC725Y bytes data — not a plain view function.
       const nameBytes = await token.getData(LSP4_TOKEN_NAME_KEY);
       expect(ethers.toUtf8String(nameBytes)).to.equal("Test Token");
     });
@@ -185,6 +171,12 @@ describe("LSP7ClaimableToken", function () {
       await expect(
         Factory.deploy("D", "D", owner.address, 100n, 0n, false)
       ).to.not.be.reverted;
+    });
+
+    it("starts with empty token requirements", async function () {
+      const [tokens, balances] = await token.getTokenRequirements();
+      expect(tokens.length).to.equal(0);
+      expect(balances.length).to.equal(0);
     });
   });
 
@@ -303,7 +295,7 @@ describe("LSP7ClaimableToken", function () {
     });
 
     it("reverts when amount exceeds 1e24", async function () {
-      const tooMuch = ethers.parseUnits("1", 25); // 1e25 > 1e24
+      const tooMuch = ethers.parseUnits("1", 25);
       await expect(token.setAmountPerClaim(tooMuch)).to.be.revertedWith(
         "Out of range"
       );
@@ -315,7 +307,6 @@ describe("LSP7ClaimableToken", function () {
     });
 
     it("reverts when amount would exceed a non-zero maxSupply", async function () {
-      // Deploy a token with maxSupply = 100 tokens, then try to raise amountPerClaim above it
       const Factory = await ethers.getContractFactory("LSP7ClaimableToken");
       const limited = await Factory.deploy("L", "L", owner.address, 10n, 100n, false);
       await expect(limited.setAmountPerClaim(101n)).to.be.revertedWith("Would exceed maxSupply");
@@ -328,7 +319,6 @@ describe("LSP7ClaimableToken", function () {
     });
 
     it("allows raising amount freely when maxSupply is unlimited (0)", async function () {
-      // token fixture has maxSupply == 0
       await expect(token.setAmountPerClaim(ethers.parseUnits("1", 24))).to.not.be.reverted;
     });
 
@@ -342,43 +332,116 @@ describe("LSP7ClaimableToken", function () {
   // ── 6. setRequirements ───────────────────────────────────────────────────
 
   describe("setRequirements", function () {
-    it("stores requiredToken, requiredTokenAmount, requiredFollowers", async function () {
+    it("stores single token requirement via getTokenRequirements()", async function () {
       const tokenAddr = await mockToken.getAddress();
-      await token.setRequirements(tokenAddr, 500n, 10n);
-      expect(await token.requiredToken()).to.equal(tokenAddr);
-      expect(await token.requiredTokenAmount()).to.equal(500n);
+      await token.setRequirements([tokenAddr], [500n], 10n);
+      const [tokens, balances] = await token.getTokenRequirements();
+      expect(tokens.length).to.equal(1);
+      expect(tokens[0]).to.equal(tokenAddr);
+      expect(balances[0]).to.equal(500n);
       expect(await token.requiredFollowers()).to.equal(10n);
     });
 
-    it("emits RequirementsUpdated", async function () {
-      const tokenAddr = await mockToken.getAddress();
-      await expect(token.setRequirements(tokenAddr, 500n, 10n))
-        .to.emit(token, "RequirementsUpdated")
-        .withArgs(tokenAddr, 500n, 10n);
+    it("stores multiple token requirements", async function () {
+      const addr1 = await mockToken.getAddress();
+      const addr2 = await mockToken2.getAddress();
+      await token.setRequirements([addr1, addr2], [100n, 200n], 5n);
+      const [tokens, balances] = await token.getTokenRequirements();
+      expect(tokens.length).to.equal(2);
+      expect(tokens[0]).to.equal(addr1);
+      expect(tokens[1]).to.equal(addr2);
+      expect(balances[0]).to.equal(100n);
+      expect(balances[1]).to.equal(200n);
+      expect(await token.requiredFollowers()).to.equal(5n);
     });
 
-    it("can clear requirements by passing address(0), 0, 0", async function () {
-      await token.setRequirements(await mockToken.getAddress(), 500n, 10n);
-      await token.setRequirements(ethers.ZeroAddress, 0n, 0n);
-      expect(await token.requiredToken()).to.equal(ethers.ZeroAddress);
-      expect(await token.requiredTokenAmount()).to.equal(0n);
+    it("emits RequirementsUpdated with tokenCount and followers", async function () {
+      const tokenAddr = await mockToken.getAddress();
+      await expect(token.setRequirements([tokenAddr], [500n], 10n))
+        .to.emit(token, "RequirementsUpdated")
+        .withArgs(1n, 10n);
+    });
+
+    it("emits RequirementsUpdated(0, 0) when clearing requirements", async function () {
+      await token.setRequirements([await mockToken.getAddress()], [500n], 10n);
+      await expect(token.setRequirements([], [], 0n))
+        .to.emit(token, "RequirementsUpdated")
+        .withArgs(0n, 0n);
+    });
+
+    it("can clear requirements by passing empty arrays and 0", async function () {
+      await token.setRequirements([await mockToken.getAddress()], [500n], 10n);
+      await token.setRequirements([], [], 0n);
+      const [tokens, balances] = await token.getTokenRequirements();
+      expect(tokens.length).to.equal(0);
+      expect(balances.length).to.equal(0);
       expect(await token.requiredFollowers()).to.equal(0n);
+    });
+
+    it("reverts when tokens and minBalances arrays have different lengths", async function () {
+      const tokenAddr = await mockToken.getAddress();
+      await expect(
+        token.setRequirements([tokenAddr], [100n, 200n], 0n)
+      ).to.be.revertedWith("Length mismatch");
+    });
+
+    it("reverts when more than 10 token requirements are provided", async function () {
+      const addrs = Array(11).fill(await mockToken.getAddress());
+      const amounts = Array(11).fill(1n);
+      await expect(
+        token.setRequirements(addrs, amounts, 0n)
+      ).to.be.revertedWith("Max 10 token requirements");
+    });
+
+    it("accepts exactly 10 token requirements", async function () {
+      const addrs = Array(10).fill(await mockToken.getAddress());
+      const amounts = Array(10).fill(1n);
+      await expect(token.setRequirements(addrs, amounts, 0n)).to.not.be.reverted;
     });
 
     it("reverts when called by non-owner", async function () {
       await expect(
-        token.connect(stranger).setRequirements(ethers.ZeroAddress, 0n, 0n)
+        token.connect(stranger).setRequirements([], [], 0n)
       ).to.be.reverted;
     });
   });
 
-  // ── 7. rescueLYX ─────────────────────────────────────────────────────────
+  // ── 7. getTokenRequirements() ─────────────────────────────────────────────
+
+  describe("getTokenRequirements()", function () {
+    it("returns empty arrays initially", async function () {
+      const [tokens, balances] = await token.getTokenRequirements();
+      expect(tokens).to.deep.equal([]);
+      expect(balances).to.deep.equal([]);
+    });
+
+    it("returns correct data after setRequirements", async function () {
+      const addr1 = await mockToken.getAddress();
+      const addr2 = await mockToken2.getAddress();
+      await token.setRequirements([addr1, addr2], [100n, 999n], 0n);
+      const [tokens, balances] = await token.getTokenRequirements();
+      expect(tokens[0]).to.equal(addr1);
+      expect(tokens[1]).to.equal(addr2);
+      expect(balances[0]).to.equal(100n);
+      expect(balances[1]).to.equal(999n);
+    });
+
+    it("reflects updated requirements after overwrite", async function () {
+      await token.setRequirements([await mockToken.getAddress()], [500n], 0n);
+      await token.setRequirements([await mockToken2.getAddress()], [777n], 0n);
+      const [tokens, balances] = await token.getTokenRequirements();
+      expect(tokens.length).to.equal(1);
+      expect(tokens[0]).to.equal(await mockToken2.getAddress());
+      expect(balances[0]).to.equal(777n);
+    });
+  });
+
+  // ── 8. rescueLYX ─────────────────────────────────────────────────────────
 
   describe("rescueLYX", function () {
     const sendAmount = ethers.parseEther("1");
 
     beforeEach(async function () {
-      // Fund the token contract
       await owner.sendTransaction({ to: await token.getAddress(), value: sendAmount });
     });
 
@@ -405,7 +468,7 @@ describe("LSP7ClaimableToken", function () {
     });
   });
 
-  // ── 8. claim() — revert paths ────────────────────────────────────────────
+  // ── 9. claim() — revert paths ────────────────────────────────────────────
 
   describe("claim() reverts", function () {
     it("reverts with ClaimNotActive when claiming is disabled", async function () {
@@ -427,7 +490,7 @@ describe("LSP7ClaimableToken", function () {
     it("reverts with OutsideClaimWindow before startTime", async function () {
       const t = await now();
       await token.setClaimEnabled(true);
-      await token.setClaimWindow(t + 9999, 0); // future start
+      await token.setClaimWindow(t + 9999, 0);
       await expect(claimer1.doClaim(await token.getAddress())).to.be.revertedWithCustomError(
         token,
         "OutsideClaimWindow"
@@ -437,8 +500,8 @@ describe("LSP7ClaimableToken", function () {
     it("reverts with OutsideClaimWindow after endTime", async function () {
       const t = await now();
       await token.setClaimEnabled(true);
-      await token.setClaimWindow(0, t + 1); // ends 1 second from now
-      await timeTravel(5); // jump past end
+      await token.setClaimWindow(0, t + 1);
+      await timeTravel(5);
       await expect(claimer1.doClaim(await token.getAddress())).to.be.revertedWithCustomError(
         token,
         "OutsideClaimWindow"
@@ -446,18 +509,17 @@ describe("LSP7ClaimableToken", function () {
     });
 
     it("reverts with MaxSupplyReached when supply is full", async function () {
-      // Deploy with maxSupply = 1 amountPerClaim worth
       const Factory = await ethers.getContractFactory("LSP7ClaimableToken");
       const limited = (await Factory.deploy(
         "Limited",
         "LTD",
         owner.address,
         AMOUNT_PER_CLAIM,
-        AMOUNT_PER_CLAIM, // maxSupply == amountPerClaim — only one claim fits
+        AMOUNT_PER_CLAIM,
         false
       )) as LSP7ClaimableToken;
       await limited.setClaimEnabled(true);
-      await claimer1.doClaim(await limited.getAddress()); // first claim OK
+      await claimer1.doClaim(await limited.getAddress());
       await expect(claimer2.doClaim(await limited.getAddress())).to.be.revertedWithCustomError(
         limited,
         "MaxSupplyReached"
@@ -467,8 +529,7 @@ describe("LSP7ClaimableToken", function () {
     it("reverts with InsufficientTokenBalance when required token not held", async function () {
       await token.setClaimEnabled(true);
       const tokenAddr = await mockToken.getAddress();
-      await token.setRequirements(tokenAddr, 1000n, 0n);
-      // claimer1 has 0 balance in MockToken — requirement fails
+      await token.setRequirements([tokenAddr], [1000n], 0n);
       await expect(claimer1.doClaim(await token.getAddress())).to.be.revertedWithCustomError(
         token,
         "InsufficientTokenBalance"
@@ -477,16 +538,28 @@ describe("LSP7ClaimableToken", function () {
 
     it("reverts with InsufficientFollowers when not enough LSP26 followers", async function () {
       await token.setClaimEnabled(true);
-      await token.setRequirements(ethers.ZeroAddress, 0n, 100n); // need 100 followers
-      // claimer1 has 0 followers (default mockLSP26 returns 0)
+      await token.setRequirements([], [], 100n);
       await expect(claimer1.doClaim(await token.getAddress())).to.be.revertedWithCustomError(
         token,
         "InsufficientFollowers"
       );
     });
+
+    it("reverts when second of two required tokens is not held", async function () {
+      await token.setClaimEnabled(true);
+      const addr1 = await mockToken.getAddress();
+      const addr2 = await mockToken2.getAddress();
+      await token.setRequirements([addr1, addr2], [100n, 200n], 0n);
+      // Give claimer1 enough of token1 but not token2
+      await mockToken.setBalance(await claimer1.getAddress(), 100n);
+      await expect(claimer1.doClaim(await token.getAddress())).to.be.revertedWithCustomError(
+        token,
+        "InsufficientTokenBalance"
+      );
+    });
   });
 
-  // ── 9. claim() — happy path ──────────────────────────────────────────────
+  // ── 10. claim() — happy path ──────────────────────────────────────────────
 
   describe("claim() success", function () {
     beforeEach(async function () {
@@ -531,18 +604,18 @@ describe("LSP7ClaimableToken", function () {
       expect(await token.totalClaimedAmount()).to.equal(AMOUNT_PER_CLAIM * 3n);
     });
 
-    it("works when requiredToken balance is exactly the minimum", async function () {
+    it("works when single requiredToken balance is exactly the minimum", async function () {
       const tokenAddr = await mockToken.getAddress();
       const claimerAddr = await claimer1.getAddress();
-      await token.setRequirements(tokenAddr, 500n, 0n);
-      await mockToken.setBalance(claimerAddr, 500n); // exactly meets requirement
+      await token.setRequirements([tokenAddr], [500n], 0n);
+      await mockToken.setBalance(claimerAddr, 500n);
       await expect(claimer1.doClaim(await token.getAddress())).to.not.be.reverted;
     });
 
     it("works when follower count exactly meets the minimum", async function () {
       const claimerAddr = await claimer1.getAddress();
-      await token.setRequirements(ethers.ZeroAddress, 0n, 50n);
-      await mockLSP26.setFollowerCount(claimerAddr, 50n); // exactly 50
+      await token.setRequirements([], [], 50n);
+      await mockLSP26.setFollowerCount(claimerAddr, 50n);
       await expect(claimer1.doClaim(await token.getAddress())).to.not.be.reverted;
     });
 
@@ -551,9 +624,106 @@ describe("LSP7ClaimableToken", function () {
       await token.setClaimWindow(t - 10, t + 9999);
       await expect(claimer1.doClaim(await token.getAddress())).to.not.be.reverted;
     });
+
+    it("works when ALL multi-token requirements are met", async function () {
+      const claimerAddr = await claimer1.getAddress();
+      const addr1 = await mockToken.getAddress();
+      const addr2 = await mockToken2.getAddress();
+      await token.setRequirements([addr1, addr2], [100n, 200n], 0n);
+      await mockToken.setBalance(claimerAddr, 100n);
+      await mockToken2.setBalance(claimerAddr, 200n);
+      await expect(claimer1.doClaim(await token.getAddress())).to.not.be.reverted;
+    });
   });
 
-  // ── 10. isClaimActive() ──────────────────────────────────────────────────
+  // ── 11. Multi-token requirements ──────────────────────────────────────────
+
+  describe("Multi-token requirements", function () {
+    it("meetsRequirements: (false,true) when first of two tokens insufficient", async function () {
+      const claimerAddr = await claimer1.getAddress();
+      const addr1 = await mockToken.getAddress();
+      const addr2 = await mockToken2.getAddress();
+      await token.setRequirements([addr1, addr2], [100n, 200n], 0n);
+      // claimer has neither token
+      const [tok, fol] = await token.meetsRequirements(claimerAddr);
+      expect(tok).to.be.false;
+      expect(fol).to.be.true;
+    });
+
+    it("meetsRequirements: (false,true) when second of two tokens insufficient", async function () {
+      const claimerAddr = await claimer1.getAddress();
+      const addr1 = await mockToken.getAddress();
+      const addr2 = await mockToken2.getAddress();
+      await token.setRequirements([addr1, addr2], [100n, 200n], 0n);
+      // Give enough of token1 but not token2
+      await mockToken.setBalance(claimerAddr, 100n);
+      const [tok, fol] = await token.meetsRequirements(claimerAddr);
+      expect(tok).to.be.false;
+      expect(fol).to.be.true;
+    });
+
+    it("meetsRequirements: (true,true) when both tokens sufficient", async function () {
+      const claimerAddr = await claimer1.getAddress();
+      const addr1 = await mockToken.getAddress();
+      const addr2 = await mockToken2.getAddress();
+      await token.setRequirements([addr1, addr2], [100n, 200n], 0n);
+      await mockToken.setBalance(claimerAddr, 100n);
+      await mockToken2.setBalance(claimerAddr, 200n);
+      const [tok, fol] = await token.meetsRequirements(claimerAddr);
+      expect(tok).to.be.true;
+      expect(fol).to.be.true;
+    });
+
+    it("meetsRequirements: (false,false) when both tokens fail and followers fail", async function () {
+      const claimerAddr = await claimer1.getAddress();
+      const addr1 = await mockToken.getAddress();
+      const addr2 = await mockToken2.getAddress();
+      await token.setRequirements([addr1, addr2], [100n, 200n], 50n);
+      // claimer has nothing
+      const [tok, fol] = await token.meetsRequirements(claimerAddr);
+      expect(tok).to.be.false;
+      expect(fol).to.be.false;
+    });
+
+    it("skips token check when minBalance is 0 for that entry", async function () {
+      const claimerAddr = await claimer1.getAddress();
+      const addr1 = await mockToken.getAddress();
+      const addr2 = await mockToken2.getAddress();
+      // token1 has minBalance=0 (skip), token2 has minBalance=200
+      await token.setRequirements([addr1, addr2], [0n, 200n], 0n);
+      await mockToken2.setBalance(claimerAddr, 200n);
+      const [tok, fol] = await token.meetsRequirements(claimerAddr);
+      expect(tok).to.be.true;
+      expect(fol).to.be.true;
+    });
+
+    it("batchMeetsRequirements works with 2 tokens across 3 claimers", async function () {
+      const addr1 = await mockToken.getAddress();
+      const addr2 = await mockToken2.getAddress();
+      const cAddr1 = await claimer1.getAddress();
+      const cAddr2 = await claimer2.getAddress();
+      const cAddr3 = await claimer3.getAddress();
+
+      await token.setRequirements([addr1, addr2], [100n, 200n], 0n);
+
+      // claimer1: has nothing
+      // claimer2: has token1 only
+      await mockToken.setBalance(cAddr2, 100n);
+      // claimer3: has both
+      await mockToken.setBalance(cAddr3, 100n);
+      await mockToken2.setBalance(cAddr3, 200n);
+
+      const [tok, fol] = await token.batchMeetsRequirements([cAddr1, cAddr2, cAddr3]);
+      expect(tok[0]).to.be.false;  // claimer1 fails
+      expect(tok[1]).to.be.false;  // claimer2 fails (missing token2)
+      expect(tok[2]).to.be.true;   // claimer3 passes
+      expect(fol[0]).to.be.true;
+      expect(fol[1]).to.be.true;
+      expect(fol[2]).to.be.true;
+    });
+  });
+
+  // ── 12. isClaimActive() ──────────────────────────────────────────────────
 
   describe("isClaimActive()", function () {
     it("returns false when disabled", async function () {
@@ -587,7 +757,7 @@ describe("LSP7ClaimableToken", function () {
         "L",
         owner.address,
         AMOUNT_PER_CLAIM,
-        AMOUNT_PER_CLAIM, // one claim fits
+        AMOUNT_PER_CLAIM,
         false
       )) as LSP7ClaimableToken;
       await limited.setClaimEnabled(true);
@@ -596,7 +766,7 @@ describe("LSP7ClaimableToken", function () {
     });
   });
 
-  // ── 11. totalClaimers() ──────────────────────────────────────────────────
+  // ── 13. totalClaimers() ──────────────────────────────────────────────────
 
   describe("totalClaimers()", function () {
     it("returns 0 initially", async function () {
@@ -612,7 +782,7 @@ describe("LSP7ClaimableToken", function () {
     });
   });
 
-  // ── 12. meetsRequirements() ──────────────────────────────────────────────
+  // ── 14. meetsRequirements() ──────────────────────────────────────────────
 
   describe("meetsRequirements()", function () {
     it("returns (true, true) when no requirements are set", async function () {
@@ -625,8 +795,7 @@ describe("LSP7ClaimableToken", function () {
     it("returns (false, true) when token balance insufficient", async function () {
       const claimerAddr = await claimer1.getAddress();
       const tokenAddr = await mockToken.getAddress();
-      await token.setRequirements(tokenAddr, 1000n, 0n);
-      // balance stays 0
+      await token.setRequirements([tokenAddr], [1000n], 0n);
       const [tok, fol] = await token.meetsRequirements(claimerAddr);
       expect(tok).to.be.false;
       expect(fol).to.be.true;
@@ -634,8 +803,7 @@ describe("LSP7ClaimableToken", function () {
 
     it("returns (true, false) when follower count insufficient", async function () {
       const addr = await claimer1.getAddress();
-      await token.setRequirements(ethers.ZeroAddress, 0n, 100n);
-      // follower count is 0
+      await token.setRequirements([], [], 100n);
       const [tok, fol] = await token.meetsRequirements(addr);
       expect(tok).to.be.true;
       expect(fol).to.be.false;
@@ -644,7 +812,7 @@ describe("LSP7ClaimableToken", function () {
     it("returns (false, false) when both requirements fail", async function () {
       const claimerAddr = await claimer1.getAddress();
       const tokenAddr = await mockToken.getAddress();
-      await token.setRequirements(tokenAddr, 1000n, 100n);
+      await token.setRequirements([tokenAddr], [1000n], 100n);
       const [tok, fol] = await token.meetsRequirements(claimerAddr);
       expect(tok).to.be.false;
       expect(fol).to.be.false;
@@ -653,7 +821,7 @@ describe("LSP7ClaimableToken", function () {
     it("returns (true, true) when all requirements are met", async function () {
       const claimerAddr = await claimer1.getAddress();
       const tokenAddr = await mockToken.getAddress();
-      await token.setRequirements(tokenAddr, 1000n, 100n);
+      await token.setRequirements([tokenAddr], [1000n], 100n);
       await mockToken.setBalance(claimerAddr, 1000n);
       await mockLSP26.setFollowerCount(claimerAddr, 100n);
       const [tok, fol] = await token.meetsRequirements(claimerAddr);
@@ -661,17 +829,16 @@ describe("LSP7ClaimableToken", function () {
       expect(fol).to.be.true;
     });
 
-    it("ignores token requirement when requiredTokenAmount is 0", async function () {
+    it("ignores token requirement when minBalance is 0", async function () {
       const addr = await claimer1.getAddress();
-      // requiredToken is set but amount is 0 → no token check
-      await token.setRequirements(await mockToken.getAddress(), 0n, 0n);
+      await token.setRequirements([await mockToken.getAddress()], [0n], 0n);
       const [tok, fol] = await token.meetsRequirements(addr);
       expect(tok).to.be.true;
       expect(fol).to.be.true;
     });
   });
 
-  // ── 13. batchHasClaimed() ────────────────────────────────────────────────
+  // ── 15. batchHasClaimed() ────────────────────────────────────────────────
 
   describe("batchHasClaimed()", function () {
     it("returns empty array for empty input", async function () {
@@ -697,16 +864,15 @@ describe("LSP7ClaimableToken", function () {
     it("returns mixed results for a batch of addresses", async function () {
       await token.setClaimEnabled(true);
       await claimer1.doClaim(await token.getAddress());
-      // claimer2 has NOT claimed
 
       const addr1 = await claimer1.getAddress();
       const addr2 = await claimer2.getAddress();
       const addr3 = await claimer3.getAddress();
 
       const results = await token.batchHasClaimed([addr1, addr2, addr3]);
-      expect(results[0]).to.be.true;  // claimed
-      expect(results[1]).to.be.false; // not claimed
-      expect(results[2]).to.be.false; // not claimed
+      expect(results[0]).to.be.true;
+      expect(results[1]).to.be.false;
+      expect(results[2]).to.be.false;
     });
 
     it("reflects state change after a second claimer claims", async function () {
@@ -728,7 +894,7 @@ describe("LSP7ClaimableToken", function () {
     });
   });
 
-  // ── 14. batchMeetsRequirements() ────────────────────────────────────────
+  // ── 16. batchMeetsRequirements() ────────────────────────────────────────
 
   describe("batchMeetsRequirements()", function () {
     it("returns empty arrays for empty input", async function () {
@@ -752,8 +918,7 @@ describe("LSP7ClaimableToken", function () {
       const addr3 = await claimer3.getAddress();
       const tokenAddr = await mockToken.getAddress();
 
-      await token.setRequirements(tokenAddr, 500n, 10n);
-      // addr1: meets neither
+      await token.setRequirements([tokenAddr], [500n], 10n);
       // addr2: meets token only
       await mockToken.setBalance(addr2, 500n);
       // addr3: meets both
@@ -762,12 +927,12 @@ describe("LSP7ClaimableToken", function () {
 
       const [tok, fol] = await token.batchMeetsRequirements([addr1, addr2, addr3]);
 
-      expect(tok[0]).to.be.false; // addr1 token fail
-      expect(fol[0]).to.be.false; // addr1 follower fail
-      expect(tok[1]).to.be.true;  // addr2 token ok
-      expect(fol[1]).to.be.false; // addr2 follower fail
-      expect(tok[2]).to.be.true;  // addr3 token ok
-      expect(fol[2]).to.be.true;  // addr3 follower ok
+      expect(tok[0]).to.be.false;
+      expect(fol[0]).to.be.false;
+      expect(tok[1]).to.be.true;
+      expect(fol[1]).to.be.false;
+      expect(tok[2]).to.be.true;
+      expect(fol[2]).to.be.true;
     });
   });
 });

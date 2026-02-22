@@ -32,8 +32,7 @@ export default function ManagePage() {
   const [amountPerClaim, setAmountPerClaim] = useState("");
   const [totalClaimed, setTotalClaimed] = useState("0");
   const [maxSupply, setMaxSupply] = useState("0");
-  const [reqToken, setReqToken] = useState("");
-  const [reqTokenAmount, setReqTokenAmount] = useState("");
+  const [tokenReqs, setTokenReqs] = useState<{ addr: string; amount: string }[]>([]);
   const [reqFollowers, setReqFollowers] = useState("");
   const [linkCopied, setLinkCopied] = useState(false);
 
@@ -69,23 +68,27 @@ export default function ManagePage() {
       const owner = await c.owner();
       setIsOwner(owner.toLowerCase() === userAddr.toLowerCase());
       const safe = (p: Promise<any>, fallback: any = null) => p.catch(() => fallback);
-      const [nameRaw, enabled, start, end, amount, supply, rT, rA, rF] = await Promise.all([
+      const [nameRaw, enabled, start, end, amount, supply, reqResult, rF] = await Promise.all([
         safe(c.getData(LSP4_TOKEN_NAME_KEY), null),
         safe(c.claimEnabled(), false),
         safe(c.startTime(), BigInt(0)),
         safe(c.endTime(), BigInt(0)),
         safe(c.amountPerClaim(), BigInt(0)),
         safe(c.maxSupply(), BigInt(0)),
-        safe(c.requiredToken(), ZERO),
-        safe(c.requiredTokenAmount(), BigInt(0)),
+        safe(c.getTokenRequirements(), { tokens: [], minBalances: [] }),
         safe(c.requiredFollowers(), BigInt(0)),
       ]);
       setDropName(nameRaw && nameRaw !== "0x" ? Buffer.from(nameRaw.replace(/^0x/, ""), "hex").toString("utf8") : "");
       setClaimEnabled(enabled);
       setAmountPerClaim(amount ? amount.toString() : "0");
       setMaxSupply(supply ? supply.toString() : "0");
-      setReqToken(!rT || rT === ZERO ? "" : rT);
-      setReqTokenAmount(rA > BigInt(0) ? rA.toString() : "");
+      // Load multi-token requirements
+      const tokensArr: string[] = reqResult?.tokens ?? [];
+      const balancesArr: bigint[] = reqResult?.minBalances ?? [];
+      setTokenReqs(tokensArr.map((addr: string, i: number) => ({
+        addr,
+        amount: balancesArr[i]?.toString() ?? "0",
+      })));
       setReqFollowers(rF > BigInt(0) ? rF.toString() : "");
       if (start > BigInt(0)) setStartTime(new Date(Number(start) * 1000).toISOString().slice(0, 16));
       if (end > BigInt(0)) setEndTime(new Date(Number(end) * 1000).toISOString().slice(0, 16));
@@ -381,24 +384,48 @@ export default function ManagePage() {
             <div className={card}>
               <h2 className="text-xs font-semibold text-zinc-300 mb-1">Requirements</h2>
               <p className="text-[10px] text-zinc-600 mb-3">
-                Set conditions users must meet before they can claim. Leave empty for no requirements.
+                Set conditions users must meet before they can claim. Add up to 10 token requirements — ALL must be satisfied. Leave empty for no requirements.
               </p>
               <div className="space-y-3">
-                <TokenSearchInput
-                  label="Required token (LSP7/LSP8)"
-                  value={reqToken}
-                  onChange={setReqToken}
-                />
-                <div>
-                  <label className={lbl}>Minimum token balance</label>
-                  <input
-                    type="number"
-                    value={reqTokenAmount}
-                    onChange={(e) => setReqTokenAmount(e.target.value)}
-                    placeholder="0"
-                    className={inp + " mt-1"}
-                  />
-                </div>
+                {/* Multi-token requirements list */}
+                {tokenReqs.map((req, i) => (
+                  <div key={i} className="bg-zinc-800/40 rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] text-zinc-500">Token requirement {i + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => setTokenReqs((prev) => prev.filter((_, j) => j !== i))}
+                        className="text-[10px] text-zinc-600 hover:text-red-400 transition-colors cursor-pointer"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    <TokenSearchInput
+                      label="Token address (LSP7/LSP8)"
+                      value={req.addr}
+                      onChange={(v) => setTokenReqs((prev) => prev.map((r, j) => j === i ? { ...r, addr: v } : r))}
+                    />
+                    <div>
+                      <label className={lbl}>Minimum balance</label>
+                      <input
+                        type="number"
+                        value={req.amount}
+                        onChange={(e) => setTokenReqs((prev) => prev.map((r, j) => j === i ? { ...r, amount: e.target.value } : r))}
+                        placeholder="0"
+                        className={inp + " mt-1"}
+                      />
+                    </div>
+                  </div>
+                ))}
+                {tokenReqs.length < 10 && (
+                  <button
+                    type="button"
+                    onClick={() => setTokenReqs((prev) => [...prev, { addr: "", amount: "" }])}
+                    className="text-xs text-purple-400 hover:text-purple-300 border border-purple-500/30 rounded-lg px-3 py-1.5 transition-colors cursor-pointer w-full"
+                  >
+                    + Add token requirement
+                  </button>
+                )}
                 <div>
                   <label className={lbl}>Minimum followers (LSP26)</label>
                   <input
@@ -410,12 +437,14 @@ export default function ManagePage() {
                   />
                 </div>
                 <button
-                  onClick={() =>
+                  onClick={() => {
+                    const tokens = tokenReqs.map((r) => r.addr || ZERO);
+                    const amounts = tokenReqs.map((r) => r.amount || "0");
                     sendTx(
-                      (c) => c.setRequirements(reqToken || ZERO, reqTokenAmount || "0", reqFollowers || "0"),
+                      (c) => c.setRequirements(tokens, amounts, reqFollowers || "0"),
                       "Updating requirements..."
-                    )
-                  }
+                    );
+                  }}
                   className={btn}
                 >
                   Update Requirements

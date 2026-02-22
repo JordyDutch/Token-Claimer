@@ -37,8 +37,8 @@ export default function ClaimPage() {
   const [status, setStatus] = useState<Status>(null);
   const [claiming, setClaiming] = useState(false);
   const [reqInfo, setReqInfo] = useState<{
-    token: string; tokenAmount: bigint; tokenName: string;
-    tokenSymbol: string; tokenIcon: string | null; followers: bigint;
+    tokens: { addr: string; amount: bigint; name: string; symbol: string; icon: string | null }[];
+    followers: bigint;
   } | null>(null);
   const [eligibility, setEligibility] = useState<{ tokenOk: boolean; followersOk: boolean } | null>(null);
   const [owner, setOwner] = useState<string | null>(null);
@@ -68,15 +68,14 @@ export default function ClaimPage() {
           return new TextDecoder().decode(bytes);
         } catch { return ""; }
       };
-      const [nameRaw, symbolRaw, supply, active, enabled, amount, rToken, rAmount, rFollowers, ownerAddr, start, end] = await Promise.all([
+      const [nameRaw, symbolRaw, supply, active, enabled, amount, reqResult, rFollowers, ownerAddr, start, end] = await Promise.all([
         safe(c.getData(LSP4_TOKEN_NAME_KEY), null),
         safe(c.getData(LSP4_TOKEN_SYMBOL_KEY), null),
         safe(c.maxSupply(), BigInt(0)),
         safe(c.isClaimActive(), false),
         safe(c.claimEnabled(), false),
         safe(c.amountPerClaim(), BigInt(0)),
-        safe(c.requiredToken(), ZERO),
-        safe(c.requiredTokenAmount(), BigInt(0)),
+        safe(c.getTokenRequirements(), { tokens: [], minBalances: [] }),
         safe(c.requiredFollowers(), BigInt(0)),
         safe(c.owner(), ZERO),
         safe(c.startTime(), BigInt(0)),
@@ -112,17 +111,28 @@ export default function ClaimPage() {
       setEndTime(Number(end));
       fetchProfile(ownerAddr).then(setCreatorProfile).catch(() => {});
 
-      let tokenName = "";
-      let tokenSymbol = "";
-      let tokenIcon: string | null = null;
-      if (rToken !== ZERO && rAmount > BigInt(0)) {
-        const asset = await fetchAssetByAddress(rToken).catch(() => null);
-        tokenName = asset?.lsp4TokenName || `${rToken.slice(0, 6)}...${rToken.slice(-4)}`;
-        tokenSymbol = asset?.lsp4TokenSymbol || "";
-        tokenIcon = asset?.icon || null;
-      }
-      const hasReqs = (rToken !== ZERO && rAmount > BigInt(0)) || rFollowers > BigInt(0);
-      setReqInfo(hasReqs ? { token: rToken, tokenAmount: rAmount, tokenName, tokenSymbol, tokenIcon, followers: rFollowers } : null);
+      // Build multi-token requirements list
+      const rawTokens: string[] = reqResult?.tokens ?? [];
+      const rawBalances: bigint[] = reqResult?.minBalances ?? [];
+      const tokenEntries = rawTokens
+        .map((addr: string, i: number) => ({ addr, amount: rawBalances[i] ?? BigInt(0) }))
+        .filter((e: { addr: string; amount: bigint }) => e.addr !== ZERO && e.amount > BigInt(0));
+
+      const enrichedTokens = await Promise.all(
+        tokenEntries.map(async (e: { addr: string; amount: bigint }) => {
+          const asset = await fetchAssetByAddress(e.addr).catch(() => null);
+          return {
+            addr: e.addr,
+            amount: e.amount,
+            name: asset?.lsp4TokenName || `${e.addr.slice(0, 6)}...${e.addr.slice(-4)}`,
+            symbol: asset?.lsp4TokenSymbol || "",
+            icon: asset?.icon || null,
+          };
+        })
+      );
+
+      const hasReqs = enrichedTokens.length > 0 || rFollowers > BigInt(0);
+      setReqInfo(hasReqs ? { tokens: enrichedTokens, followers: rFollowers } : null);
 
       if (type === "LSP7") {
         const [, claimers, decimals] = await Promise.all([c.totalClaimedAmount(), c.totalClaimers(), c.decimals()]);
@@ -140,7 +150,7 @@ export default function ClaimPage() {
       if (userAddr) {
         const [claimed, meets] = await Promise.all([
           c.hasClaimed(userAddr),
-          hasReqs ? c.meetsRequirements(userAddr) : Promise.resolve({ tokenOk: true, followersOk: true }),
+          hasReqs ? c.meetsRequirements(userAddr) : Promise.resolve({ tokenOk: true, followersOk: true } as any),
         ]);
         setAlreadyClaimed(claimed);
         setEligibility({ tokenOk: meets.tokenOk, followersOk: meets.followersOk });
@@ -342,19 +352,19 @@ export default function ClaimPage() {
               <div className="text-zinc-400 text-[10px] uppercase tracking-wider mb-2 text-center font-medium">
                 Requirements
               </div>
-              {reqInfo.token !== ZERO && reqInfo.tokenAmount > BigInt(0) && (
-                <div className="flex items-center justify-between py-1.5 gap-2">
+              {reqInfo.tokens.map((t, i) => (
+                <div key={i} className="flex items-center justify-between py-1.5 gap-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    {reqInfo.tokenIcon ? (
-                      <img src={reqInfo.tokenIcon} alt="" className="w-5 h-5 rounded-md object-cover flex-shrink-0" />
+                    {t.icon ? (
+                      <img src={t.icon} alt="" className="w-5 h-5 rounded-md object-cover flex-shrink-0" />
                     ) : (
                       <span className="text-base flex-shrink-0">🪙</span>
                     )}
                     <span className="text-zinc-300 text-xs truncate">
-                      Hold {reqInfo.tokenAmount.toString()}{" "}
-                      <span className="font-semibold">{reqInfo.tokenName}</span>
-                      {reqInfo.tokenSymbol && reqInfo.tokenSymbol !== reqInfo.tokenName && (
-                        <span className="text-zinc-500 ml-1">({reqInfo.tokenSymbol})</span>
+                      Hold {t.amount.toString()}{" "}
+                      <span className="font-semibold">{t.name}</span>
+                      {t.symbol && t.symbol !== t.name && (
+                        <span className="text-zinc-500 ml-1">({t.symbol})</span>
                       )}
                     </span>
                   </div>
@@ -364,7 +374,7 @@ export default function ClaimPage() {
                     </span>
                   )}
                 </div>
-              )}
+              ))}
               {reqInfo.followers > BigInt(0) && (
                 <div className="flex items-center justify-between py-1.5">
                   <span className="text-zinc-300">
