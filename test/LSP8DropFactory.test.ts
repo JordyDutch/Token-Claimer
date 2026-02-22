@@ -144,6 +144,12 @@ describe("LSP8DropFactory", function () {
         factory.connect(creator1).createNFTDrop("N", "N", 0n, 51n)
       ).to.be.revertedWith("Max 50 per claim");
     });
+
+    it("reverts when maxSupply < amountPerClaim", async function () {
+      await expect(
+        factory.connect(creator1).createNFTDrop("N", "N", 2n, 5n)
+      ).to.be.revertedWith("maxSupply < amountPerClaim");
+    });
   });
 
   // ── 3. Multiple creators ─────────────────────────────────────────────────

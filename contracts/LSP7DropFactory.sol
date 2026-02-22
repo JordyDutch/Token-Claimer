@@ -11,7 +11,7 @@ import {LSP7ClaimableToken} from "./LSP7ClaimableToken.sol";
 /// @dev Separated from LSP8DropFactory to keep each factory's bytecode under the
 ///      24 576-byte EIP-170 (Spurious Dragon) contract size limit. The unified
 ///      TokenClaimerFactory embedded both child contracts' creation bytecode,
-///      pushing it to ~36 KB. Each split factory stays at ~16–18 KB.
+///      pushing it to ~36 KB. Each split factory stays at ~16–18 KB.   
 contract LSP7DropFactory {
 
     // ──────────────────── Types ────────────────────
@@ -114,8 +114,9 @@ contract LSP7DropFactory {
         if (offset_ >= total) return new Campaign[](0);
         uint256 end = offset_ + limit_ > total ? total : offset_ + limit_;
         Campaign[] memory result = new Campaign[](end - offset_);
-        for (uint256 i = offset_; i < end; i++) {
+        for (uint256 i = offset_; i < end;) {
             result[i - offset_] = tokenCampaigns[i];
+            unchecked { ++i; }
         }
         return result;
     }

@@ -143,10 +143,17 @@ describe("LSP7DropFactory", function () {
     });
 
     it("deployed token has correct maxSupply", async function () {
-      await factory.connect(creator1).createTokenDrop("T", "T", AMOUNT_PER_CLAIM, 500n, false);
+      const supply = AMOUNT_PER_CLAIM * 5n; // 5 claims worth
+      await factory.connect(creator1).createTokenDrop("T", "T", AMOUNT_PER_CLAIM, supply, false);
       const { contractAddr } = await factory.tokenCampaigns(0);
       const token = (await ethers.getContractAt("LSP7ClaimableToken", contractAddr)) as LSP7ClaimableToken;
-      expect(await token.maxSupply()).to.equal(500n);
+      expect(await token.maxSupply()).to.equal(supply);
+    });
+
+    it("reverts when maxSupply < amountPerClaim", async function () {
+      await expect(
+        factory.connect(creator1).createTokenDrop("T", "T", AMOUNT_PER_CLAIM, 1n, false)
+      ).to.be.revertedWith("maxSupply < amountPerClaim");
     });
   });
 

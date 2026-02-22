@@ -165,6 +165,27 @@ describe("LSP7ClaimableToken", function () {
         Factory.deploy("D", "D", owner.address, 0n, 0n, false)
       ).to.be.revertedWith("amountPerClaim must be > 0");
     });
+
+    it("reverts when maxSupply < amountPerClaim (non-zero maxSupply)", async function () {
+      const Factory = await ethers.getContractFactory("LSP7ClaimableToken");
+      await expect(
+        Factory.deploy("D", "D", owner.address, 100n, 50n, false)
+      ).to.be.revertedWith("maxSupply < amountPerClaim");
+    });
+
+    it("allows maxSupply == amountPerClaim", async function () {
+      const Factory = await ethers.getContractFactory("LSP7ClaimableToken");
+      await expect(
+        Factory.deploy("D", "D", owner.address, 100n, 100n, false)
+      ).to.not.be.reverted;
+    });
+
+    it("allows maxSupply == 0 (unlimited)", async function () {
+      const Factory = await ethers.getContractFactory("LSP7ClaimableToken");
+      await expect(
+        Factory.deploy("D", "D", owner.address, 100n, 0n, false)
+      ).to.not.be.reverted;
+    });
   });
 
   // ── 2. receive() ─────────────────────────────────────────────────────────

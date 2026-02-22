@@ -165,6 +165,27 @@ describe("LSP8ClaimableNFT", function () {
         Factory.deploy("Z", "Z", owner.address, 0n, 50n)
       ).to.not.be.reverted;
     });
+
+    it("reverts when maxSupply < amountPerClaim (non-zero maxSupply)", async function () {
+      const Factory = await ethers.getContractFactory("LSP8ClaimableNFT");
+      await expect(
+        Factory.deploy("Z", "Z", owner.address, 2n, 5n)
+      ).to.be.revertedWith("maxSupply < amountPerClaim");
+    });
+
+    it("allows maxSupply == amountPerClaim", async function () {
+      const Factory = await ethers.getContractFactory("LSP8ClaimableNFT");
+      await expect(
+        Factory.deploy("Z", "Z", owner.address, 5n, 5n)
+      ).to.not.be.reverted;
+    });
+
+    it("allows maxSupply == 0 (unlimited)", async function () {
+      const Factory = await ethers.getContractFactory("LSP8ClaimableNFT");
+      await expect(
+        Factory.deploy("Z", "Z", owner.address, 0n, 5n)
+      ).to.not.be.reverted;
+    });
   });
 
   // ── 2. receive() ─────────────────────────────────────────────────────────
@@ -584,7 +605,32 @@ describe("LSP8ClaimableNFT", function () {
     });
   });
 
-  // ── 13. nextTokenId() / totalClaimed() ──────────────────────────────────
+  // ── 13. totalClaimers() ─────────────────────────────────────────────────
+
+  describe("totalClaimers()", function () {
+    it("returns 0 initially", async function () {
+      expect(await nft.totalClaimers()).to.equal(0n);
+    });
+
+    it("increments after each unique claim", async function () {
+      await nft.setClaimEnabled(true);
+      await claimer1.doClaim(await nft.getAddress());
+      expect(await nft.totalClaimers()).to.equal(1n);
+      await claimer2.doClaim(await nft.getAddress());
+      expect(await nft.totalClaimers()).to.equal(2n);
+    });
+
+    it("counts unique claimers, not total NFTs", async function () {
+      nft = await deployNFT(owner, { amountPerClaim: 3n });
+      await nft.setClaimEnabled(true);
+      await claimer1.doClaim(await nft.getAddress()); // 3 NFTs, 1 claimer
+      await claimer2.doClaim(await nft.getAddress()); // 3 NFTs, 2 claimers
+      expect(await nft.totalClaimers()).to.equal(2n);
+      expect(await nft.totalClaimed()).to.equal(6n);
+    });
+  });
+
+  // ── 14. nextTokenId() / totalClaimed() ──────────────────────────────────
 
   describe("nextTokenId() / totalClaimed()", function () {
     it("nextTokenId starts at 1 before any claims", async function () {

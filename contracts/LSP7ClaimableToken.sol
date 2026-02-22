@@ -143,6 +143,7 @@ contract LSP7ClaimableToken is LSP7DigitalAsset {
         )
     {
         require(amountPerClaim_ > 0, "amountPerClaim must be > 0");
+        require(maxSupply_ == 0 || maxSupply_ >= amountPerClaim_, "maxSupply < amountPerClaim");
         amountPerClaim = amountPerClaim_;
         maxSupply = maxSupply_;
     }
@@ -280,8 +281,9 @@ contract LSP7ClaimableToken is LSP7DigitalAsset {
         returns (bool[] memory results)
     {
         results = new bool[](addrs.length);
-        for (uint256 i = 0; i < addrs.length; i++) {
+        for (uint256 i = 0; i < addrs.length;) {
             results[i] = hasClaimed[addrs[i]];
+            unchecked { ++i; }
         }
     }
 
@@ -298,8 +300,9 @@ contract LSP7ClaimableToken is LSP7DigitalAsset {
         uint256 len = addrs.length;
         tokenOk = new bool[](len);
         followersOk = new bool[](len);
-        for (uint256 i = 0; i < len; i++) {
+        for (uint256 i = 0; i < len;) {
             (tokenOk[i], followersOk[i]) = _checkRequirements(addrs[i]);
+            unchecked { ++i; }
         }
     }
 

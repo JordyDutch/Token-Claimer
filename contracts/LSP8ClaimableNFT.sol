@@ -38,6 +38,9 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
     /// @notice Number of NFTs minted per successful claim.
     uint256 public amountPerClaim;
 
+    /// @notice Number of unique addresses that have claimed.
+    uint256 public claimerCount;
+
     /// @notice Address of the LSP7/LSP8 token contract a claimer must hold (address(0) = none).
     address public requiredToken;
 
@@ -137,9 +140,11 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
             _LSP8_TOKENID_FORMAT_NUMBER
         )
     {
-        maxSupply = maxSupply_;
         require(amountPerClaim_ <= 50, "Max 50 per claim");
-        amountPerClaim = amountPerClaim_ == 0 ? 1 : amountPerClaim_;
+        uint256 apc = amountPerClaim_ == 0 ? 1 : amountPerClaim_;
+        require(maxSupply_ == 0 || maxSupply_ >= apc, "maxSupply < amountPerClaim");
+        maxSupply = maxSupply_;
+        amountPerClaim = apc;
         _nextTokenId = 1; // token IDs start at 1
     }
 
@@ -230,12 +235,14 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
 
         // --- Effects (all state mutations completed before any interaction) ---
         hasClaimed[msg.sender] = true;
+        claimerCount++;
         uint256 firstId = _nextTokenId;
         _nextTokenId += toMint; // advance counter fully before minting (strict CEI)
 
         // --- Interaction (mint NFTs to claimer) ---
-        for (uint256 i = 0; i < toMint; i++) {
+        for (uint256 i = 0; i < toMint;) {
             _mint(msg.sender, bytes32(firstId + i), false, "");
+            unchecked { ++i; }
         }
 
         emit NFTsClaimed(msg.sender, firstId, toMint);
@@ -274,6 +281,12 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
         return _nextTokenId - 1;
     }
 
+    /// @notice Returns the total number of unique claimers.
+    /// @return The claimer count.
+    function totalClaimers() external view returns (uint256) {
+        return claimerCount;
+    }
+
     /// @notice Checks if a single address meets the token-holding and follower requirements.
     /// @param addr The address to check.
     /// @return tokenOk     True if the token balance requirement is met (or not set).
@@ -293,8 +306,9 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
         returns (bool[] memory results)
     {
         results = new bool[](addrs.length);
-        for (uint256 i = 0; i < addrs.length; i++) {
+        for (uint256 i = 0; i < addrs.length;) {
             results[i] = hasClaimed[addrs[i]];
+            unchecked { ++i; }
         }
     }
 
@@ -310,8 +324,9 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
         uint256 len = addrs.length;
         tokenOk = new bool[](len);
         followersOk = new bool[](len);
-        for (uint256 i = 0; i < len; i++) {
+        for (uint256 i = 0; i < len;) {
             (tokenOk[i], followersOk[i]) = _checkRequirements(addrs[i]);
+            unchecked { ++i; }
         }
     }
 

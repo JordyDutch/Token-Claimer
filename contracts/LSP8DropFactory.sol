@@ -112,8 +112,9 @@ contract LSP8DropFactory {
         if (offset_ >= total) return new Campaign[](0);
         uint256 end = offset_ + limit_ > total ? total : offset_ + limit_;
         Campaign[] memory result = new Campaign[](end - offset_);
-        for (uint256 i = offset_; i < end; i++) {
+        for (uint256 i = offset_; i < end;) {
             result[i - offset_] = nftCampaigns[i];
+            unchecked { ++i; }
         }
         return result;
     }
