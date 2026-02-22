@@ -1,58 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-
-const ENVIO = "https://envio.lukso-mainnet.universal.tech/v1/graphql";
-const IPFS = "https://api.universalprofile.cloud/ipfs";
-
-interface TokenInfo {
-  id: string;
-  lsp4TokenName: string;
-  lsp4TokenSymbol: string;
-  isLSP7: boolean;
-  icon: string | null;
-  description: string | null;
-}
-
-async function queryByAddress(address: string): Promise<TokenInfo | null> {
-  const res = await fetch(ENVIO, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      query: `{ Asset_by_pk(id: "${address.toLowerCase()}") { id lsp4TokenName lsp4TokenSymbol isLSP7 icons { url } description } }`,
-    }),
-  });
-  const json = await res.json();
-  const a = json?.data?.Asset_by_pk;
-  if (!a) return null;
-  return {
-    id: a.id,
-    lsp4TokenName: a.lsp4TokenName ?? "",
-    lsp4TokenSymbol: a.lsp4TokenSymbol ?? "",
-    isLSP7: a.isLSP7 ?? true,
-    icon: a.icons?.[0]?.url ? `${IPFS}/${a.icons[0].url.replace("ipfs://", "")}` : null,
-    description: a.description ?? null,
-  };
-}
-
-async function queryByName(search: string): Promise<TokenInfo[]> {
-  const res = await fetch(ENVIO, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      query: `{ Asset(where: {lsp4TokenName: {_ilike: "%${search}%"}}, limit: 8, order_by: {lsp4TokenName: asc}) { id lsp4TokenName lsp4TokenSymbol isLSP7 icons { url } } }`,
-    }),
-  });
-  const json = await res.json();
-  return (json?.data?.Asset ?? []).map((a: any) => ({
-    id: a.id,
-    lsp4TokenName: a.lsp4TokenName ?? "",
-    lsp4TokenSymbol: a.lsp4TokenSymbol ?? "",
-    isLSP7: a.isLSP7 ?? true,
-    icon: a.icons?.[0]?.url ? `${IPFS}/${a.icons[0].url.replace("ipfs://", "")}` : null,
-    description: null,
-  }));
-}
+import { fetchAssetByAddress, searchAssetsByName, type AssetInfo as TokenInfo } from "../lib/envio";
 
 interface Props {
   value: string;
@@ -77,7 +26,7 @@ export default function TokenSearchInput({ value, onChange, label, className }: 
       return;
     }
     if (selected?.id.toLowerCase() === value.toLowerCase()) return;
-    queryByAddress(value).then((t) => setSelected(t)).catch(() => setSelected(null));
+    fetchAssetByAddress(value).then((t) => setSelected(t)).catch(() => setSelected(null));
   }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounced search
@@ -88,7 +37,7 @@ export default function TokenSearchInput({ value, onChange, label, className }: 
     // If it looks like a full address, look up directly
     if (q.startsWith("0x") && q.length === 42) {
       setSearching(true);
-      queryByAddress(q)
+      fetchAssetByAddress(q)
         .then((t) => { setResults(t ? [t] : []); setSearching(false); })
         .catch(() => { setResults([]); setSearching(false); });
       return;
@@ -97,7 +46,7 @@ export default function TokenSearchInput({ value, onChange, label, className }: 
     setSearching(true);
     debounceRef.current = setTimeout(async () => {
       try {
-        const r = await queryByName(q);
+        const r = await searchAssetsByName(q);
         setResults(r);
       } catch {
         setResults([]);

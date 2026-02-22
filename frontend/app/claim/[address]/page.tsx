@@ -10,6 +10,7 @@ import {
 } from "../../lib/contracts";
 import { fetchProfile, ProfileInfo } from "../../lib/profile";
 import { LSP4_METADATA_KEY } from "../../lib/lsp4";
+import { fetchAssetByAddress } from "../../lib/envio";
 import Link from "next/link";
 import CopyButton from "../../components/CopyButton";
 import Footer from "../../components/Footer";
@@ -36,7 +37,8 @@ export default function ClaimPage() {
   const [status, setStatus] = useState<Status>(null);
   const [claiming, setClaiming] = useState(false);
   const [reqInfo, setReqInfo] = useState<{
-    token: string; tokenAmount: bigint; tokenName: string; followers: bigint;
+    token: string; tokenAmount: bigint; tokenName: string;
+    tokenSymbol: string; tokenIcon: string | null; followers: bigint;
   } | null>(null);
   const [eligibility, setEligibility] = useState<{ tokenOk: boolean; followersOk: boolean } | null>(null);
   const [owner, setOwner] = useState<string | null>(null);
@@ -111,16 +113,16 @@ export default function ClaimPage() {
       fetchProfile(ownerAddr).then(setCreatorProfile).catch(() => {});
 
       let tokenName = "";
+      let tokenSymbol = "";
+      let tokenIcon: string | null = null;
       if (rToken !== ZERO && rAmount > BigInt(0)) {
-        try {
-          const tc = new Contract(rToken, ["function name() view returns (string)"], rpc);
-          tokenName = await tc.name();
-        } catch {
-          tokenName = `${rToken.slice(0, 6)}...${rToken.slice(-4)}`;
-        }
+        const asset = await fetchAssetByAddress(rToken).catch(() => null);
+        tokenName = asset?.lsp4TokenName || `${rToken.slice(0, 6)}...${rToken.slice(-4)}`;
+        tokenSymbol = asset?.lsp4TokenSymbol || "";
+        tokenIcon = asset?.icon || null;
       }
       const hasReqs = (rToken !== ZERO && rAmount > BigInt(0)) || rFollowers > BigInt(0);
-      setReqInfo(hasReqs ? { token: rToken, tokenAmount: rAmount, tokenName, followers: rFollowers } : null);
+      setReqInfo(hasReqs ? { token: rToken, tokenAmount: rAmount, tokenName, tokenSymbol, tokenIcon, followers: rFollowers } : null);
 
       if (type === "LSP7") {
         const [, claimers, decimals] = await Promise.all([c.totalClaimedAmount(), c.totalClaimers(), c.decimals()]);
@@ -341,10 +343,21 @@ export default function ClaimPage() {
                 Requirements
               </div>
               {reqInfo.token !== ZERO && reqInfo.tokenAmount > BigInt(0) && (
-                <div className="flex items-center justify-between py-1.5">
-                  <span className="text-zinc-300">
-                    Hold {reqInfo.tokenAmount.toString()} {reqInfo.tokenName}
-                  </span>
+                <div className="flex items-center justify-between py-1.5 gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {reqInfo.tokenIcon ? (
+                      <img src={reqInfo.tokenIcon} alt="" className="w-5 h-5 rounded-md object-cover flex-shrink-0" />
+                    ) : (
+                      <span className="text-base flex-shrink-0">🪙</span>
+                    )}
+                    <span className="text-zinc-300 text-xs truncate">
+                      Hold {reqInfo.tokenAmount.toString()}{" "}
+                      <span className="font-semibold">{reqInfo.tokenName}</span>
+                      {reqInfo.tokenSymbol && reqInfo.tokenSymbol !== reqInfo.tokenName && (
+                        <span className="text-zinc-500 ml-1">({reqInfo.tokenSymbol})</span>
+                      )}
+                    </span>
+                  </div>
                   {eligibility && (
                     <span className={eligibility.tokenOk ? "text-green-400" : "text-red-400"}>
                       {eligibility.tokenOk ? "✓" : "✗"}
