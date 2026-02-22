@@ -34,6 +34,9 @@ export default function Header() {
           <Link href="/" className={linkClass("/")}>
             Explore
           </Link>
+          <Link href="/activity" className={linkClass("/activity")}>
+            Activity
+          </Link>
           <Link href="/create" className={linkClass("/create")}>
             Create
           </Link>
