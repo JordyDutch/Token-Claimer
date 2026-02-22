@@ -16,7 +16,7 @@ import { useWallet } from "../../components/WalletProvider";
 import { useNetwork } from "../../components/NetworkProvider";
 import TokenSearchInput from "../../components/TokenSearchInput";
 
-type Status = { message: string; type: "success" | "error" | "loading" } | null;
+type Status = { message: string; type: "success" | "error" | "loading"; link?: string } | null;
 
 export default function ManagePage() {
   const params = useParams();
@@ -129,7 +129,10 @@ export default function ManagePage() {
     setStatus({ message: "Connecting...", type: "loading" });
     const addr = await walletConnect();
     if (!addr) {
-      setStatus({ message: "Install the UP Browser Extension", type: "error" });
+      const mobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+      setStatus(mobile
+        ? { message: "Open in Mobile UP App", type: "error", link: "https://universalprofile.cloud/" }
+        : { message: "Install the UP Browser Extension", type: "error", link: "https://chromewebstore.google.com/detail/universal-profiles/abchhpf8hn4lfpcnhbmgfkbiimhmbpkh" });
       return;
     }
     setStatus(null);
@@ -704,7 +707,11 @@ export default function ManagePage() {
                 : "bg-dropdown border border-purple-300 dark:border-purple-500/30 text-purple-700 dark:text-purple-400"
             }`}
           >
-            {status.message}
+            {status.link ? (
+                <a href={status.link} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+                  {status.message}
+                </a>
+              ) : status.message}
           </div>
         )}
 
