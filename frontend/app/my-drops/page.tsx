@@ -190,12 +190,7 @@ export default function MyDropsPage() {
     if (address) loadDrops(address);
   }, [address, loadDrops, networkId]);
 
-  function copyClaimLink(contractAddr: string) {
-    const url = `${window.location.origin}/claim/${contractAddr}`;
-    navigator.clipboard.writeText(url);
-  }
-
-  const card = "bg-[#12121a] rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-purple-500/10";
+  const card = "bg-card rounded-xl p-4 sm:p-6 border border-border-muted card-elevated";
 
   return (
     <div className="min-h-dvh px-3 py-6 sm:p-8">
@@ -204,7 +199,7 @@ export default function MyDropsPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold">My Drops</h1>
-            <p className="text-zinc-500 text-xs sm:text-sm mt-1">
+            <p className="text-label text-xs sm:text-sm mt-1">
               Manage your token and NFT drops
             </p>
           </div>
@@ -220,7 +215,7 @@ export default function MyDropsPage() {
         {!address && (
           <div className={card + " text-center"}>
             <div className="text-4xl mb-3">🔗</div>
-            <p className="text-zinc-400 text-sm mb-4">
+            <p className="text-muted text-sm mb-4">
               Connect your Universal Profile to see your drops
             </p>
             <button
@@ -238,12 +233,12 @@ export default function MyDropsPage() {
             {profile?.image && (
               <img src={profile.image} alt="" className="w-5 h-5 rounded-full object-cover" />
             )}
-            <span className="text-zinc-300 text-xs sm:text-sm">
+            <span className="text-tertiary text-xs sm:text-sm">
               {profile?.name || `${address.slice(0, 6)}...${address.slice(-4)}`}
             </span>
             <button
               onClick={() => { disconnect(); setDrops([]); }}
-              className="text-zinc-600 text-[10px] hover:text-zinc-400 ml-1 cursor-pointer"
+              className="text-faint text-[10px] hover:text-muted ml-1 cursor-pointer"
             >
               Disconnect
             </button>
@@ -252,7 +247,7 @@ export default function MyDropsPage() {
 
         {/* Error */}
         {error && (
-          <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-3 py-2.5 rounded-xl text-xs sm:text-sm mb-4">
+          <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400 px-3 py-2.5 rounded-xl text-xs sm:text-sm mb-4">
             {error}
           </div>
         )}
@@ -263,10 +258,10 @@ export default function MyDropsPage() {
             {[1, 2].map((i) => (
               <div key={i} className={card + " animate-pulse"}>
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-zinc-800" />
+                  <div className="w-12 h-12 rounded-xl bg-surface" />
                   <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-zinc-800 rounded w-1/3" />
-                    <div className="h-3 bg-zinc-800/60 rounded w-1/2" />
+                    <div className="h-4 bg-surface rounded w-1/3" />
+                    <div className="h-3 bg-surface-subtle rounded w-1/2" />
                   </div>
                 </div>
               </div>
@@ -278,7 +273,7 @@ export default function MyDropsPage() {
         {address && !loading && drops.length === 0 && (
           <div className={card + " text-center"}>
             <div className="text-4xl mb-3">🚀</div>
-            <p className="text-zinc-400 text-sm mb-2">You haven't created any drops yet</p>
+            <p className="text-muted text-sm mb-2">You haven't created any drops yet</p>
             <Link
               href="/create"
               className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
@@ -309,29 +304,29 @@ export default function MyDropsPage() {
                       <h3 className="font-semibold text-sm sm:text-base truncate">
                         {drop.name}
                       </h3>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 flex-shrink-0">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface text-label flex-shrink-0">
                         {drop.isNFT ? "NFT" : "Token"}
                       </span>
                       {/* Status badge */}
                       {drop.claimEnabled ? (
                         drop.isActive ? (
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-400 border border-green-500/20 flex-shrink-0">
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-500/20 flex-shrink-0">
                             Live
                           </span>
                         ) : (
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 flex-shrink-0">
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-300 dark:border-blue-500/20 flex-shrink-0">
                             Scheduled
                           </span>
                         )
                       ) : (
-                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 flex-shrink-0">
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-yellow-50 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border border-yellow-300 dark:border-yellow-500/20 flex-shrink-0">
                           Paused
                         </span>
                       )}
                     </div>
 
                     {/* Stats row */}
-                    <div className="flex items-center gap-4 text-[10px] sm:text-xs text-zinc-500 mb-3">
+                    <div className="flex items-center gap-4 text-[10px] sm:text-xs text-label mb-3">
                       <span>{drop.totalClaimed} claimed</span>
                       <span>Supply: {drop.maxSupply}</span>
                       <span>{new Date(drop.createdAt * 1000).toLocaleDateString()}</span>
@@ -347,14 +342,14 @@ export default function MyDropsPage() {
                       </Link>
                       <Link
                         href={`/claim/${drop.contractAddr}`}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 border border-zinc-700 hover:border-zinc-600 hover:text-zinc-300 transition-all"
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium text-muted border border-border-default hover:border-border-muted hover:text-tertiary transition-all"
                       >
                         View claim page
                       </Link>
                       <CopyButton
                         text={typeof window !== "undefined" ? `${window.location.origin}/claim/${drop.contractAddr}` : `/claim/${drop.contractAddr}`}
                         label="Copy link"
-                        className="px-3 py-1.5 rounded-lg text-xs border border-zinc-700/50 hover:border-zinc-600"
+                        className="px-3 py-1.5 rounded-lg text-xs border border-border-muted hover:border-border-default"
                       />
                     </div>
                   </div>

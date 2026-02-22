@@ -1,7 +1,7 @@
 export default function Footer() {
   return (
     <footer className="text-center py-6 px-4">
-      <p className="text-zinc-600 text-[10px] sm:text-xs">
+      <p className="text-faint text-[10px] sm:text-xs">
         Built on{" "}
         <a
           href="https://lukso.network"

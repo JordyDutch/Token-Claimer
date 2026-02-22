@@ -12,9 +12,9 @@ import {
 // POST /api/secret-drop/[id]/claim
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params;
+  const { id } = await params;
 
   try {
     const body = await req.json();

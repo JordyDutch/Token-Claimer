@@ -229,9 +229,9 @@ export default function CreatePage() {
   }
 
   const inp =
-    "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-purple-400 transition-colors";
-  const lbl = "text-[11px] sm:text-xs text-zinc-500 mb-1 block";
-  const card = "bg-[#12121a] rounded-2xl sm:rounded-3xl p-5 sm:p-8 border border-purple-500/10";
+    "w-full bg-surface border border-border-default rounded-lg px-3 py-2.5 text-sm text-secondary focus:outline-none focus:border-purple-400 transition-colors";
+  const lbl = "text-[11px] sm:text-xs text-label mb-1 block";
+  const card = "bg-card rounded-xl p-5 sm:p-8 border border-border-muted card-elevated";
 
   // Secret Drop success screen
   if (secretDropId) {
@@ -243,15 +243,15 @@ export default function CreatePage() {
             🔐
           </div>
           <h1 className="text-xl sm:text-2xl font-bold mb-2">Secret Drop Created!</h1>
-          <p className="text-zinc-400 text-sm mb-6">
+          <p className="text-muted text-sm mb-6">
             Share the link — codes are safe off-chain and only revealed after verification
           </p>
-          <div className="bg-zinc-800/50 rounded-xl p-3 mb-6">
-            <p className="text-[10px] text-zinc-500 mb-1">Claim Link</p>
+          <div className="bg-surface-subtle rounded-xl p-3 mb-6">
+            <p className="text-[10px] text-label mb-1">Claim Link</p>
             <p className="text-xs font-mono text-violet-400 break-all mb-2">{shareUrl}</p>
             <CopyButton text={shareUrl} label="Copy link" />
           </div>
-          <Link href="/" className="block text-zinc-500 text-xs hover:text-purple-400 transition-colors">
+          <Link href="/" className="block text-label text-xs hover:text-purple-400 transition-colors">
             ← All drops
           </Link>
         </div>
@@ -268,12 +268,12 @@ export default function CreatePage() {
             ✓
           </div>
           <h1 className="text-xl sm:text-2xl font-bold mb-2">Drop Created!</h1>
-          <p className="text-zinc-400 text-sm mb-6">
+          <p className="text-muted text-sm mb-6">
             Your {dropType === "nft" ? "NFT" : "token"} drop is live on LUKSO
           </p>
 
-          <div className="bg-zinc-800/50 rounded-xl p-3 mb-4">
-            <p className="text-[10px] text-zinc-500 mb-1">Contract Address</p>
+          <div className="bg-surface-subtle rounded-xl p-3 mb-4">
+            <p className="text-[10px] text-label mb-1">Contract Address</p>
             <p className="text-xs font-mono text-purple-400 break-all mb-2">{deployedAddress}</p>
             <div className="flex items-center justify-center gap-3">
               <CopyButton text={deployedAddress} label="Copy address" />
@@ -281,16 +281,16 @@ export default function CreatePage() {
                 href={`${networkConfig.explorerBase}/address/${deployedAddress}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-zinc-500 hover:text-purple-400 transition-colors"
+                className="text-xs text-label hover:text-purple-400 transition-colors"
               >
                 View on Explorer
               </a>
             </div>
           </div>
 
-          <div className="bg-zinc-800/30 rounded-xl p-3 mb-6">
-            <p className="text-[10px] text-zinc-500 mb-1">Claim Link</p>
-            <p className="text-xs font-mono text-zinc-400 break-all mb-2">
+          <div className="bg-surface-muted rounded-xl p-3 mb-6">
+            <p className="text-[10px] text-label mb-1">Claim Link</p>
+            <p className="text-xs font-mono text-muted break-all mb-2">
               {typeof window !== "undefined" ? `${window.location.origin}/claim/${deployedAddress}` : `/claim/${deployedAddress}`}
             </p>
             <CopyButton
@@ -312,7 +312,7 @@ export default function CreatePage() {
             >
               View Claim Page →
             </Link>
-            <Link href="/" className="block text-zinc-500 text-xs hover:text-purple-400 mt-4 transition-colors">
+            <Link href="/" className="block text-label text-xs hover:text-purple-400 mt-4 transition-colors">
               ← All drops
             </Link>
           </div>
@@ -334,11 +334,11 @@ export default function CreatePage() {
     <div className="min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4">
       <div className="max-w-md w-full space-y-4">
         <div className={card}>
-          <Link href="/" className="text-zinc-500 text-xs hover:text-purple-400 transition-colors">
+          <Link href="/" className="text-label text-xs hover:text-purple-400 transition-colors">
             ← Back
           </Link>
           <h1 className="text-xl sm:text-2xl font-bold mt-2 mb-1">Create a Drop</h1>
-          <p className="text-zinc-500 text-xs sm:text-sm mb-6">
+          <p className="text-label text-xs sm:text-sm mb-6">
             Deploy your own token or NFT claim campaign on LUKSO
           </p>
 
@@ -355,12 +355,12 @@ export default function CreatePage() {
                 {profile?.image && (
                   <img src={profile.image} alt="" className="w-5 h-5 rounded-full object-cover" />
                 )}
-                <span className="text-zinc-300 text-xs">
+                <span className="text-tertiary text-xs">
                   {profile?.name || `${address.slice(0, 6)}...${address.slice(-4)}`}
                 </span>
                 <button
                   onClick={disconnect}
-                  className="text-zinc-600 text-[10px] hover:text-zinc-400 ml-1 cursor-pointer"
+                  className="text-faint text-[10px] hover:text-muted ml-1 cursor-pointer"
                 >
                   Disconnect
                 </button>
@@ -372,8 +372,8 @@ export default function CreatePage() {
                   onClick={() => setDropType("nft")}
                   className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
                     dropType === "nft"
-                      ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
-                      : "bg-zinc-800 text-zinc-400 border border-zinc-700"
+                      ? "bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 border border-purple-300 dark:border-purple-500/30"
+                      : "bg-surface text-muted border border-border-default"
                   }`}
                 >
                   🖼 NFT Drop
@@ -382,8 +382,8 @@ export default function CreatePage() {
                   onClick={() => setDropType("token")}
                   className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
                     dropType === "token"
-                      ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
-                      : "bg-zinc-800 text-zinc-400 border border-zinc-700"
+                      ? "bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 border border-purple-300 dark:border-purple-500/30"
+                      : "bg-surface text-muted border border-border-default"
                   }`}
                 >
                   🪙 Token Drop
@@ -392,8 +392,8 @@ export default function CreatePage() {
                   onClick={() => setDropType("secret")}
                   className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
                     dropType === "secret"
-                      ? "bg-violet-500/20 text-violet-400 border border-violet-500/30"
-                      : "bg-zinc-800 text-zinc-400 border border-zinc-700"
+                      ? "bg-violet-50 dark:bg-violet-500/20 text-violet-700 dark:text-violet-400 border border-violet-300 dark:border-violet-500/30"
+                      : "bg-surface text-muted border border-border-default"
                   }`}
                 >
                   🔐 Secret Drop
@@ -430,7 +430,7 @@ export default function CreatePage() {
                     className={inp}
                     min="0"
                   />
-                  <span className="text-[10px] text-zinc-600 mt-0.5 block">
+                  <span className="text-[10px] text-faint mt-0.5 block">
                     Set to 0 for unlimited supply
                   </span>
                 </div>
@@ -455,8 +455,8 @@ export default function CreatePage() {
                         onClick={() => setIsNonDivisible(false)}
                         className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                           !isNonDivisible
-                            ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
-                            : "bg-zinc-800 text-zinc-400 border border-zinc-700"
+                            ? "bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 border border-purple-300 dark:border-purple-500/30"
+                            : "bg-surface text-muted border border-border-default"
                         }`}
                       >
                         Divisible (18 decimals)
@@ -466,8 +466,8 @@ export default function CreatePage() {
                         onClick={() => setIsNonDivisible(true)}
                         className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                           isNonDivisible
-                            ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
-                            : "bg-zinc-800 text-zinc-400 border border-zinc-700"
+                            ? "bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 border border-purple-300 dark:border-purple-500/30"
+                            : "bg-surface text-muted border border-border-default"
                         }`}
                       >
                         Non-divisible (whole)
@@ -477,8 +477,8 @@ export default function CreatePage() {
                 )}
 
                 {/* LSP4 Metadata */}
-                <div className="border-t border-zinc-700/30 pt-4 mt-1">
-                  <p className="text-xs font-semibold text-zinc-300 mb-3">Metadata</p>
+                <div className="border-t border-border-muted pt-4 mt-1">
+                  <p className="text-xs font-semibold text-tertiary mb-3">Metadata</p>
 
                   {/* Icon upload */}
                   <div className="mb-3">
@@ -488,10 +488,10 @@ export default function CreatePage() {
                         <img
                           src={iconPreview}
                           alt="Icon preview"
-                          className="w-10 h-10 rounded-lg object-cover border border-zinc-700"
+                          className="w-10 h-10 rounded-lg object-cover border border-border-default"
                         />
                       ) : (
-                        <div className="w-10 h-10 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-600 text-sm">
+                        <div className="w-10 h-10 rounded-lg bg-surface border border-border-default flex items-center justify-center text-faint text-sm">
                           IMG
                         </div>
                       )}
@@ -510,7 +510,7 @@ export default function CreatePage() {
                             setIconPreview(null);
                             if (fileRef.current) fileRef.current.value = "";
                           }}
-                          className="text-xs text-zinc-500 hover:text-red-400 transition-colors cursor-pointer"
+                          className="text-xs text-label hover:text-red-400 transition-colors cursor-pointer"
                         >
                           Remove
                         </button>
@@ -524,7 +524,7 @@ export default function CreatePage() {
                       className="hidden"
                     />
                     {iconFile && (
-                      <p className="text-[10px] text-zinc-600 mt-1">{iconFile.name}</p>
+                      <p className="text-[10px] text-faint mt-1">{iconFile.name}</p>
                     )}
                   </div>
 
@@ -545,7 +545,7 @@ export default function CreatePage() {
                     <label className={lbl}>Links</label>
                     <div className="space-y-2">
                       {links.map((link, i) => (
-                        <div key={i} className="bg-zinc-800/40 rounded-lg p-2.5 space-y-1.5">
+                        <div key={i} className="bg-surface-muted rounded-lg p-2.5 space-y-1.5">
                           <input
                             value={link.title}
                             onChange={(e) => updateLink(i, "title", e.target.value)}
@@ -563,7 +563,7 @@ export default function CreatePage() {
                             <button
                               type="button"
                               onClick={() => removeLink(i)}
-                              className="text-[10px] text-zinc-600 hover:text-red-400 transition-colors cursor-pointer"
+                              className="text-[10px] text-faint hover:text-red-400 transition-colors cursor-pointer"
                             >
                               Remove link
                             </button>
@@ -583,7 +583,7 @@ export default function CreatePage() {
                   {/* Assets */}
                   <div className="mb-3">
                     <label className={lbl}>Assets</label>
-                    <span className="text-[10px] text-zinc-600 block mb-1.5">
+                    <span className="text-[10px] text-faint block mb-1.5">
                       Attach files to the token (images, documents, media). Uploaded to IPFS.
                     </span>
                     {assetFiles.length > 0 && (
@@ -591,18 +591,18 @@ export default function CreatePage() {
                         {assetFiles.map((file, i) => (
                           <div
                             key={i}
-                            className="flex items-center justify-between bg-zinc-800/40 rounded-lg px-3 py-2"
+                            className="flex items-center justify-between bg-surface-muted rounded-lg px-3 py-2"
                           >
-                            <span className="text-xs text-zinc-300 truncate flex-1 mr-2">
+                            <span className="text-xs text-tertiary truncate flex-1 mr-2">
                               {file.name}
                             </span>
-                            <span className="text-[10px] text-zinc-600 mr-2 flex-shrink-0">
+                            <span className="text-[10px] text-faint mr-2 flex-shrink-0">
                               {(file.size / 1024).toFixed(0)} KB
                             </span>
                             <button
                               type="button"
                               onClick={() => removeAsset(i)}
-                              className="text-[10px] text-zinc-600 hover:text-red-400 transition-colors cursor-pointer flex-shrink-0"
+                              className="text-[10px] text-faint hover:text-red-400 transition-colors cursor-pointer flex-shrink-0"
                             >
                               Remove
                             </button>
@@ -626,7 +626,7 @@ export default function CreatePage() {
                     />
                   </div>
 
-                  <p className="text-[10px] text-zinc-600">
+                  <p className="text-[10px] text-faint">
                     Metadata is uploaded to IPFS and stored on-chain via a second wallet confirmation after deployment.
                   </p>
                 </div>
@@ -644,7 +644,7 @@ export default function CreatePage() {
               {/* ── Secret Drop Form ── */}
               {dropType === "secret" && (
                 <div className="space-y-4 mt-2">
-                  <div className="bg-violet-500/5 border border-violet-500/15 rounded-xl px-4 py-3 text-xs text-violet-300">
+                  <div className="bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/20 rounded-xl px-4 py-3 text-xs text-violet-700 dark:text-violet-300">
                     Codes and links are stored off-chain. Only verified claimers receive them — nothing is readable on-chain.
                   </div>
 
@@ -667,13 +667,13 @@ export default function CreatePage() {
                     <textarea value={secretCodesRaw} onChange={(e) => setSecretCodesRaw(e.target.value)}
                       placeholder={"DISCOUNT-A1B2\nDISCOUNT-C3D4\nhttps://meet.example.com/vip-room"}
                       rows={5} className={`${inp} font-mono text-xs resize-y`} />
-                    <p className="text-[10px] text-zinc-600 mt-1">
+                    <p className="text-[10px] text-faint mt-1">
                       {secretCodesRaw.split("\n").filter((l) => l.trim()).length} code(s)
                     </p>
                   </div>
 
                   <div>
-                    <label className={lbl}>Max uses per code <span className="text-zinc-600">(1 = unique per person, higher = reusable)</span></label>
+                    <label className={lbl}>Max uses per code <span className="text-faint">(1 = unique per person, higher = reusable)</span></label>
                     <input type="number" min="1" value={secretUsageLimit}
                       onChange={(e) => setSecretUsageLimit(e.target.value)}
                       className={inp} />
@@ -682,17 +682,17 @@ export default function CreatePage() {
                   {/* Token requirements */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <label className={lbl + " mb-0"}>Token Requirements <span className="text-zinc-600">(optional)</span></label>
+                      <label className={lbl + " mb-0"}>Token Requirements <span className="text-faint">(optional)</span></label>
                       <button type="button"
                         onClick={() => setSecretTokenReqs((prev) => [...prev, { address: "", minBalance: "1" }])}
                         className="text-[10px] text-purple-400 hover:text-purple-300 border border-purple-500/20 rounded-md px-2 py-1"
                       >+ Add token</button>
                     </div>
                     {secretTokenReqs.length === 0 && (
-                      <p className="text-[11px] text-zinc-600 mb-1">No token requirement — anyone with a UP can claim</p>
+                      <p className="text-[11px] text-faint mb-1">No token requirement — anyone with a UP can claim</p>
                     )}
                     {secretTokenReqs.map((req, i) => (
-                      <div key={i} className="mb-3 bg-zinc-800/50 border border-zinc-700/50 rounded-xl p-3 space-y-2">
+                      <div key={i} className="mb-3 bg-surface-subtle border border-border-muted rounded-xl p-3 space-y-2">
                         <div>
                           <label className={lbl}>Token</label>
                           <TokenSearchInput
@@ -702,7 +702,7 @@ export default function CreatePage() {
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="flex-1">
-                            <label className={lbl}>Min amount to hold <span className="text-zinc-600">(0 = just hold any)</span></label>
+                            <label className={lbl}>Min amount to hold <span className="text-faint">(0 = just hold any)</span></label>
                             <input type="number" min="0" placeholder="0"
                               value={req.minBalance}
                               onChange={(e) => setSecretTokenReqs((prev) => prev.map((r, j) => j === i ? { ...r, minBalance: e.target.value } : r))}
@@ -721,13 +721,13 @@ export default function CreatePage() {
                   {/* Follower requirements */}
                   <div className="space-y-3">
                     <div>
-                      <label className={lbl}>Minimum followers <span className="text-zinc-600">(0 = no requirement)</span></label>
+                      <label className={lbl}>Minimum followers <span className="text-faint">(0 = no requirement)</span></label>
                       <input type="number" min="0" value={secretMinFollowers}
                         onChange={(e) => setSecretMinFollowers(e.target.value)}
                         className={inp} />
                     </div>
                     <div>
-                      <label className={lbl}>Must follow UP <span className="text-zinc-600">(optional — search by name)</span></label>
+                      <label className={lbl}>Must follow UP <span className="text-faint">(optional — search by name)</span></label>
                       <UPSearchInput
                         value={secretFollowAddress}
                         onChange={setSecretFollowAddress}
@@ -738,9 +738,9 @@ export default function CreatePage() {
 
                   {status && (
                     <div className={`px-3 py-2 rounded-lg text-xs ${
-                      status.type === "error" ? "bg-red-500/10 text-red-400 border border-red-500/20" :
-                      status.type === "success" ? "bg-green-500/10 text-green-400 border border-green-500/20" :
-                      "bg-purple-500/10 text-purple-400 border border-purple-500/20"}`}>
+                      status.type === "error" ? "bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-500/20" :
+                      status.type === "success" ? "bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-500/20" :
+                      "bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-500/20"}`}>
                       {status.message}
                     </div>
                   )}
@@ -762,10 +762,10 @@ export default function CreatePage() {
           <div
             className={`px-3 py-2.5 rounded-xl text-xs sm:text-sm ${
               status.type === "success"
-                ? "bg-green-500/10 border border-green-500/20 text-green-400"
+                ? "bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 text-green-700 dark:text-green-400"
                 : status.type === "error"
-                ? "bg-red-500/10 border border-red-500/20 text-red-400"
-                : "bg-purple-500/10 border border-purple-500/20 text-purple-400"
+                ? "bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400"
+                : "bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-400"
             }`}
           >
             {status.message}

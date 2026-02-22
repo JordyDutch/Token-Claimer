@@ -218,10 +218,10 @@ export default function ManagePage() {
     }
   }
 
-  const inp = "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-purple-400 transition-colors";
-  const lbl = "text-[11px] sm:text-xs text-zinc-500";
-  const btn = "w-full py-2.5 sm:py-3 rounded-xl text-sm font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition-all cursor-pointer active:scale-[0.97]";
-  const card = "bg-[#12121a] rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-purple-500/10";
+  const inp = "w-full bg-surface border border-border-default rounded-lg px-3 py-2.5 text-sm text-secondary focus:outline-none focus:border-purple-400 transition-colors";
+  const lbl = "text-[11px] sm:text-xs text-label";
+  const btn = "w-full py-2.5 sm:py-3 rounded-xl text-sm font-medium bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 border border-purple-300 dark:border-purple-500/30 hover:bg-purple-100 dark:hover:bg-purple-500/30 transition-all cursor-pointer active:scale-[0.97]";
+  const card = "bg-card rounded-xl p-4 sm:p-6 border border-border-muted card-elevated";
   const explorerUrl = `${networkConfig.explorerBase}/address/${contractAddress}`;
 
   return (
@@ -230,20 +230,20 @@ export default function ManagePage() {
         {/* Header card */}
         <div className={card}>
           <div className="flex items-center justify-between mb-1">
-            <Link href={`/claim/${contractAddress}`} className="text-zinc-500 text-xs hover:text-purple-400 transition-colors">
+            <Link href={`/claim/${contractAddress}`} className="text-label text-xs hover:text-purple-400 transition-colors">
               ← Claim page
             </Link>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface text-muted">
               {tokenType || "..."}
             </span>
           </div>
 
           <h1 className="text-xl sm:text-2xl font-bold mb-1">Manage Drop</h1>
-          <p className="text-zinc-500 text-xs truncate mb-2">{dropName || contractAddress}</p>
+          <p className="text-label text-xs truncate mb-2">{dropName || contractAddress}</p>
 
           {/* Contract address with copy + explorer */}
-          <div className="flex items-center gap-2 bg-zinc-800/50 rounded-lg px-3 py-2 mb-3">
-            <span className="text-[10px] font-mono text-zinc-500 truncate flex-1">
+          <div className="flex items-center gap-2 bg-surface-subtle rounded-lg px-3 py-2 mb-3">
+            <span className="text-[10px] font-mono text-label truncate flex-1">
               {contractAddress}
             </span>
             <CopyButton text={contractAddress} label="Copy" />
@@ -251,7 +251,7 @@ export default function ManagePage() {
               href={explorerUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[10px] text-zinc-500 hover:text-purple-400 transition-colors"
+              className="text-[10px] text-label hover:text-purple-400 transition-colors"
             >
               Explorer
             </a>
@@ -260,7 +260,7 @@ export default function ManagePage() {
           {/* Share claim link */}
           <button
             onClick={copyClaimLink}
-            className="w-full py-2 rounded-lg text-xs font-medium border border-zinc-700 text-zinc-400 hover:text-purple-400 hover:border-purple-500/30 transition-all cursor-pointer mb-3"
+            className="w-full py-2 rounded-lg text-xs font-medium border border-border-default text-muted hover:text-purple-400 hover:border-purple-500/30 transition-all cursor-pointer mb-3"
           >
             {linkCopied ? "Claim link copied!" : "Copy claim link for sharing"}
           </button>
@@ -273,7 +273,7 @@ export default function ManagePage() {
               Connect Universal Profile
             </button>
           ) : !isOwner ? (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-3 py-2.5 rounded-xl text-xs">
+            <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400 px-3 py-2.5 rounded-xl text-xs">
               You are not the owner of this contract. Only the owner can manage this drop.
             </div>
           ) : (
@@ -281,12 +281,12 @@ export default function ManagePage() {
               {profile?.image && (
                 <img src={profile.image} alt="" className="w-5 h-5 rounded-full object-cover" />
               )}
-              <span className="text-green-400 text-xs">
+              <span className="text-green-600 dark:text-green-400 text-xs">
                 ✓ {profile?.name || `${address.slice(0, 6)}...${address.slice(-4)}`}
               </span>
               <button
                 onClick={() => { disconnect(); setIsOwner(false); }}
-                className="text-zinc-600 text-[10px] hover:text-zinc-400 ml-1 cursor-pointer"
+                className="text-faint text-[10px] hover:text-muted ml-1 cursor-pointer"
               >
                 Disconnect
               </button>
@@ -301,17 +301,17 @@ export default function ManagePage() {
               <div className="grid grid-cols-3 gap-3 text-center mb-4">
                 <div>
                   <div className={lbl + " uppercase tracking-wider"}>Status</div>
-                  <div className={`text-lg font-semibold ${claimEnabled ? "text-green-400" : "text-red-400"}`}>
+                  <div className={`text-lg font-semibold ${claimEnabled ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                     {claimEnabled ? "Live" : "Paused"}
                   </div>
                 </div>
                 <div>
                   <div className={lbl + " uppercase tracking-wider"}>Claimed</div>
-                  <div className="text-lg font-semibold text-purple-400">{totalClaimed}</div>
+                  <div className="text-lg font-semibold text-purple-600 dark:text-purple-400">{totalClaimed}</div>
                 </div>
                 <div>
                   <div className={lbl + " uppercase tracking-wider"}>Supply</div>
-                  <div className="text-lg font-semibold text-purple-400">
+                  <div className="text-lg font-semibold text-purple-600 dark:text-purple-400">
                     {maxSupply === "0" ? "Unlimited" : maxSupply}
                   </div>
                 </div>
@@ -325,8 +325,8 @@ export default function ManagePage() {
                 }
                 className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer active:scale-[0.97] ${
                   claimEnabled
-                    ? "bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
-                    : "bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30"
+                    ? "bg-red-50 dark:bg-red-500/20 text-red-700 dark:text-red-400 border border-red-300 dark:border-red-500/30 hover:bg-red-100 dark:hover:bg-red-500/30"
+                    : "bg-green-50 dark:bg-green-500/20 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-500/30 hover:bg-green-100 dark:hover:bg-green-500/30"
                 }`}
               >
                 {claimEnabled ? "Pause Claims" : "Enable Claims"}
@@ -335,8 +335,8 @@ export default function ManagePage() {
 
             {/* Claim window */}
             <div className={card}>
-              <h2 className="text-xs font-semibold text-zinc-300 mb-3">Claim Window</h2>
-              <p className="text-[10px] text-zinc-600 mb-3">
+              <h2 className="text-xs font-semibold text-tertiary mb-3">Claim Window</h2>
+              <p className="text-[10px] text-faint mb-3">
                 Set a time window during which claims are allowed. Leave empty for no time restriction.
               </p>
               <div className="space-y-3">
@@ -373,10 +373,10 @@ export default function ManagePage() {
 
             {/* Amount per claim */}
             <div className={card}>
-              <h2 className="text-xs font-semibold text-zinc-300 mb-1">
+              <h2 className="text-xs font-semibold text-tertiary mb-1">
                 {tokenType === "LSP7" ? "Tokens" : "NFTs"} Per Claim
               </h2>
-              <p className="text-[10px] text-zinc-600 mb-3">
+              <p className="text-[10px] text-faint mb-3">
                 How many {tokenType === "LSP7" ? "tokens" : "NFTs"} each user receives when they claim.
               </p>
               <input
@@ -398,20 +398,20 @@ export default function ManagePage() {
 
             {/* Requirements */}
             <div className={card}>
-              <h2 className="text-xs font-semibold text-zinc-300 mb-1">Requirements</h2>
-              <p className="text-[10px] text-zinc-600 mb-3">
+              <h2 className="text-xs font-semibold text-tertiary mb-1">Requirements</h2>
+              <p className="text-[10px] text-faint mb-3">
                 Set conditions users must meet before they can claim. Add up to 10 token requirements — ALL must be satisfied. Leave empty for no requirements.
               </p>
               <div className="space-y-3">
                 {/* Multi-token requirements list */}
                 {tokenReqs.map((req, i) => (
-                  <div key={i} className="bg-zinc-800/40 rounded-xl p-3 space-y-2">
+                  <div key={i} className="bg-surface-muted rounded-xl p-3 space-y-2">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] text-zinc-500">Token requirement {i + 1}</span>
+                      <span className="text-[10px] text-label">Token requirement {i + 1}</span>
                       <button
                         type="button"
                         onClick={() => setTokenReqs((prev) => prev.filter((_, j) => j !== i))}
-                        className="text-[10px] text-zinc-600 hover:text-red-400 transition-colors cursor-pointer"
+                        className="text-[10px] text-faint hover:text-red-400 transition-colors cursor-pointer"
                       >
                         Remove
                       </button>
@@ -422,7 +422,7 @@ export default function ManagePage() {
                       onChange={(v) => setTokenReqs((prev) => prev.map((r, j) => j === i ? { ...r, addr: v } : r))}
                     />
                     <div>
-                      <label className={lbl}>Minimum balance <span className="text-zinc-600">(min 1)</span></label>
+                      <label className={lbl}>Minimum balance <span className="text-faint">(min 1)</span></label>
                       <input
                         type="number"
                         value={req.amount}
@@ -475,12 +475,12 @@ export default function ManagePage() {
             </div>
             {/* Codeword */}
             <div className={card}>
-              <h2 className="text-xs font-semibold text-zinc-300 mb-1">Codeword</h2>
-              <p className="text-[10px] text-zinc-600 mb-3">
+              <h2 className="text-xs font-semibold text-tertiary mb-1">Codeword</h2>
+              <p className="text-[10px] text-faint mb-3">
                 Require claimers to enter a secret word — say it in a livestream. Only the keccak256 hash is stored on-chain, not the plaintext.
               </p>
               <div className="flex items-center gap-2 mb-3">
-                <span className={`text-xs font-semibold ${codewordEnabled ? "text-green-400" : "text-zinc-500"}`}>
+                <span className={`text-xs font-semibold ${codewordEnabled ? "text-green-600 dark:text-green-400" : "text-label"}`}>
                   {codewordEnabled ? "🔑 Codeword active" : "No codeword set"}
                 </span>
               </div>
@@ -494,7 +494,7 @@ export default function ManagePage() {
                   autoComplete="off"
                   spellCheck={false}
                 />
-                <p className="text-[10px] text-zinc-600">
+                <p className="text-[10px] text-faint">
                   Use a longer passphrase for better security. Empty = clear codeword.
                 </p>
                 <div className="flex gap-2">
@@ -513,7 +513,7 @@ export default function ManagePage() {
                   {codewordEnabled && (
                     <button
                       onClick={() => sendTx((c) => c.setCodeword(""), "Clearing codeword...")}
-                      className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-zinc-700 text-zinc-400 hover:border-red-500/30 hover:text-red-400 transition-all cursor-pointer"
+                      className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-border-default text-muted hover:border-red-500/30 hover:text-red-400 transition-all cursor-pointer"
                     >
                       Clear Codeword
                     </button>
@@ -524,8 +524,8 @@ export default function ManagePage() {
 
             {/* LSP4 Metadata */}
             <div className={card}>
-              <h2 className="text-xs font-semibold text-zinc-300 mb-1">Metadata (LSP4)</h2>
-              <p className="text-[10px] text-zinc-600 mb-3">
+              <h2 className="text-xs font-semibold text-tertiary mb-1">Metadata (LSP4)</h2>
+              <p className="text-[10px] text-faint mb-3">
                 Set icon and description shown on the claim page. Uploaded to IPFS — requires Pinata JWT configured server-side.
               </p>
               <div className="space-y-3">
@@ -534,9 +534,9 @@ export default function ManagePage() {
                   <label className={lbl}>Icon</label>
                   <div className="flex items-center gap-3 mt-1">
                     {metaIconPreview ? (
-                      <img src={metaIconPreview} alt="" className="w-10 h-10 rounded-lg object-cover border border-zinc-700" />
+                      <img src={metaIconPreview} alt="" className="w-10 h-10 rounded-lg object-cover border border-border-default" />
                     ) : (
-                      <div className="w-10 h-10 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-600 text-xs">IMG</div>
+                      <div className="w-10 h-10 rounded-lg bg-surface border border-border-default flex items-center justify-center text-faint text-xs">IMG</div>
                     )}
                     <button
                       type="button"
@@ -549,7 +549,7 @@ export default function ManagePage() {
                       <button
                         type="button"
                         onClick={() => { setMetaIconFile(null); setMetaIconPreview(null); if (metaIconRef.current) metaIconRef.current.value = ""; }}
-                        className="text-xs text-zinc-500 hover:text-red-400 transition-colors cursor-pointer"
+                        className="text-xs text-label hover:text-red-400 transition-colors cursor-pointer"
                       >
                         Remove
                       </button>
@@ -586,7 +586,7 @@ export default function ManagePage() {
                   <label className={lbl}>Links</label>
                   <div className="space-y-2 mt-1">
                     {metaLinks.map((link, i) => (
-                      <div key={i} className="bg-zinc-800/40 rounded-lg p-2 space-y-1.5">
+                      <div key={i} className="bg-surface-muted rounded-lg p-2 space-y-1.5">
                         <input
                           value={link.title}
                           onChange={(e) => setMetaLinks((prev) => prev.map((l, j) => j === i ? { ...l, title: e.target.value } : l))}
@@ -603,7 +603,7 @@ export default function ManagePage() {
                           <button
                             type="button"
                             onClick={() => setMetaLinks((prev) => prev.filter((_, j) => j !== i))}
-                            className="text-[10px] text-zinc-600 hover:text-red-400 transition-colors cursor-pointer"
+                            className="text-[10px] text-faint hover:text-red-400 transition-colors cursor-pointer"
                           >
                             Remove
                           </button>
@@ -623,7 +623,7 @@ export default function ManagePage() {
                 {/* Assets */}
                 <div>
                   <label className={lbl}>Assets</label>
-                  <span className="text-[10px] text-zinc-600 block mb-1.5">
+                  <span className="text-[10px] text-faint block mb-1.5">
                     Attach files to the token (images, documents, media). Uploaded to IPFS.
                   </span>
                   {metaAssetFiles.length > 0 && (
@@ -631,18 +631,18 @@ export default function ManagePage() {
                       {metaAssetFiles.map((file, i) => (
                         <div
                           key={i}
-                          className="flex items-center justify-between bg-zinc-800/40 rounded-lg px-3 py-2"
+                          className="flex items-center justify-between bg-surface-muted rounded-lg px-3 py-2"
                         >
-                          <span className="text-xs text-zinc-300 truncate flex-1 mr-2">
+                          <span className="text-xs text-tertiary truncate flex-1 mr-2">
                             {file.name}
                           </span>
-                          <span className="text-[10px] text-zinc-600 mr-2 flex-shrink-0">
+                          <span className="text-[10px] text-faint mr-2 flex-shrink-0">
                             {(file.size / 1024).toFixed(0)} KB
                           </span>
                           <button
                             type="button"
                             onClick={() => removeMetaAsset(i)}
-                            className="text-[10px] text-zinc-600 hover:text-red-400 transition-colors cursor-pointer flex-shrink-0"
+                            className="text-[10px] text-faint hover:text-red-400 transition-colors cursor-pointer flex-shrink-0"
                           >
                             Remove
                           </button>
@@ -679,8 +679,8 @@ export default function ManagePage() {
             {/* Verified creator */}
             <div className={card}>
               <h2 className="text-sm font-semibold mb-1">Verified Creator</h2>
-              <p className="text-zinc-500 text-xs mb-3">
-                Sets <span className="text-zinc-300">LSP4Creators[]</span> on this contract and adds it to your UP&apos;s <span className="text-zinc-300">LSP12IssuedAssets[]</span>. Removes the &quot;Un-verified creators&quot; badge on marketplaces. Requires 2 wallet confirmations.
+              <p className="text-label text-xs mb-3">
+                Sets <span className="text-tertiary">LSP4Creators[]</span> on this contract and adds it to your UP&apos;s <span className="text-tertiary">LSP12IssuedAssets[]</span>. Removes the &quot;Un-verified creators&quot; badge on marketplaces. Requires 2 wallet confirmations.
               </p>
               <button
                 onClick={verifyCreator}
@@ -698,10 +698,10 @@ export default function ManagePage() {
           <div
             className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-sm px-4 py-3 rounded-xl text-xs sm:text-sm shadow-xl shadow-black/40 transition-all ${
               status.type === "success"
-                ? "bg-green-950 border border-green-500/30 text-green-400"
+                ? "bg-toast-success border border-green-300 dark:border-green-500/30 text-green-700 dark:text-green-400"
                 : status.type === "error"
-                ? "bg-red-950 border border-red-500/30 text-red-400"
-                : "bg-zinc-900 border border-purple-500/30 text-purple-400"
+                ? "bg-toast-error border border-red-300 dark:border-red-500/30 text-red-700 dark:text-red-400"
+                : "bg-dropdown border border-purple-300 dark:border-purple-500/30 text-purple-700 dark:text-purple-400"
             }`}
           >
             {status.message}
@@ -710,7 +710,7 @@ export default function ManagePage() {
 
         {/* Footer nav */}
         <div className="flex justify-between px-2 pb-4">
-          <Link href="/" className="text-zinc-600 text-[10px] sm:text-xs hover:text-purple-400 transition-colors">
+          <Link href="/" className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors">
             ← All drops
           </Link>
           <Footer />

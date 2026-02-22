@@ -92,38 +92,38 @@ export default function TokenSearchInput({ value, onChange, label, className }: 
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const inp = "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-purple-400 transition-colors";
+  const inp = "w-full bg-surface border border-border-default rounded-lg px-3 py-2.5 text-sm text-secondary focus:outline-none focus:border-purple-400 transition-colors";
 
   return (
     <div ref={containerRef} className={className}>
-      {label && <label className="text-[11px] sm:text-xs text-zinc-500 block mb-1">{label}</label>}
+      {label && <label className="text-[11px] sm:text-xs text-label block mb-1">{label}</label>}
 
       {/* Selected token preview */}
       {selected && (
-        <div className="flex items-center gap-3 bg-zinc-800/60 border border-zinc-700 rounded-lg px-3 py-2 mb-2">
+        <div className="flex items-center gap-3 bg-surface-subtle border border-border-default rounded-lg px-3 py-2 mb-2">
           {selected.icon ? (
             <img src={selected.icon} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
           ) : (
-            <div className="w-8 h-8 rounded-lg bg-zinc-700 flex items-center justify-center text-xs text-zinc-500 flex-shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-surface-hover flex items-center justify-center text-xs text-label flex-shrink-0">
               {selected.isLSP7 ? "🪙" : "🖼"}
             </div>
           )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="text-xs font-semibold text-zinc-200 truncate">{selected.lsp4TokenName}</span>
-              <span className="text-[10px] text-zinc-500 flex-shrink-0">{selected.lsp4TokenSymbol}</span>
-              <span className="text-[10px] px-1 py-0.5 rounded bg-zinc-700 text-zinc-400 flex-shrink-0">
+              <span className="text-xs font-semibold text-secondary truncate">{selected.lsp4TokenName}</span>
+              <span className="text-[10px] text-label flex-shrink-0">{selected.lsp4TokenSymbol}</span>
+              <span className="text-[10px] px-1 py-0.5 rounded bg-surface-hover text-muted flex-shrink-0">
                 {selected.isLSP7 ? "LSP7" : "LSP8"}
               </span>
             </div>
-            <span className="text-[10px] font-mono text-zinc-600 truncate block">
+            <span className="text-[10px] font-mono text-faint truncate block">
               {selected.id.slice(0, 10)}...{selected.id.slice(-8)}
             </span>
           </div>
           <button
             type="button"
             onClick={clearSelection}
-            className="text-zinc-500 hover:text-red-400 transition-colors text-xs flex-shrink-0 cursor-pointer"
+            className="text-label hover:text-red-400 transition-colors text-xs flex-shrink-0 cursor-pointer"
           >
             ✕
           </button>
@@ -148,30 +148,30 @@ export default function TokenSearchInput({ value, onChange, label, className }: 
 
         {/* Dropdown */}
         {open && results.length > 0 && (
-          <div className="absolute z-50 mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl overflow-hidden">
+          <div className="absolute z-50 mt-1 w-full bg-dropdown border border-border-default rounded-xl shadow-xl overflow-hidden">
             {results.map((token) => (
               <button
                 key={token.id}
                 type="button"
                 onClick={() => selectToken(token)}
-                className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-zinc-800 transition-colors text-left cursor-pointer"
+                className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-surface-hover transition-colors text-left cursor-pointer"
               >
                 {token.icon ? (
                   <img src={token.icon} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
                 ) : (
-                  <div className="w-8 h-8 rounded-lg bg-zinc-700 flex items-center justify-center text-xs text-zinc-500 flex-shrink-0">
+                  <div className="w-8 h-8 rounded-lg bg-surface-hover flex items-center justify-center text-xs text-label flex-shrink-0">
                     {token.isLSP7 ? "🪙" : "🖼"}
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-semibold text-zinc-200 truncate">{token.lsp4TokenName}</span>
-                    <span className="text-[10px] text-zinc-500 flex-shrink-0">{token.lsp4TokenSymbol}</span>
-                    <span className="text-[10px] px-1 py-0.5 rounded bg-zinc-700 text-zinc-400 flex-shrink-0">
+                    <span className="text-xs font-semibold text-secondary truncate">{token.lsp4TokenName}</span>
+                    <span className="text-[10px] text-label flex-shrink-0">{token.lsp4TokenSymbol}</span>
+                    <span className="text-[10px] px-1 py-0.5 rounded bg-surface-hover text-muted flex-shrink-0">
                       {token.isLSP7 ? "LSP7" : "LSP8"}
                     </span>
                   </div>
-                  <span className="text-[10px] font-mono text-zinc-600 truncate block">
+                  <span className="text-[10px] font-mono text-faint truncate block">
                     {token.id.slice(0, 10)}...{token.id.slice(-8)}
                   </span>
                 </div>
@@ -182,8 +182,8 @@ export default function TokenSearchInput({ value, onChange, label, className }: 
 
         {/* No results */}
         {open && search.length >= 2 && results.length === 0 && !searching && (
-          <div className="absolute z-50 mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl px-3 py-3">
-            <span className="text-xs text-zinc-500">No tokens found. Try a different name or paste a contract address.</span>
+          <div className="absolute z-50 mt-1 w-full bg-dropdown border border-border-default rounded-xl shadow-xl px-3 py-3">
+            <span className="text-xs text-label">No tokens found. Try a different name or paste a contract address.</span>
           </div>
         )}
       </div>

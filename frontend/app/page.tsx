@@ -167,8 +167,8 @@ export default function HomePage() {
   const tabClass = (tab: FilterTab) =>
     `px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
       filter === tab
-        ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
-        : "text-zinc-500 hover:text-zinc-300 border border-transparent"
+        ? "bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 border border-purple-300 dark:border-purple-500/30"
+        : "text-label hover:text-secondary border border-transparent"
     }`;
 
   function timeSince(timestamp: number): string {
@@ -188,7 +188,7 @@ export default function HomePage() {
           <h1 className="text-3xl sm:text-4xl font-bold mb-2">
             Discover Drops
           </h1>
-          <p className="text-zinc-400 text-sm sm:text-base mb-6">
+          <p className="text-muted text-sm sm:text-base mb-6">
             Claim tokens and NFTs on LUKSO
           </p>
           <Link
@@ -206,7 +206,7 @@ export default function HomePage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name, symbol, or address..."
-            className="w-full bg-[#12121a] border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-purple-500/40 transition-colors"
+            className="w-full bg-card border border-border-muted rounded-xl px-4 py-2.5 text-sm text-tertiary placeholder:text-faint focus:outline-none focus:border-purple-500/40 transition-colors"
           />
           <div className="flex items-center gap-2 flex-wrap">
             <button onClick={() => setFilter("all")} className={tabClass("all")}>
@@ -230,7 +230,7 @@ export default function HomePage() {
             >
               My Drops
             </button>
-            <span className="text-zinc-600 text-xs ml-auto">
+            <span className="text-faint text-xs ml-auto">
               {loading ? "Loading..." : `${filtered.length} drop${filtered.length !== 1 ? "s" : ""}`}
             </span>
           </div>
@@ -242,13 +242,13 @@ export default function HomePage() {
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="bg-[#12121a] rounded-2xl p-4 sm:p-5 border border-purple-500/10 animate-pulse"
+                className="bg-card rounded-xl p-4 sm:p-5 border border-border-muted card-elevated animate-pulse"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-zinc-800" />
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-surface" />
                   <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-zinc-800 rounded w-1/3" />
-                    <div className="h-3 bg-zinc-800/60 rounded w-1/2" />
+                    <div className="h-4 bg-surface rounded w-1/3" />
+                    <div className="h-3 bg-surface-subtle rounded w-1/2" />
                   </div>
                 </div>
               </div>
@@ -258,9 +258,9 @@ export default function HomePage() {
 
         {/* Empty state */}
         {!loading && filtered.length === 0 && (
-          <div className="bg-[#12121a] rounded-2xl p-8 text-center border border-purple-500/10">
+          <div className="bg-card rounded-xl p-8 text-center border border-border-muted card-elevated">
             <div className="text-4xl mb-3">{search || filter !== "all" ? "🔍" : "🚀"}</div>
-            <p className="text-zinc-400 text-sm">
+            <p className="text-muted text-sm">
               {search
                 ? "No drops match your search"
                 : filter === "mine"
@@ -284,7 +284,7 @@ export default function HomePage() {
             <Link
               key={c.contractAddr}
               href={`/claim/${c.contractAddr}`}
-              className="block bg-[#12121a] rounded-2xl p-4 sm:p-5 border border-purple-500/10 hover:border-purple-500/30 transition-all group"
+              className="block bg-card rounded-xl p-4 sm:p-5 border border-border-muted hover:border-purple-500/30 card-elevated transition-all group"
             >
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden">
@@ -299,7 +299,7 @@ export default function HomePage() {
                     <h3 className="font-semibold text-sm sm:text-base truncate group-hover:text-purple-400 transition-colors">
                       {c.name}
                     </h3>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 flex-shrink-0">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface text-muted flex-shrink-0">
                       {c.isNFT ? "NFT" : "Token"}
                     </span>
                   </div>
@@ -311,16 +311,16 @@ export default function HomePage() {
                         className="w-4 h-4 rounded-full object-cover"
                       />
                     )}
-                    <span className="text-zinc-500 text-xs truncate">
+                    <span className="text-label text-xs truncate">
                       {c.creatorProfile?.name ||
                         `${c.creator.slice(0, 6)}...${c.creator.slice(-4)}`}
                     </span>
-                    <span className="text-zinc-700 text-xs flex-shrink-0">
+                    <span className="text-ghost text-xs flex-shrink-0">
                       {timeSince(c.createdAt)}
                     </span>
                   </div>
                 </div>
-                <div className="text-zinc-600 group-hover:text-purple-400 transition-colors flex-shrink-0 text-lg">
+                <div className="text-faint group-hover:text-purple-400 transition-colors flex-shrink-0 text-lg">
                   →
                 </div>
               </div>

@@ -120,7 +120,7 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
+      <div className="min-h-screen bg-bg flex items-center justify-center">
         <div className="w-6 h-6 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
       </div>
     );
@@ -128,8 +128,8 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
 
   if (notFound || !drop) {
     return (
-      <div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center gap-4">
-        <p className="text-zinc-400">Drop not found</p>
+      <div className="min-h-screen bg-bg flex flex-col items-center justify-center gap-4">
+        <p className="text-muted">Drop not found</p>
         <Link href="/" className="text-purple-400 text-sm hover:underline">Back home</Link>
       </div>
     );
@@ -140,7 +140,7 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
   const isActive = drop.active && !poolEmpty;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
+    <div className="min-h-screen bg-bg text-primary">
       <div className="max-w-lg mx-auto px-4 py-12 pb-32">
 
         {/* Badge */}
@@ -149,40 +149,40 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
             Secret Drop
           </span>
           {!isActive && (
-            <span className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs px-2.5 py-1 rounded-full">
+            <span className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400 text-xs px-2.5 py-1 rounded-full">
               {poolEmpty ? "All claimed" : "Inactive"}
             </span>
           )}
         </div>
 
         {/* Title & description */}
-        <h1 className="text-2xl font-bold text-white mb-3">{drop.title}</h1>
+        <h1 className="text-2xl font-bold text-primary mb-3">{drop.title}</h1>
         {drop.description && (
-          <p className="text-zinc-400 text-sm leading-relaxed mb-6">{drop.description}</p>
+          <p className="text-muted text-sm leading-relaxed mb-6">{drop.description}</p>
         )}
 
         {/* Remaining (pool mode) */}
         {drop.mode === "pool" && drop.remaining !== null && (
-          <div className="text-xs text-zinc-500 mb-6">
+          <div className="text-xs text-label mb-6">
             {drop.remaining} of {drop.totalCodes} remaining
           </div>
         )}
 
         {/* Requirements */}
         {hasReqs && (
-          <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 mb-6">
-            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-3">Requirements</p>
+          <div className="bg-surface-subtle border border-border-muted rounded-xl p-4 mb-6">
+            <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-3">Requirements</p>
             <div className="flex flex-col gap-2">
               {tokenInfos.map((t, i) => (
                 <div key={i} className="flex items-center gap-2">
                   {t.icon ? (
                     <img src={t.icon} alt="" className="w-6 h-6 rounded-full object-cover" />
                   ) : (
-                    <div className="w-6 h-6 rounded-full bg-zinc-700 flex items-center justify-center text-[10px] text-zinc-400">
+                    <div className="w-6 h-6 rounded-full bg-surface-hover flex items-center justify-center text-[10px] text-muted">
                       {t.symbol.slice(0, 2)}
                     </div>
                   )}
-                  <span className="text-sm text-zinc-300">
+                  <span className="text-sm text-tertiary">
                     {t.minBalance === "0"
                       ? `Hold any ${t.name}`
                       : `Hold ${Number(BigInt(t.minBalance)) / 1e18} ${t.symbol}`}
@@ -194,7 +194,7 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
                   <div className="w-6 h-6 rounded-full bg-purple-500/10 flex items-center justify-center text-[10px] text-purple-400">
                     👥
                   </div>
-                  <span className="text-sm text-zinc-300">At least {drop.minFollowers} followers</span>
+                  <span className="text-sm text-tertiary">At least {drop.minFollowers} followers</span>
                 </div>
               )}
               {drop.followerRequirement && (
@@ -202,7 +202,7 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
                   <div className="w-6 h-6 rounded-full bg-purple-500/10 flex items-center justify-center text-[10px] text-purple-400">
                     ✓
                   </div>
-                  <span className="text-sm text-zinc-300">
+                  <span className="text-sm text-tertiary">
                     Follow{" "}
                     <span className="font-mono text-xs text-purple-400">
                       {drop.followerRequirement.followAddress.slice(0, 8)}…
@@ -217,26 +217,26 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
         {/* Claim result */}
         {claimed ? (
           <div className="bg-green-500/5 border border-green-500/20 rounded-xl p-5">
-            <p className="text-green-400 text-xs font-semibold uppercase tracking-wide mb-2">
+            <p className="text-green-700 dark:text-green-400 text-xs font-semibold uppercase tracking-wide mb-2">
               Your secret
             </p>
-            <div className="bg-[#0a0a0f] border border-zinc-700 rounded-lg px-4 py-3 flex items-center justify-between gap-3 mb-3">
-              <span className="font-mono text-sm text-white break-all">{claimed}</span>
+            <div className="bg-bg border border-border-default rounded-lg px-4 py-3 flex items-center justify-between gap-3 mb-3">
+              <span className="font-mono text-sm text-primary break-all">{claimed}</span>
               <button
                 onClick={copyCode}
-                className="shrink-0 text-xs text-zinc-400 hover:text-white border border-zinc-700 rounded-md px-2 py-1 transition-colors"
+                className="shrink-0 text-xs text-muted hover:text-primary border border-border-default rounded-md px-2 py-1 transition-colors"
               >
                 {copied ? "Copied!" : "Copy"}
               </button>
             </div>
-            <p className="text-zinc-500 text-xs">
+            <p className="text-label text-xs">
               Save this — it won&apos;t be shown again if you navigate away.
             </p>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
             {error && (
-              <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 text-red-400 text-sm">
+              <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg px-4 py-3 text-red-700 dark:text-red-400 text-sm">
                 {error}
               </div>
             )}
@@ -249,7 +249,7 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
                 Connect Universal Profile
               </button>
             ) : !isActive ? (
-              <div className="text-center text-zinc-500 text-sm py-4">
+              <div className="text-center text-label text-sm py-4">
                 {poolEmpty ? "All codes have been claimed." : "This drop is not active."}
               </div>
             ) : (
@@ -270,7 +270,7 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
             )}
 
             {address && (
-              <p className="text-center text-zinc-600 text-xs">
+              <p className="text-center text-faint text-xs">
                 Connected as {address.slice(0, 6)}…{address.slice(-4)}
               </p>
             )}

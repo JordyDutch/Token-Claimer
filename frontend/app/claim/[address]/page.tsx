@@ -249,28 +249,28 @@ export default function ClaimPage() {
   let statusColor = "";
   if (!claimEnabled) {
     statusLabel = "Paused";
-    statusColor = "text-yellow-400 bg-yellow-500/10 border-yellow-500/20";
+    statusColor = "text-yellow-700 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-500/10 border-yellow-300 dark:border-yellow-500/20";
   } else if (isActive) {
     statusLabel = "Live";
-    statusColor = "text-green-400 bg-green-500/10 border-green-500/20";
+    statusColor = "text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-500/10 border-green-300 dark:border-green-500/20";
   } else {
     statusLabel = "Scheduled";
-    statusColor = "text-blue-400 bg-blue-500/10 border-blue-500/20";
+    statusColor = "text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 border-blue-300 dark:border-blue-500/20";
   }
 
   if (pageLoading) {
     return (
       <div className="min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4">
         <div className="max-w-md w-full">
-          <div className="bg-[#12121a] rounded-2xl sm:rounded-3xl p-5 sm:p-8 border border-purple-500/10 animate-pulse">
-            <div className="w-32 h-32 sm:w-48 sm:h-48 rounded-xl sm:rounded-2xl mx-auto mb-4 sm:mb-6 bg-zinc-800" />
-            <div className="h-6 bg-zinc-800 rounded w-1/2 mx-auto mb-3" />
-            <div className="h-4 bg-zinc-800/60 rounded w-1/3 mx-auto mb-6" />
+          <div className="bg-card rounded-xl p-5 sm:p-8 border border-border-muted card-elevated animate-pulse">
+            <div className="w-32 h-32 sm:w-48 sm:h-48 rounded-xl mx-auto mb-4 sm:mb-6 bg-surface" />
+            <div className="h-6 bg-surface rounded w-1/2 mx-auto mb-3" />
+            <div className="h-4 bg-surface-subtle rounded w-1/3 mx-auto mb-6" />
             <div className="flex justify-center gap-8 mb-6">
-              <div className="h-12 bg-zinc-800/40 rounded w-20" />
-              <div className="h-12 bg-zinc-800/40 rounded w-20" />
+              <div className="h-12 bg-surface-muted rounded w-20" />
+              <div className="h-12 bg-surface-muted rounded w-20" />
             </div>
-            <div className="h-12 bg-zinc-800 rounded-xl" />
+            <div className="h-12 bg-surface rounded-xl" />
           </div>
         </div>
       </div>
@@ -280,9 +280,9 @@ export default function ClaimPage() {
   return (
     <div className="min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4">
       <div className="max-w-md w-full">
-        <div className="bg-[#12121a] rounded-2xl sm:rounded-3xl p-5 sm:p-8 text-center border border-purple-500/10">
+        <div className="bg-card rounded-xl p-5 sm:p-8 text-center border border-border-muted card-elevated">
           {/* Drop icon */}
-          <div className="w-32 h-32 sm:w-48 sm:h-48 rounded-xl sm:rounded-2xl mx-auto mb-4 sm:mb-6 bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-4xl sm:text-6xl overflow-hidden">
+          <div className="w-32 h-32 sm:w-48 sm:h-48 rounded-xl mx-auto mb-4 sm:mb-6 bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-4xl sm:text-6xl overflow-hidden">
             {dropIcon
               ? <img src={dropIcon} alt={dropName} className="w-full h-full object-cover" />
               : (tokenType === "LSP7" ? "🪙" : "🖼")}
@@ -293,22 +293,22 @@ export default function ClaimPage() {
             <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${statusColor}`}>
               {statusLabel}
             </span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface text-label">
               {tokenType === "LSP7" ? "Token" : "NFT"}
             </span>
           </div>
 
           <h1 className="text-xl sm:text-2xl font-bold mb-0.5">{dropName}</h1>
-          {dropSymbol && <p className="text-zinc-600 text-xs mb-1">${dropSymbol}</p>}
+          {dropSymbol && <p className="text-faint text-xs mb-1">${dropSymbol}</p>}
 
           {/* Creator */}
           {creatorProfile && (
             <div className="flex items-center justify-center gap-1.5 mb-3">
-              <span className="text-zinc-500 text-xs">by</span>
+              <span className="text-label text-xs">by</span>
               {creatorProfile.image && (
                 <img src={creatorProfile.image} alt="" className="w-4 h-4 rounded-full object-cover" />
               )}
-              <span className="text-zinc-400 text-xs">
+              <span className="text-muted text-xs">
                 {creatorProfile.name || (owner ? `${owner.slice(0, 6)}...${owner.slice(-4)}` : "")}
               </span>
             </div>
@@ -320,7 +320,7 @@ export default function ClaimPage() {
               {profile?.image && (
                 <img src={profile.image} alt="" className="w-5 h-5 rounded-full object-cover" />
               )}
-              <span className="text-zinc-300 text-xs sm:text-sm font-medium">
+              <span className="text-tertiary text-xs sm:text-sm font-medium">
                 {profile?.name || `${address.slice(0, 6)}...${address.slice(-4)}`}
               </span>
               <button
@@ -328,7 +328,7 @@ export default function ClaimPage() {
                   disconnect();
                   setAlreadyClaimed(false); setEligibility(null);
                 }}
-                className="text-zinc-600 hover:text-zinc-400 text-[10px] ml-1 cursor-pointer"
+                className="text-faint hover:text-muted text-[10px] ml-1 cursor-pointer"
               >
                 Disconnect
               </button>
@@ -336,27 +336,27 @@ export default function ClaimPage() {
           )}
 
           {!address && !alreadyClaimed && (
-            <p className="text-zinc-500 mb-3 text-xs sm:text-sm">
+            <p className="text-label mb-3 text-xs sm:text-sm">
               Connect your Universal Profile to claim
             </p>
           )}
 
           {/* Amount per claim */}
           {amountDisplay && (
-            <div className="inline-block bg-purple-500/10 border border-purple-500/20 text-purple-400 px-3 py-1 rounded-full text-xs font-medium mb-4">
+            <div className="inline-block bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-400 px-3 py-1 rounded-full text-xs font-medium mb-4">
               {amountDisplay} per claim
             </div>
           )}
 
           {/* Claim window */}
           {hasTimeWindow && (
-            <div className="bg-zinc-800/40 rounded-xl p-3 mb-4 text-xs">
-              <div className="text-zinc-500 text-[10px] uppercase tracking-wider mb-1.5 font-medium">
+            <div className="bg-surface-muted rounded-xl p-3 mb-4 text-xs">
+              <div className="text-label text-[10px] uppercase tracking-wider mb-1.5 font-medium">
                 Claim Window
               </div>
-              <div className="flex items-center justify-center gap-3 text-zinc-300">
+              <div className="flex items-center justify-center gap-3 text-tertiary">
                 <span>{formatTime(startTime)}</span>
-                <span className="text-zinc-600">→</span>
+                <span className="text-faint">→</span>
                 <span>{formatTime(endTime)}</span>
               </div>
             </div>
@@ -364,8 +364,8 @@ export default function ClaimPage() {
 
           {/* Requirements */}
           {reqInfo && (
-            <div className="bg-zinc-800/50 rounded-xl p-3 sm:p-4 mb-4 text-left text-xs sm:text-sm">
-              <div className="text-zinc-400 text-[10px] uppercase tracking-wider mb-2 text-center font-medium">
+            <div className="bg-surface-subtle rounded-xl p-3 sm:p-4 mb-4 text-left text-xs sm:text-sm">
+              <div className="text-muted text-[10px] uppercase tracking-wider mb-2 text-center font-medium">
                 Requirements
               </div>
               {reqInfo.tokens.map((t, i) => (
@@ -376,17 +376,17 @@ export default function ClaimPage() {
                     ) : (
                       <span className="text-base flex-shrink-0">🪙</span>
                     )}
-                    <span className="text-zinc-300 text-xs truncate">
+                    <span className="text-tertiary text-xs truncate">
                       Hold{" "}
                       {t.amount > BigInt(0) ? t.amount.toString() : "any"}{" "}
                       <span className="font-semibold">{t.name}</span>
                       {t.symbol && t.symbol !== t.name && (
-                        <span className="text-zinc-500 ml-1">({t.symbol})</span>
+                        <span className="text-label ml-1">({t.symbol})</span>
                       )}
                     </span>
                   </div>
                   {eligibility && (
-                    <span className={eligibility.tokenOk ? "text-green-400" : "text-red-400"}>
+                    <span className={eligibility.tokenOk ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
                       {eligibility.tokenOk ? "✓" : "✗"}
                     </span>
                   )}
@@ -394,11 +394,11 @@ export default function ClaimPage() {
               ))}
               {reqInfo.followers > BigInt(0) && (
                 <div className="flex items-center justify-between py-1.5">
-                  <span className="text-zinc-300">
+                  <span className="text-tertiary">
                     {reqInfo.followers.toString()}+ followers
                   </span>
                   {eligibility && (
-                    <span className={eligibility.followersOk ? "text-green-400" : "text-red-400"}>
+                    <span className={eligibility.followersOk ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
                       {eligibility.followersOk ? "✓" : "✗"}
                     </span>
                   )}
@@ -409,7 +409,7 @@ export default function ClaimPage() {
 
           {/* Inactive warning */}
           {!isActive && tokenType && (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-3 py-2.5 rounded-xl mb-4 text-xs sm:text-sm">
+            <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400 px-3 py-2.5 rounded-xl mb-4 text-xs sm:text-sm">
               {!claimEnabled
                 ? "This drop is currently paused by the creator"
                 : "Claim window has not started yet"}
@@ -419,18 +419,18 @@ export default function ClaimPage() {
           {/* Stats */}
           <div className="flex justify-center gap-8 sm:gap-12 mb-6 sm:mb-8">
             <div>
-              <div className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-wider">
+              <div className="text-[10px] sm:text-xs text-label uppercase tracking-wider">
                 Claimers
               </div>
-              <div className="text-lg sm:text-xl font-semibold text-purple-400">
+              <div className="text-lg sm:text-xl font-semibold text-purple-600 dark:text-purple-400">
                 {claimedDisplay}
               </div>
             </div>
             <div>
-              <div className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-wider">
+              <div className="text-[10px] sm:text-xs text-label uppercase tracking-wider">
                 Max Supply
               </div>
-              <div className="text-lg sm:text-xl font-semibold text-purple-400">
+              <div className="text-lg sm:text-xl font-semibold text-purple-600 dark:text-purple-400">
                 {supplyDisplay}
               </div>
             </div>
@@ -440,14 +440,14 @@ export default function ClaimPage() {
           {!address ? (
             <button
               onClick={connect}
-              className="w-full py-3.5 sm:py-4 rounded-xl sm:rounded-2xl text-base sm:text-lg font-semibold border-2 border-purple-400 text-purple-400 hover:bg-purple-400/10 transition-all cursor-pointer active:scale-[0.97]"
+              className="w-full py-3.5 sm:py-4 rounded-xl text-base sm:text-lg font-semibold border-2 border-purple-400 text-purple-400 hover:bg-purple-400/10 transition-all cursor-pointer active:scale-[0.97]"
             >
               Connect Universal Profile
             </button>
           ) : alreadyClaimed ? (
             <button
               disabled
-              className="w-full py-3.5 sm:py-4 rounded-xl sm:rounded-2xl text-base sm:text-lg font-semibold bg-green-500/20 text-green-400 border border-green-500/30 cursor-not-allowed"
+              className="w-full py-3.5 sm:py-4 rounded-xl text-base sm:text-lg font-semibold bg-green-50 dark:bg-green-500/20 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-500/30 cursor-not-allowed"
             >
               Already Claimed ✓
             </button>
@@ -455,7 +455,7 @@ export default function ClaimPage() {
             <>
               {codewordRequired && (
                 <div className="mb-3">
-                  <label className="text-[10px] text-zinc-500 uppercase tracking-wider block mb-1.5 text-center">
+                  <label className="text-[10px] text-label uppercase tracking-wider block mb-1.5 text-center">
                     🔑 Codeword required
                   </label>
                   <input
@@ -464,7 +464,7 @@ export default function ClaimPage() {
                     onChange={(e) => setCodewordInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && canClaim && claim()}
                     placeholder="Enter codeword..."
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 focus:outline-none focus:border-purple-400 transition-colors text-center tracking-widest placeholder:tracking-normal"
+                    className="w-full bg-surface border border-border-default rounded-xl px-4 py-3 text-sm text-secondary focus:outline-none focus:border-purple-400 transition-colors text-center tracking-widest placeholder:tracking-normal"
                     autoComplete="off"
                     spellCheck={false}
                   />
@@ -473,7 +473,7 @@ export default function ClaimPage() {
             <button
               onClick={claim}
               disabled={!canClaim}
-              className="w-full py-3.5 sm:py-4 rounded-xl sm:rounded-2xl text-base sm:text-lg font-semibold bg-purple-400 text-white hover:bg-purple-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.97]"
+              className="w-full py-3.5 sm:py-4 rounded-xl text-base sm:text-lg font-semibold bg-purple-400 text-white hover:bg-purple-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.97]"
             >
               {claiming
                 ? "Claiming..."
@@ -489,10 +489,10 @@ export default function ClaimPage() {
             <div
               className={`mt-3 px-3 py-2.5 rounded-xl text-xs sm:text-sm ${
                 status.type === "success"
-                  ? "bg-green-500/10 border border-green-500/20 text-green-400"
+                  ? "bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 text-green-700 dark:text-green-400"
                   : status.type === "error"
-                  ? "bg-red-500/10 border border-red-500/20 text-red-400"
-                  : "bg-purple-500/10 border border-purple-500/20 text-purple-400"
+                  ? "bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400"
+                  : "bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-400"
               }`}
             >
               {status.message}
@@ -504,7 +504,7 @@ export default function ClaimPage() {
         <div className="flex items-center justify-between mt-4 sm:mt-6 px-2 gap-2">
           <Link
             href="/"
-            className="text-zinc-600 text-[10px] sm:text-xs hover:text-purple-400 transition-colors"
+            className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors"
           >
             ← All drops
           </Link>
@@ -512,7 +512,7 @@ export default function ClaimPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={shareLink}
-              className="text-zinc-600 text-[10px] sm:text-xs hover:text-purple-400 transition-colors cursor-pointer"
+              className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors cursor-pointer"
             >
               {copied ? "Link copied!" : "Share"}
             </button>
@@ -520,7 +520,7 @@ export default function ClaimPage() {
               href={explorerUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-zinc-600 text-[10px] sm:text-xs hover:text-purple-400 transition-colors"
+              className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors"
             >
               Explorer
             </a>
@@ -532,7 +532,7 @@ export default function ClaimPage() {
             {address && owner && address.toLowerCase() === owner.toLowerCase() && (
               <Link
                 href={`/manage/${contractAddress}`}
-                className="text-zinc-600 text-[10px] sm:text-xs hover:text-purple-400 transition-colors"
+                className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors"
               >
                 Manage →
               </Link>

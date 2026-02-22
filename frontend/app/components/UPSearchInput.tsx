@@ -148,19 +148,19 @@ export default function UPSearchInput({ value, onChange, placeholder, className 
     setResults([]);
   }
 
-  const inp = "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-purple-400 transition-colors";
+  const inp = "w-full bg-surface border border-border-default rounded-lg px-3 py-2.5 text-sm text-secondary focus:outline-none focus:border-purple-400 transition-colors";
 
   if (selected) {
     return (
-      <div className={`flex items-center gap-2 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 ${className ?? ""}`}>
+      <div className={`flex items-center gap-2 bg-surface border border-border-default rounded-lg px-3 py-2 ${className ?? ""}`}>
         {selected.avatar ? (
           <img src={selected.avatar} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" />
         ) : (
           <div className="w-5 h-5 rounded-full bg-purple-500/20 shrink-0 flex items-center justify-center text-[10px] text-purple-400">UP</div>
         )}
-        <span className="text-xs text-zinc-200 flex-1 truncate">{selected.name || selected.id.slice(0, 10) + "…"}</span>
-        <span className="text-[10px] text-zinc-500 font-mono hidden sm:inline">{selected.id.slice(0, 6)}…{selected.id.slice(-4)}</span>
-        <button type="button" onClick={clear} className="text-zinc-500 hover:text-red-400 text-xs ml-1">✕</button>
+        <span className="text-xs text-secondary flex-1 truncate">{selected.name || selected.id.slice(0, 10) + "…"}</span>
+        <span className="text-[10px] text-label font-mono hidden sm:inline">{selected.id.slice(0, 6)}…{selected.id.slice(-4)}</span>
+        <button type="button" onClick={clear} className="text-label hover:text-red-400 text-xs ml-1">✕</button>
       </div>
     );
   }
@@ -175,14 +175,14 @@ export default function UPSearchInput({ value, onChange, placeholder, className 
         className={inp}
       />
       {open && (loading || results.length > 0) && (
-        <div className="absolute z-50 top-full mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl overflow-hidden">
-          {loading && <div className="px-3 py-2 text-xs text-zinc-500">Searching…</div>}
+        <div className="absolute z-50 top-full mt-1 w-full bg-dropdown border border-border-default rounded-xl shadow-2xl overflow-hidden">
+          {loading && <div className="px-3 py-2 text-xs text-label">Searching…</div>}
           {results.map((p) => (
             <button
               key={p.id}
               type="button"
               onClick={() => pick(p)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-zinc-800 transition-colors text-left"
+              className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-surface-hover transition-colors text-left"
             >
               {p.avatar ? (
                 <img src={p.avatar} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
@@ -190,13 +190,13 @@ export default function UPSearchInput({ value, onChange, placeholder, className 
                 <div className="w-6 h-6 rounded-full bg-purple-500/20 shrink-0 flex items-center justify-center text-[10px] text-purple-400">UP</div>
               )}
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-zinc-200 truncate">{p.name}</p>
-                <p className="text-[10px] text-zinc-500 font-mono">{p.id.slice(0, 8)}…{p.id.slice(-6)}</p>
+                <p className="text-sm text-secondary truncate">{p.name}</p>
+                <p className="text-[10px] text-label font-mono">{p.id.slice(0, 8)}…{p.id.slice(-6)}</p>
               </div>
             </button>
           ))}
           {!loading && results.length === 0 && search.trim() && (
-            <div className="px-3 py-2 text-xs text-zinc-500">No profiles found</div>
+            <div className="px-3 py-2 text-xs text-label">No profiles found</div>
           )}
         </div>
       )}

@@ -1,10 +1,79 @@
 @import "tailwindcss";
 
+/* Enable class-based dark mode so dark:* utilities work with .dark on <html> */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-bg: var(--c-bg);
+  --color-bg-transparent: var(--c-bg-transparent);
+  --color-card: var(--c-card);
+  --color-surface: var(--c-surface);
+  --color-surface-subtle: var(--c-surface-subtle);
+  --color-surface-muted: var(--c-surface-muted);
+  --color-surface-hover: var(--c-surface-hover);
+  --color-dropdown: var(--c-dropdown);
+  --color-border-default: var(--c-border);
+  --color-border-muted: var(--c-border-muted);
+  --color-border-header: var(--c-border-header);
+  --color-primary: var(--c-primary);
+  --color-secondary: var(--c-secondary);
+  --color-tertiary: var(--c-tertiary);
+  --color-muted: var(--c-muted);
+  --color-label: var(--c-label);
+  --color-faint: var(--c-faint);
+  --color-ghost: var(--c-ghost);
+  --color-toast-success: var(--c-toast-success);
+  --color-toast-error: var(--c-toast-error);
+}
+
+/* Light mode (default) — WCAG AA compliant, clean white */
 :root {
   --accent: #c084fc;
   --accent-hover: #a855f7;
-  --bg: #0a0a0f;
-  --card: #12121a;
+  --c-bg: #f7f8fa;
+  --c-bg-transparent: rgba(247, 248, 250, 0.92);
+  --c-card: #ffffff;
+  --c-surface: #e8ebf0;
+  --c-surface-subtle: rgba(203, 213, 225, 0.35);
+  --c-surface-muted: rgba(203, 213, 225, 0.22);
+  --c-surface-hover: #dce0e8;
+  --c-dropdown: #ffffff;
+  --c-border: #c5cdd8;
+  --c-border-muted: rgba(180, 192, 208, 0.55);
+  --c-border-header: rgba(180, 192, 208, 0.7);
+  --c-primary: #0f172a;
+  --c-secondary: #1e293b;
+  --c-tertiary: #334155;
+  --c-muted: #475569;
+  --c-label: #64748b;
+  --c-faint: #94a3b8;
+  --c-ghost: #cbd5e1;
+  --c-toast-success: #ecfdf5;
+  --c-toast-error: #fef2f2;
+}
+
+/* Dark mode */
+.dark {
+  --c-bg: #0a0a0f;
+  --c-bg-transparent: rgba(10, 10, 15, 0.8);
+  --c-card: #12121a;
+  --c-surface: #27272a;
+  --c-surface-subtle: rgba(39, 39, 42, 0.6);
+  --c-surface-muted: rgba(39, 39, 42, 0.4);
+  --c-surface-hover: #3f3f46;
+  --c-dropdown: #18181b;
+  --c-border: #3f3f46;
+  --c-border-muted: rgba(63, 63, 70, 0.5);
+  --c-border-header: rgba(39, 39, 42, 0.6);
+  --c-primary: #e4e4e7;
+  --c-secondary: #d4d4d8;
+  --c-tertiary: #a1a1aa;
+  --c-muted: #71717a;
+  --c-label: #71717a;
+  --c-faint: #52525b;
+  --c-ghost: #3f3f46;
+  --c-toast-success: #052e16;
+  --c-toast-error: #450a0a;
 }
 
 html {
@@ -13,8 +82,8 @@ html {
 }
 
 body {
-  background: var(--bg);
-  color: #e4e4e7;
+  background: var(--c-bg);
+  color: var(--c-primary);
   min-height: 100dvh;
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -39,7 +108,7 @@ button:focus-visible, input:focus-visible, a:focus-visible {
 /* Selection */
 ::selection {
   background: rgba(192, 132, 252, 0.3);
-  color: white;
+  color: var(--c-primary);
 }
 
 /* Scrollbar */
@@ -57,4 +126,12 @@ button:focus-visible, input:focus-visible, a:focus-visible {
 /* Active press state for buttons */
 button:active:not(:disabled) {
   transform: scale(0.97);
+}
+
+/* Card elevation — shadow in light, border-only in dark */
+.card-elevated {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.dark .card-elevated {
+  box-shadow: none;
 }

@@ -35,7 +35,7 @@ export default function CopyButton({ text, label, className }: CopyButtonProps) 
     <button
       onClick={copy}
       className={`text-xs transition-colors cursor-pointer ${
-        copied ? "text-green-400" : "text-zinc-500 hover:text-purple-400"
+        copied ? "text-green-600 dark:text-green-400" : "text-label hover:text-purple-600 dark:hover:text-purple-400"
       } ${className ?? ""}`}
       title="Copy to clipboard"
     >

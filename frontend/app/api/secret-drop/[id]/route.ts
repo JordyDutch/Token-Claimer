@@ -5,9 +5,9 @@ import { SecretDropConfig } from "../../../lib/secret-drop";
 // GET /api/secret-drop/[id] — returns public config (no codes, no claimed addresses)
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params;
+  const { id } = await params;
   const config = await kv.get<SecretDropConfig>(`sdrop:${id}`);
   if (!config) {
     return NextResponse.json({ error: "Drop not found" }, { status: 404 });
