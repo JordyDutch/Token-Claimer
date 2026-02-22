@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { BrowserProvider, Contract } from "ethers";
 import {
-  LSP7_FACTORY, LSP8_FACTORY, LSP7_FACTORY_ABI, LSP8_FACTORY_ABI,
+  LSP7_FACTORY_ABI, LSP8_FACTORY_ABI,
   getProvider,
 } from "../lib/contracts";
 import { uploadAndSetLSP4Metadata, addToLSP12IssuedAssets, type Lsp4Link } from "../lib/lsp4";
@@ -11,11 +11,13 @@ import Link from "next/link";
 import CopyButton from "../components/CopyButton";
 import Footer from "../components/Footer";
 import { useWallet } from "../components/WalletProvider";
+import { useNetwork } from "../components/NetworkProvider";
 
 type Status = { message: string; type: "success" | "error" | "loading" } | null;
 
 export default function CreatePage() {
   const { address, profile, connect: walletConnect, disconnect } = useWallet();
+  const { config: networkConfig } = useNetwork();
   const [status, setStatus] = useState<Status>(null);
   const [dropType, setDropType] = useState<"token" | "nft">("nft");
   const [name, setName] = useState("");
@@ -95,20 +97,20 @@ export default function CreatePage() {
       let deployedAddr: string;
 
       if (dropType === "token") {
-        const factory = new Contract(LSP7_FACTORY, LSP7_FACTORY_ABI, signer);
+        const factory = new Contract(networkConfig.lsp7Factory, LSP7_FACTORY_ABI, signer);
         const tx = await factory.createTokenDrop(name, symbol, amountPerClaim, maxSupply, isNonDivisible);
         setStatus({ message: "Waiting for confirmation...", type: "loading" });
         await tx.wait();
-        const fr = new Contract(LSP7_FACTORY, LSP7_FACTORY_ABI, provider);
+        const fr = new Contract(networkConfig.lsp7Factory, LSP7_FACTORY_ABI, provider);
         const t = await fr.totalTokenCampaigns();
         const items = await fr.getTokenCampaigns(t - BigInt(1), 1);
         deployedAddr = items[0].contractAddr;
       } else {
-        const factory = new Contract(LSP8_FACTORY, LSP8_FACTORY_ABI, signer);
+        const factory = new Contract(networkConfig.lsp8Factory, LSP8_FACTORY_ABI, signer);
         const tx = await factory.createNFTDrop(name, symbol, maxSupply, amountPerClaim);
         setStatus({ message: "Waiting for confirmation...", type: "loading" });
         await tx.wait();
-        const fr = new Contract(LSP8_FACTORY, LSP8_FACTORY_ABI, provider);
+        const fr = new Contract(networkConfig.lsp8Factory, LSP8_FACTORY_ABI, provider);
         const t = await fr.totalNFTCampaigns();
         const items = await fr.getNFTCampaigns(t - BigInt(1), 1);
         deployedAddr = items[0].contractAddr;
@@ -173,7 +175,7 @@ export default function CreatePage() {
             <div className="flex items-center justify-center gap-3">
               <CopyButton text={deployedAddress} label="Copy address" />
               <a
-                href={`https://explorer.execution.mainnet.lukso.network/address/${deployedAddress}`}
+                href={`${networkConfig.explorerBase}/address/${deployedAddress}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-zinc-500 hover:text-purple-400 transition-colors"

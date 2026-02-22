@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { BrowserProvider, Contract, JsonRpcProvider } from "ethers";
 import { uploadAndSetLSP4Metadata, setLSP4Creators, addToLSP12IssuedAssets, type Lsp4Link } from "../../lib/lsp4";
 import {
-  CLAIM_ABI, LSP7_EXTRA_ABI, LSP8_EXTRA_ABI, LUKSO_RPC, ZERO,
+  CLAIM_ABI, LSP7_EXTRA_ABI, LSP8_EXTRA_ABI, ZERO,
   LSP4_TOKEN_NAME_KEY,
   getProvider, detectTokenType,
 } from "../../lib/contracts";
@@ -13,6 +13,7 @@ import Link from "next/link";
 import CopyButton from "../../components/CopyButton";
 import Footer from "../../components/Footer";
 import { useWallet } from "../../components/WalletProvider";
+import { useNetwork } from "../../components/NetworkProvider";
 import TokenSearchInput from "../../components/TokenSearchInput";
 
 type Status = { message: string; type: "success" | "error" | "loading" } | null;
@@ -21,6 +22,7 @@ export default function ManagePage() {
   const params = useParams();
   const contractAddress = params.address as string;
   const { address, profile, connect: walletConnect, disconnect } = useWallet();
+  const { config: networkConfig } = useNetwork();
 
   const [isOwner, setIsOwner] = useState(false);
   const [status, setStatus] = useState<Status>(null);
@@ -71,7 +73,7 @@ export default function ManagePage() {
   }
 
   const loadState = useCallback(async (userAddr: string) => {
-    const rpc = new JsonRpcProvider(LUKSO_RPC);
+    const rpc = new JsonRpcProvider(networkConfig.rpc);
     const abi = [...CLAIM_ABI, ...LSP7_EXTRA_ABI, ...LSP8_EXTRA_ABI];
     const c = new Contract(contractAddress, abi, rpc);
     try {
@@ -116,7 +118,7 @@ export default function ManagePage() {
         }
       } catch { setTotalClaimed("?"); }
     } catch (e) { console.error(e); }
-  }, [contractAddress]);
+  }, [contractAddress, networkConfig]);
 
   // Auto-load when wallet is already connected
   useEffect(() => {
@@ -220,7 +222,7 @@ export default function ManagePage() {
   const lbl = "text-[11px] sm:text-xs text-zinc-500";
   const btn = "w-full py-2.5 sm:py-3 rounded-xl text-sm font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition-all cursor-pointer active:scale-[0.97]";
   const card = "bg-[#12121a] rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-purple-500/10";
-  const explorerUrl = `https://explorer.execution.mainnet.lukso.network/address/${contractAddress}`;
+  const explorerUrl = `${networkConfig.explorerBase}/address/${contractAddress}`;
 
   return (
     <div className="min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4">

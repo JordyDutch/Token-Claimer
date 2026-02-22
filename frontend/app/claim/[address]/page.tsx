@@ -4,17 +4,18 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { BrowserProvider, Contract, JsonRpcProvider, formatUnits } from "ethers";
 import {
-  CLAIM_ABI, LSP7_EXTRA_ABI, LSP8_EXTRA_ABI, LUKSO_RPC, ZERO,
+  CLAIM_ABI, LSP7_EXTRA_ABI, LSP8_EXTRA_ABI, ZERO,
   LSP4_TOKEN_NAME_KEY, LSP4_TOKEN_SYMBOL_KEY,
   getProvider, detectTokenType,
 } from "../../lib/contracts";
 import { fetchProfile, ProfileInfo } from "../../lib/profile";
 import { LSP4_METADATA_KEY } from "../../lib/lsp4";
-import { fetchAssetByAddress } from "../../lib/envio";
+import { fetchAssetByAddress, getEnvioEndpoint } from "../../lib/envio";
 import Link from "next/link";
 import CopyButton from "../../components/CopyButton";
 import Footer from "../../components/Footer";
 import { useWallet } from "../../components/WalletProvider";
+import { useNetwork } from "../../components/NetworkProvider";
 
 type Status = { message: string; type: "success" | "error" | "loading" } | null;
 
@@ -22,6 +23,7 @@ export default function ClaimPage() {
   const params = useParams();
   const contractAddress = params.address as string;
   const { address, profile, connect: walletConnect, disconnect } = useWallet();
+  const { config: networkConfig, networkId } = useNetwork();
 
   const [creatorProfile, setCreatorProfile] = useState<ProfileInfo | null>(null);
   const [dropName, setDropName] = useState("Loading...");
@@ -51,7 +53,7 @@ export default function ClaimPage() {
 
   const loadState = useCallback(async (userAddr?: string) => {
     if (!contractAddress) return;
-    const rpc = new JsonRpcProvider(LUKSO_RPC);
+    const rpc = new JsonRpcProvider(networkConfig.rpc);
     const abi = [...CLAIM_ABI, ...LSP7_EXTRA_ABI, ...LSP8_EXTRA_ABI];
     const c = new Contract(contractAddress, abi, rpc);
 
@@ -124,7 +126,7 @@ export default function ClaimPage() {
 
       const enrichedTokens = await Promise.all(
         tokenEntries.map(async (e: { addr: string; amount: bigint }) => {
-          const asset = await fetchAssetByAddress(e.addr).catch(() => null);
+          const asset = await fetchAssetByAddress(e.addr, getEnvioEndpoint(networkId)).catch(() => null);
           return {
             addr: e.addr,
             amount: e.amount,
@@ -165,9 +167,9 @@ export default function ClaimPage() {
     } finally {
       setPageLoading(false);
     }
-  }, [contractAddress]);
+  }, [contractAddress, networkConfig]);
 
-  // Load contract state on mount, and reload user-specific state when wallet connects
+  // Load contract state on mount, reload when wallet connects or network changes
   useEffect(() => { loadState(address ?? undefined); }, [loadState, address]);
 
   async function connect() {
@@ -239,7 +241,7 @@ export default function ClaimPage() {
 
   const codewordOk = !codewordRequired || codewordInput.trim().length > 0;
   const canClaim = isActive && !alreadyClaimed && !claiming && codewordOk && (!eligibility || (eligibility.tokenOk && eligibility.followersOk));
-  const explorerUrl = `https://explorer.execution.mainnet.lukso.network/address/${contractAddress}`;
+  const explorerUrl = `${networkConfig.explorerBase}/address/${contractAddress}`;
   const hasTimeWindow = startTime > 0 || endTime > 0;
 
   // Determine claim status label

@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { getProvider, ensureLuksoNetwork } from "../lib/contracts";
 import { fetchProfile, ProfileInfo } from "../lib/profile";
+import { useNetwork } from "./NetworkProvider";
 
 interface WalletState {
   address: string | null;
@@ -28,6 +29,7 @@ export default function WalletProvider({ children }: { children: ReactNode }) {
   const [address, setAddress] = useState<string | null>(null);
   const [profile, setProfile] = useState<ProfileInfo | null>(null);
   const [connecting, setConnecting] = useState(false);
+  const { config: networkConfig } = useNetwork();
 
   // Try to restore connection on mount (silent, no popup)
   useEffect(() => {
@@ -72,7 +74,7 @@ export default function WalletProvider({ children }: { children: ReactNode }) {
     if (!p) return null;
     try {
       setConnecting(true);
-      await ensureLuksoNetwork();
+      await ensureLuksoNetwork(networkConfig);
       const accounts = await p.request({ method: "eth_requestAccounts" });
       const addr = accounts[0];
       setAddress(addr);
@@ -83,7 +85,7 @@ export default function WalletProvider({ children }: { children: ReactNode }) {
     } finally {
       setConnecting(false);
     }
-  }, []);
+  }, [networkConfig]);
 
   const disconnect = useCallback(() => {
     setAddress(null);

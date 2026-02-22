@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { fetchAssetByAddress, searchAssetsByName, type AssetInfo as TokenInfo } from "../lib/envio";
+import { fetchAssetByAddress, searchAssetsByName, getEnvioEndpoint, type AssetInfo as TokenInfo } from "../lib/envio";
+import { useNetwork } from "./NetworkProvider";
 
 interface Props {
   value: string;
@@ -11,6 +12,8 @@ interface Props {
 }
 
 export default function TokenSearchInput({ value, onChange, label, className }: Props) {
+  const { networkId } = useNetwork();
+  const envioEndpoint = getEnvioEndpoint(networkId);
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<TokenInfo[]>([]);
   const [selected, setSelected] = useState<TokenInfo | null>(null);
@@ -26,8 +29,8 @@ export default function TokenSearchInput({ value, onChange, label, className }: 
       return;
     }
     if (selected?.id.toLowerCase() === value.toLowerCase()) return;
-    fetchAssetByAddress(value).then((t) => setSelected(t)).catch(() => setSelected(null));
-  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+    fetchAssetByAddress(value, envioEndpoint).then((t) => setSelected(t)).catch(() => setSelected(null));
+  }, [value, envioEndpoint]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounced search
   const doSearch = useCallback((q: string) => {
@@ -37,7 +40,7 @@ export default function TokenSearchInput({ value, onChange, label, className }: 
     // If it looks like a full address, look up directly
     if (q.startsWith("0x") && q.length === 42) {
       setSearching(true);
-      fetchAssetByAddress(q)
+      fetchAssetByAddress(q, envioEndpoint)
         .then((t) => { setResults(t ? [t] : []); setSearching(false); })
         .catch(() => { setResults([]); setSearching(false); });
       return;
@@ -46,7 +49,7 @@ export default function TokenSearchInput({ value, onChange, label, className }: 
     setSearching(true);
     debounceRef.current = setTimeout(async () => {
       try {
-        const r = await searchAssetsByName(q);
+        const r = await searchAssetsByName(q, 8, envioEndpoint);
         setResults(r);
       } catch {
         setResults([]);
@@ -54,7 +57,7 @@ export default function TokenSearchInput({ value, onChange, label, className }: 
         setSearching(false);
       }
     }, 300);
-  }, []);
+  }, [envioEndpoint]);
 
   function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
     const q = e.target.value;

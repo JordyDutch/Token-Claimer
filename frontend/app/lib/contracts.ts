@@ -1,3 +1,4 @@
+// Legacy static constants — prefer useNetwork().config.* for new code
 export const LUKSO_RPC =
   process.env.NEXT_PUBLIC_LUKSO_RPC ?? "https://rpc.mainnet.lukso.network";
 export const LUKSO_CHAIN_ID = "0x2a";
@@ -74,21 +75,28 @@ export function getProvider() {
   return (window as any).lukso || (window as any).ethereum || null;
 }
 
-export async function ensureLuksoNetwork() {
+/** Switch the wallet to a specific LUKSO network. Pass a NetworkConfig for testnet support. */
+export async function ensureLuksoNetwork(
+  config?: { chainIdHex: string; rpc: string; explorerBase: string; name: string }
+) {
   const p = getProvider();
   if (!p) return;
+  const chainId = config?.chainIdHex ?? LUKSO_CHAIN_ID;
+  const rpc = config?.rpc ?? LUKSO_RPC;
+  const explorer = config?.explorerBase ?? "https://explorer.execution.mainnet.lukso.network";
+  const name = config?.name ?? "LUKSO";
   try {
-    await p.request({ method: "wallet_switchEthereumChain", params: [{ chainId: LUKSO_CHAIN_ID }] });
+    await p.request({ method: "wallet_switchEthereumChain", params: [{ chainId }] });
   } catch (e: any) {
     if (e.code === 4902) {
       await p.request({
         method: "wallet_addEthereumChain",
         params: [{
-          chainId: LUKSO_CHAIN_ID,
-          chainName: "LUKSO",
+          chainId,
+          chainName: `LUKSO ${name}`,
           nativeCurrency: { name: "LYX", symbol: "LYX", decimals: 18 },
-          rpcUrls: [LUKSO_RPC],
-          blockExplorerUrls: ["https://explorer.execution.mainnet.lukso.network"],
+          rpcUrls: [rpc],
+          blockExplorerUrls: [explorer],
         }],
       });
     }

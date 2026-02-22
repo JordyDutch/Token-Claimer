@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { JsonRpcProvider, Contract } from "ethers";
-import { LSP7_FACTORY, LSP8_FACTORY, LSP7_FACTORY_ABI, LSP8_FACTORY_ABI, LUKSO_RPC } from "./lib/contracts";
+import { LSP7_FACTORY_ABI, LSP8_FACTORY_ABI } from "./lib/contracts";
 import { fetchProfile, ProfileInfo } from "./lib/profile";
 import { LSP4_METADATA_KEY } from "./lib/lsp4";
 
@@ -33,6 +33,7 @@ async function fetchCampaignIcon(contractAddr: string, provider: JsonRpcProvider
 import Link from "next/link";
 import Footer from "./components/Footer";
 import { useWallet } from "./components/WalletProvider";
+import { useNetwork } from "./components/NetworkProvider";
 
 interface Campaign {
   contractAddr: string;
@@ -53,20 +54,22 @@ export default function HomePage() {
   const [filter, setFilter] = useState<FilterTab>("all");
   const [search, setSearch] = useState("");
   const { address: walletAddress, connect: walletConnect } = useWallet();
+  const { config: networkConfig, networkId } = useNetwork();
 
   useEffect(() => {
-    loadCampaigns();
-  }, []);
+    loadCampaigns(networkConfig);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [networkId]);
 
   async function connectForMyDrops() {
     const addr = await walletConnect();
     if (addr) setFilter("mine");
   }
 
-  async function loadCampaigns() {
-    const rpc = new JsonRpcProvider(LUKSO_RPC);
-    const lsp7 = new Contract(LSP7_FACTORY, LSP7_FACTORY_ABI, rpc);
-    const lsp8 = new Contract(LSP8_FACTORY, LSP8_FACTORY_ABI, rpc);
+  async function loadCampaigns(cfg: typeof networkConfig) {
+    const rpc = new JsonRpcProvider(cfg.rpc);
+    const lsp7 = new Contract(cfg.lsp7Factory, LSP7_FACTORY_ABI, rpc);
+    const lsp8 = new Contract(cfg.lsp8Factory, LSP8_FACTORY_ABI, rpc);
 
     try {
       const [total7, total8] = await Promise.all([

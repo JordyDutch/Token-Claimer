@@ -1,6 +1,7 @@
 import { Contract, JsonRpcProvider, getBytes } from "ethers";
 
-const LUKSO_RPC = "https://rpc.mainnet.lukso.network";
+export const PROFILE_RPC_MAINNET = "https://rpc.mainnet.lukso.network";
+const LUKSO_RPC = PROFILE_RPC_MAINNET;
 const IPFS_GATEWAY = "https://api.universalprofile.cloud/ipfs/";
 
 // LSP3Profile data key: keccak256("LSP3Profile")
@@ -46,11 +47,11 @@ function extractUrlFromVerifiableURI(hexData: string): string | null {
   }
 }
 
-export async function fetchProfile(address: string): Promise<ProfileInfo> {
+export async function fetchProfile(address: string, rpcUrl = LUKSO_RPC): Promise<ProfileInfo> {
   const result: ProfileInfo = { name: "", image: null, address };
 
   try {
-    const rpc = new JsonRpcProvider(LUKSO_RPC);
+    const rpc = new JsonRpcProvider(rpcUrl);
     const up = new Contract(address, UP_ABI, rpc);
     const rawData = await up.getData(LSP3_PROFILE_KEY);
 

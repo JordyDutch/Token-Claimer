@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useNetwork } from "./NetworkProvider";
 
 export default function Header() {
   const pathname = usePathname();
+  const { networkId, setNetwork } = useNetwork();
+  const isTestnet = networkId === "testnet";
 
   const linkClass = (href: string) => {
     const active = pathname === href;
@@ -35,6 +38,24 @@ export default function Header() {
           <Link href="/my-drops" className={linkClass("/my-drops")}>
             My Drops
           </Link>
+
+          {/* Network toggle */}
+          <button
+            onClick={() => setNetwork(isTestnet ? "mainnet" : "testnet")}
+            title={`Switch to ${isTestnet ? "Mainnet" : "Testnet"}`}
+            className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold border transition-all cursor-pointer ${
+              isTestnet
+                ? "bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20"
+                : "bg-green-500/10 border-green-500/20 text-green-400 hover:bg-green-500/20"
+            }`}
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                isTestnet ? "bg-amber-400" : "bg-green-400"
+              }`}
+            />
+            {isTestnet ? "Testnet" : "Mainnet"}
+          </button>
         </nav>
       </div>
     </header>

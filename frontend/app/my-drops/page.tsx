@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { JsonRpcProvider, Contract } from "ethers";
 import {
-  LSP7_FACTORY, LSP8_FACTORY, LSP7_FACTORY_ABI, LSP8_FACTORY_ABI, CLAIM_ABI,
-  LSP7_EXTRA_ABI, LSP8_EXTRA_ABI, LUKSO_RPC,
+  LSP7_FACTORY_ABI, LSP8_FACTORY_ABI, CLAIM_ABI,
+  LSP7_EXTRA_ABI, LSP8_EXTRA_ABI,
   detectTokenType,
 } from "../lib/contracts";
 import { LSP4_METADATA_KEY } from "../lib/lsp4";
@@ -35,6 +35,7 @@ import Link from "next/link";
 import CopyButton from "../components/CopyButton";
 import Footer from "../components/Footer";
 import { useWallet } from "../components/WalletProvider";
+import { useNetwork } from "../components/NetworkProvider";
 
 interface MyDrop {
   contractAddr: string;
@@ -51,6 +52,7 @@ interface MyDrop {
 
 export default function MyDropsPage() {
   const { address, profile, connect: walletConnect, disconnect } = useWallet();
+  const { config: networkConfig, networkId } = useNetwork();
   const [drops, setDrops] = useState<MyDrop[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,9 +60,9 @@ export default function MyDropsPage() {
   const loadDrops = useCallback(async (userAddr: string) => {
     setLoading(true);
     setError(null);
-    const rpc = new JsonRpcProvider(LUKSO_RPC);
-    const lsp7 = new Contract(LSP7_FACTORY, LSP7_FACTORY_ABI, rpc);
-    const lsp8 = new Contract(LSP8_FACTORY, LSP8_FACTORY_ABI, rpc);
+    const rpc = new JsonRpcProvider(networkConfig.rpc);
+    const lsp7 = new Contract(networkConfig.lsp7Factory, LSP7_FACTORY_ABI, rpc);
+    const lsp8 = new Contract(networkConfig.lsp8Factory, LSP8_FACTORY_ABI, rpc);
 
     try {
       const [total7, total8] = await Promise.all([
@@ -172,7 +174,7 @@ export default function MyDropsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [networkConfig]);
 
   async function connect() {
     setError(null);
@@ -183,10 +185,10 @@ export default function MyDropsPage() {
     }
   }
 
-  // Auto-load drops when wallet is connected
+  // Auto-load drops when wallet is connected or network changes
   useEffect(() => {
     if (address) loadDrops(address);
-  }, [address, loadDrops]);
+  }, [address, loadDrops, networkId]);
 
   function copyClaimLink(contractAddr: string) {
     const url = `${window.location.origin}/claim/${contractAddr}`;
