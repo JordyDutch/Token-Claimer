@@ -14,6 +14,11 @@ const config: HardhatUserConfig = {
     },
   },
   networks: {
+    // Allow the unified factory (>24 KB) to deploy in tests without hitting
+    // the Spurious Dragon contract-size limit enforced on hardhat's in-process chain.
+    hardhat: {
+      allowUnlimitedContractSize: true,
+    },
     lukso: {
       url: "https://rpc.mainnet.lukso.network",
       chainId: 42,
