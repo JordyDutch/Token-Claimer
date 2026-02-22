@@ -16,6 +16,7 @@ export interface Lsp4Input {
   description: string;
   iconFile?: File | null;
   links?: Lsp4Link[];
+  assetFiles?: File[];
 }
 
 // Pin a Blob/File to IPFS via LUKSO gateway — returns CID string
@@ -75,7 +76,25 @@ export async function uploadAndSetLSP4Metadata(
     ];
   }
 
-  // 2. Build LSP4Metadata JSON
+  // 2. Upload asset files if provided
+  const assetsArray: object[] = [];
+  if (input.assetFiles && input.assetFiles.length > 0) {
+    for (let i = 0; i < input.assetFiles.length; i++) {
+      const file = input.assetFiles[i];
+      log(`Uploading asset ${i + 1}/${input.assetFiles.length} to IPFS...`);
+      const hash = await hashBlob(file);
+      const cid = await pinToIPFS(file, file.name);
+      assetsArray.push({
+        url: `ipfs://${cid}`,
+        verification: {
+          method: "keccak256(bytes)",
+          data: hash,
+        },
+      });
+    }
+  }
+
+  // 3. Build LSP4Metadata JSON
   const metadata = {
     LSP4Metadata: {
       name: input.name,
@@ -83,22 +102,22 @@ export async function uploadAndSetLSP4Metadata(
       links: (input.links ?? []).filter((l) => l.title && l.url),
       icon: iconArray,
       images: [],
-      assets: [],
+      assets: assetsArray,
       attributes: [],
     },
   };
 
-  // 3. Pin metadata JSON
+  // 4. Pin metadata JSON
   log("Uploading metadata to IPFS...");
   const jsonStr = JSON.stringify(metadata);
   const jsonBlob = new Blob([jsonStr], { type: "application/json" });
   const jsonHash = keccak256(toUtf8Bytes(jsonStr));
   const jsonCID = await pinToIPFS(jsonBlob, "LSP4Metadata.json");
 
-  // 4. Encode VerifiableURI
+  // 5. Encode VerifiableURI
   const verifiableURI = encodeVerifiableURI(jsonHash, jsonCID);
 
-  // 5. setData on the deployed contract
+  // 6. setData on the deployed contract
   log("Setting LSP4 metadata on-chain... confirm in wallet");
   const contract = new Contract(
     contractAddress,

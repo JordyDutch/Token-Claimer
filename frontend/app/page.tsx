@@ -5,6 +5,8 @@ import { JsonRpcProvider, Contract } from "ethers";
 import { LSP7_FACTORY, LSP8_FACTORY, FACTORY_ABI, LUKSO_RPC } from "./lib/contracts";
 import { fetchProfile, ProfileInfo } from "./lib/profile";
 import Link from "next/link";
+import Footer from "./components/Footer";
+import { useWallet } from "./components/WalletProvider";
 
 interface Campaign {
   contractAddr: string;
@@ -16,13 +18,23 @@ interface Campaign {
   creatorProfile?: ProfileInfo | null;
 }
 
+type FilterTab = "all" | "tokens" | "nfts" | "mine";
+
 export default function HomePage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<FilterTab>("all");
+  const [search, setSearch] = useState("");
+  const { address: walletAddress, connect: walletConnect } = useWallet();
 
   useEffect(() => {
     loadCampaigns();
   }, []);
+
+  async function connectForMyDrops() {
+    const addr = await walletConnect();
+    if (addr) setFilter("mine");
+  }
 
   async function loadCampaigns() {
     const rpc = new JsonRpcProvider(LUKSO_RPC);
@@ -65,8 +77,11 @@ export default function HomePage() {
         }
       }
 
-      // Sort by newest first
       all.sort((a, b) => b.createdAt - a.createdAt);
+
+      // Show campaigns immediately, then fetch profiles
+      setCampaigns(all);
+      setLoading(false);
 
       // Fetch creator profiles in background
       const uniqueCreators = [...new Set(all.map((c) => c.creator))];
@@ -80,47 +95,148 @@ export default function HomePage() {
           }
         })
       );
-      for (const c of all) c.creatorProfile = profiles.get(c.creator);
-
-      setCampaigns(all);
+      setCampaigns((prev) =>
+        prev.map((c) => ({ ...c, creatorProfile: profiles.get(c.creator) }))
+      );
     } catch (e) {
       console.error("Failed to load campaigns:", e);
-    } finally {
       setLoading(false);
     }
   }
 
+  const filtered = campaigns.filter((c) => {
+    if (filter === "tokens" && c.isNFT) return false;
+    if (filter === "nfts" && !c.isNFT) return false;
+    if (filter === "mine" && walletAddress && c.creator.toLowerCase() !== walletAddress.toLowerCase()) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return (
+        c.name.toLowerCase().includes(q) ||
+        c.symbol.toLowerCase().includes(q) ||
+        c.contractAddr.toLowerCase().includes(q) ||
+        (c.creatorProfile?.name || "").toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
+
+  const tabClass = (tab: FilterTab) =>
+    `px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+      filter === tab
+        ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+        : "text-zinc-500 hover:text-zinc-300 border border-transparent"
+    }`;
+
+  function timeSince(timestamp: number): string {
+    const seconds = Math.floor(Date.now() / 1000 - timestamp);
+    if (seconds < 60) return "just now";
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    if (seconds < 2592000) return `${Math.floor(seconds / 86400)}d ago`;
+    return new Date(timestamp * 1000).toLocaleDateString();
+  }
+
   return (
-    <div className="min-h-dvh px-3 py-8 sm:p-8">
+    <div className="min-h-dvh px-3 py-6 sm:p-8">
       <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8 sm:mb-12">
-          <h1 className="text-3xl sm:text-4xl font-bold mb-2">Token Claimer</h1>
+        {/* Hero */}
+        <div className="text-center mb-8 sm:mb-10">
+          <h1 className="text-3xl sm:text-4xl font-bold mb-2">
+            Discover Drops
+          </h1>
           <p className="text-zinc-400 text-sm sm:text-base mb-6">
-            Create and discover token drops on LUKSO
+            Claim tokens and NFTs on LUKSO
           </p>
           <Link
             href="/create"
             className="inline-block px-6 py-3 rounded-xl text-sm sm:text-base font-semibold bg-purple-500 text-white hover:bg-purple-600 transition-all active:scale-[0.97]"
           >
-            Create a Drop
+            + Create a Drop
           </Link>
         </div>
 
-        {/* Campaigns */}
+        {/* Search + Filters */}
+        <div className="mb-4 space-y-3">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name, symbol, or address..."
+            className="w-full bg-[#12121a] border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-purple-500/40 transition-colors"
+          />
+          <div className="flex items-center gap-2 flex-wrap">
+            <button onClick={() => setFilter("all")} className={tabClass("all")}>
+              All
+            </button>
+            <button onClick={() => setFilter("tokens")} className={tabClass("tokens")}>
+              Tokens
+            </button>
+            <button onClick={() => setFilter("nfts")} className={tabClass("nfts")}>
+              NFTs
+            </button>
+            <button
+              onClick={() => {
+                if (!walletAddress) {
+                  connectForMyDrops();
+                } else {
+                  setFilter("mine");
+                }
+              }}
+              className={tabClass("mine")}
+            >
+              My Drops
+            </button>
+            <span className="text-zinc-600 text-xs ml-auto">
+              {loading ? "Loading..." : `${filtered.length} drop${filtered.length !== 1 ? "s" : ""}`}
+            </span>
+          </div>
+        </div>
+
+        {/* Loading skeleton */}
+        {loading && (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="bg-[#12121a] rounded-2xl p-4 sm:p-5 border border-purple-500/10 animate-pulse"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-zinc-800" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-zinc-800 rounded w-1/3" />
+                    <div className="h-3 bg-zinc-800/60 rounded w-1/2" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!loading && filtered.length === 0 && (
+          <div className="bg-[#12121a] rounded-2xl p-8 text-center border border-purple-500/10">
+            <div className="text-4xl mb-3">{search || filter !== "all" ? "🔍" : "🚀"}</div>
+            <p className="text-zinc-400 text-sm">
+              {search
+                ? "No drops match your search"
+                : filter === "mine"
+                ? "You haven't created any drops yet"
+                : "No drops yet. Be the first to create one!"}
+            </p>
+            {filter === "mine" && (
+              <Link
+                href="/create"
+                className="inline-block mt-3 text-xs text-purple-400 hover:text-purple-300"
+              >
+                Create your first drop →
+              </Link>
+            )}
+          </div>
+        )}
+
+        {/* Campaign list */}
         <div className="space-y-3">
-          <h2 className="text-sm font-medium text-zinc-500 uppercase tracking-wider px-1">
-            {loading ? "Loading..." : `${campaigns.length} Drop${campaigns.length !== 1 ? "s" : ""}`}
-          </h2>
-
-          {!loading && campaigns.length === 0 && (
-            <div className="bg-[#12121a] rounded-2xl p-8 text-center border border-purple-500/10">
-              <div className="text-4xl mb-3">🎵</div>
-              <p className="text-zinc-400 text-sm">No drops yet. Be the first to create one!</p>
-            </div>
-          )}
-
-          {campaigns.map((c) => (
+          {filtered.map((c) => (
             <Link
               key={c.contractAddr}
               href={`/claim/${c.contractAddr}`}
@@ -128,7 +244,7 @@ export default function HomePage() {
             >
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-2xl flex-shrink-0">
-                  {c.isNFT ? "🎵" : "🪙"}
+                  {c.isNFT ? "🖼" : "🪙"}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
@@ -141,29 +257,30 @@ export default function HomePage() {
                   </div>
                   <div className="flex items-center gap-2 mt-1">
                     {c.creatorProfile?.image && (
-                      <img src={c.creatorProfile.image} alt="" className="w-4 h-4 rounded-full object-cover" />
+                      <img
+                        src={c.creatorProfile.image}
+                        alt=""
+                        className="w-4 h-4 rounded-full object-cover"
+                      />
                     )}
                     <span className="text-zinc-500 text-xs truncate">
-                      {c.creatorProfile?.name || `${c.creator.slice(0, 6)}...${c.creator.slice(-4)}`}
+                      {c.creatorProfile?.name ||
+                        `${c.creator.slice(0, 6)}...${c.creator.slice(-4)}`}
                     </span>
-                    <span className="text-zinc-600 text-xs">·</span>
-                    <span className="text-zinc-600 text-xs flex-shrink-0">
-                      {new Date(c.createdAt * 1000).toLocaleDateString()}
+                    <span className="text-zinc-700 text-xs flex-shrink-0">
+                      {timeSince(c.createdAt)}
                     </span>
                   </div>
                 </div>
-                <div className="text-zinc-600 group-hover:text-purple-400 transition-colors flex-shrink-0">→</div>
+                <div className="text-zinc-600 group-hover:text-purple-400 transition-colors flex-shrink-0 text-lg">
+                  →
+                </div>
               </div>
             </Link>
           ))}
         </div>
 
-        <div className="text-center mt-8">
-          <p className="text-zinc-600 text-[10px] sm:text-xs">
-            Powered by{" "}
-            <a href="https://lukso.network" target="_blank" className="text-purple-400 hover:underline">LUKSO</a>
-          </p>
-        </div>
+        <Footer />
       </div>
     </div>
   );

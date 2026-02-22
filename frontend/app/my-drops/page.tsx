@@ -1,0 +1,330 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { JsonRpcProvider, Contract } from "ethers";
+import {
+  LSP7_FACTORY, LSP8_FACTORY, FACTORY_ABI, CLAIM_ABI,
+  LSP7_EXTRA_ABI, LSP8_EXTRA_ABI, LUKSO_RPC,
+  detectTokenType,
+} from "../lib/contracts";
+import Link from "next/link";
+import CopyButton from "../components/CopyButton";
+import Footer from "../components/Footer";
+import { useWallet } from "../components/WalletProvider";
+
+interface MyDrop {
+  contractAddr: string;
+  name: string;
+  symbol: string;
+  createdAt: number;
+  isNFT: boolean;
+  claimEnabled: boolean;
+  isActive: boolean;
+  totalClaimed: string;
+  maxSupply: string;
+}
+
+export default function MyDropsPage() {
+  const { address, profile, connect: walletConnect, disconnect } = useWallet();
+  const [drops, setDrops] = useState<MyDrop[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadDrops = useCallback(async (userAddr: string) => {
+    setLoading(true);
+    setError(null);
+    const rpc = new JsonRpcProvider(LUKSO_RPC);
+    const lsp7 = new Contract(LSP7_FACTORY, FACTORY_ABI, rpc);
+    const lsp8 = new Contract(LSP8_FACTORY, FACTORY_ABI, rpc);
+
+    try {
+      const [total7, total8] = await Promise.all([
+        lsp7.totalCampaigns().catch(() => BigInt(0)),
+        lsp8.totalCampaigns().catch(() => BigInt(0)),
+      ]);
+
+      interface RawCampaign {
+        contractAddr: string;
+        creator: string;
+        name: string;
+        symbol: string;
+        createdAt: number;
+        isNFT: boolean;
+      }
+
+      const mine: RawCampaign[] = [];
+
+      if (total7 > BigInt(0)) {
+        const items = await lsp7.getCampaigns(0, total7);
+        for (const c of items) {
+          if (c.creator.toLowerCase() === userAddr.toLowerCase()) {
+            mine.push({
+              contractAddr: c.contractAddr,
+              creator: c.creator,
+              name: c.name,
+              symbol: c.symbol,
+              createdAt: Number(c.createdAt),
+              isNFT: false,
+            });
+          }
+        }
+      }
+
+      if (total8 > BigInt(0)) {
+        const items = await lsp8.getCampaigns(0, total8);
+        for (const c of items) {
+          if (c.creator.toLowerCase() === userAddr.toLowerCase()) {
+            mine.push({
+              contractAddr: c.contractAddr,
+              creator: c.creator,
+              name: c.name,
+              symbol: c.symbol,
+              createdAt: Number(c.createdAt),
+              isNFT: true,
+            });
+          }
+        }
+      }
+
+      mine.sort((a, b) => b.createdAt - a.createdAt);
+
+      // Fetch live stats for each drop
+      const abi = [...CLAIM_ABI, ...LSP7_EXTRA_ABI, ...LSP8_EXTRA_ABI];
+      const withStats: MyDrop[] = await Promise.all(
+        mine.map(async (raw) => {
+          const c = new Contract(raw.contractAddr, abi, rpc);
+          const safe = (p: Promise<any>, fb: any) => p.catch(() => fb);
+          try {
+            const type = await detectTokenType(c);
+            const [enabled, active, supply] = await Promise.all([
+              safe(c.claimEnabled(), false),
+              safe(c.isClaimActive(), false),
+              safe(c.maxSupply(), BigInt(0)),
+            ]);
+
+            let claimed = "0";
+            if (type === "LSP7") {
+              const cl = await safe(c.totalClaimers(), BigInt(0));
+              claimed = cl.toString();
+            } else {
+              const cl = await safe(c.totalClaimed(), BigInt(0));
+              claimed = cl.toString();
+            }
+
+            return {
+              ...raw,
+              claimEnabled: enabled,
+              isActive: active,
+              totalClaimed: claimed,
+              maxSupply: supply === BigInt(0) ? "Unlimited" : supply.toString(),
+            };
+          } catch {
+            return {
+              ...raw,
+              claimEnabled: false,
+              isActive: false,
+              totalClaimed: "?",
+              maxSupply: "?",
+            };
+          }
+        })
+      );
+
+      setDrops(withStats);
+    } catch (e) {
+      console.error(e);
+      setError("Failed to load drops");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  async function connect() {
+    setError(null);
+    const addr = await walletConnect();
+    if (!addr) {
+      setError("Install the Universal Profile Browser Extension");
+      return;
+    }
+  }
+
+  // Auto-load drops when wallet is connected
+  useEffect(() => {
+    if (address) loadDrops(address);
+  }, [address, loadDrops]);
+
+  function copyClaimLink(contractAddr: string) {
+    const url = `${window.location.origin}/claim/${contractAddr}`;
+    navigator.clipboard.writeText(url);
+  }
+
+  const card = "bg-[#12121a] rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-purple-500/10";
+
+  return (
+    <div className="min-h-dvh px-3 py-6 sm:p-8">
+      <div className="max-w-2xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold">My Drops</h1>
+            <p className="text-zinc-500 text-xs sm:text-sm mt-1">
+              Manage your token and NFT drops
+            </p>
+          </div>
+          <Link
+            href="/create"
+            className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-purple-500 text-white hover:bg-purple-600 transition-all active:scale-[0.97] flex-shrink-0"
+          >
+            + New Drop
+          </Link>
+        </div>
+
+        {/* Not connected */}
+        {!address && (
+          <div className={card + " text-center"}>
+            <div className="text-4xl mb-3">🔗</div>
+            <p className="text-zinc-400 text-sm mb-4">
+              Connect your Universal Profile to see your drops
+            </p>
+            <button
+              onClick={connect}
+              className="px-6 py-3 rounded-xl text-sm font-semibold border-2 border-purple-400 text-purple-400 hover:bg-purple-400/10 transition-all cursor-pointer active:scale-[0.97]"
+            >
+              Connect Universal Profile
+            </button>
+          </div>
+        )}
+
+        {/* Connected header */}
+        {address && (
+          <div className="flex items-center gap-2 mb-4">
+            {profile?.image && (
+              <img src={profile.image} alt="" className="w-5 h-5 rounded-full object-cover" />
+            )}
+            <span className="text-zinc-300 text-xs sm:text-sm">
+              {profile?.name || `${address.slice(0, 6)}...${address.slice(-4)}`}
+            </span>
+            <button
+              onClick={() => { disconnect(); setDrops([]); }}
+              className="text-zinc-600 text-[10px] hover:text-zinc-400 ml-1 cursor-pointer"
+            >
+              Disconnect
+            </button>
+          </div>
+        )}
+
+        {/* Error */}
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-3 py-2.5 rounded-xl text-xs sm:text-sm mb-4">
+            {error}
+          </div>
+        )}
+
+        {/* Loading skeleton */}
+        {loading && (
+          <div className="space-y-3">
+            {[1, 2].map((i) => (
+              <div key={i} className={card + " animate-pulse"}>
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-zinc-800" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-zinc-800 rounded w-1/3" />
+                    <div className="h-3 bg-zinc-800/60 rounded w-1/2" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Empty state */}
+        {address && !loading && drops.length === 0 && (
+          <div className={card + " text-center"}>
+            <div className="text-4xl mb-3">🚀</div>
+            <p className="text-zinc-400 text-sm mb-2">You haven't created any drops yet</p>
+            <Link
+              href="/create"
+              className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+            >
+              Create your first drop →
+            </Link>
+          </div>
+        )}
+
+        {/* Drops list */}
+        {drops.length > 0 && (
+          <div className="space-y-3">
+            {drops.map((drop) => (
+              <div key={drop.contractAddr} className={card}>
+                <div className="flex items-start gap-4">
+                  {/* Icon */}
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-2xl flex-shrink-0">
+                    {drop.isNFT ? "🖼" : "🪙"}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <h3 className="font-semibold text-sm sm:text-base truncate">
+                        {drop.name}
+                      </h3>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 flex-shrink-0">
+                        {drop.isNFT ? "NFT" : "Token"}
+                      </span>
+                      {/* Status badge */}
+                      {drop.claimEnabled ? (
+                        drop.isActive ? (
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-400 border border-green-500/20 flex-shrink-0">
+                            Live
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 flex-shrink-0">
+                            Scheduled
+                          </span>
+                        )
+                      ) : (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 flex-shrink-0">
+                          Paused
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Stats row */}
+                    <div className="flex items-center gap-4 text-[10px] sm:text-xs text-zinc-500 mb-3">
+                      <span>{drop.totalClaimed} claimed</span>
+                      <span>Supply: {drop.maxSupply}</span>
+                      <span>{new Date(drop.createdAt * 1000).toLocaleDateString()}</span>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Link
+                        href={`/manage/${drop.contractAddr}`}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition-all"
+                      >
+                        Manage
+                      </Link>
+                      <Link
+                        href={`/claim/${drop.contractAddr}`}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 border border-zinc-700 hover:border-zinc-600 hover:text-zinc-300 transition-all"
+                      >
+                        View claim page
+                      </Link>
+                      <CopyButton
+                        text={typeof window !== "undefined" ? `${window.location.origin}/claim/${drop.contractAddr}` : `/claim/${drop.contractAddr}`}
+                        label="Copy link"
+                        className="px-3 py-1.5 rounded-lg text-xs border border-zinc-700/50 hover:border-zinc-600"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <Footer />
+      </div>
+    </div>
+  );
+}

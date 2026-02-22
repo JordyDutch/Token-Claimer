@@ -3,31 +3,44 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { BrowserProvider, Contract, JsonRpcProvider, formatUnits } from "ethers";
-import { CLAIM_ABI, LSP7_EXTRA_ABI, LSP8_EXTRA_ABI, LUKSO_RPC, ZERO, getProvider, ensureLuksoNetwork, detectTokenType } from "../../lib/contracts";
+import {
+  CLAIM_ABI, LSP7_EXTRA_ABI, LSP8_EXTRA_ABI, LUKSO_RPC, ZERO,
+  getProvider, detectTokenType,
+} from "../../lib/contracts";
 import { fetchProfile, ProfileInfo } from "../../lib/profile";
 import Link from "next/link";
+import CopyButton from "../../components/CopyButton";
+import Footer from "../../components/Footer";
+import { useWallet } from "../../components/WalletProvider";
 
 type Status = { message: string; type: "success" | "error" | "loading" } | null;
 
 export default function ClaimPage() {
   const params = useParams();
   const contractAddress = params.address as string;
+  const { address, profile, connect: walletConnect, disconnect } = useWallet();
 
-  const [address, setAddress] = useState<string | null>(null);
-  const [profile, setProfile] = useState<ProfileInfo | null>(null);
   const [creatorProfile, setCreatorProfile] = useState<ProfileInfo | null>(null);
   const [dropName, setDropName] = useState("Loading...");
+  const [dropSymbol, setDropSymbol] = useState("");
   const [tokenType, setTokenType] = useState<"LSP7" | "LSP8" | null>(null);
   const [claimedDisplay, setClaimedDisplay] = useState("-");
   const [supplyDisplay, setSupplyDisplay] = useState("-");
   const [amountDisplay, setAmountDisplay] = useState("");
   const [isActive, setIsActive] = useState(false);
+  const [claimEnabled, setClaimEnabled] = useState(false);
   const [alreadyClaimed, setAlreadyClaimed] = useState(false);
   const [status, setStatus] = useState<Status>(null);
   const [claiming, setClaiming] = useState(false);
-  const [reqInfo, setReqInfo] = useState<{ token: string; tokenAmount: bigint; tokenName: string; followers: bigint } | null>(null);
+  const [reqInfo, setReqInfo] = useState<{
+    token: string; tokenAmount: bigint; tokenName: string; followers: bigint;
+  } | null>(null);
   const [eligibility, setEligibility] = useState<{ tokenOk: boolean; followersOk: boolean } | null>(null);
   const [owner, setOwner] = useState<string | null>(null);
+  const [startTime, setStartTime] = useState<number>(0);
+  const [endTime, setEndTime] = useState<number>(0);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
 
   const loadState = useCallback(async (userAddr?: string) => {
     if (!contractAddress) return;
@@ -40,31 +53,51 @@ export default function ClaimPage() {
       setTokenType(type);
 
       const safe = (p: Promise<any>, fallback: any = null) => p.catch(() => fallback);
-      const [name, supply, active, amount, rToken, rAmount, rFollowers, ownerAddr] = await Promise.all([
-        safe(c.name(), "Unknown"), safe(c.maxSupply(), BigInt(0)), safe(c.isClaimActive(), false), safe(c.amountPerClaim(), BigInt(0)),
-        safe(c.requiredToken(), ZERO), safe(c.requiredTokenAmount(), BigInt(0)), safe(c.requiredFollowers(), BigInt(0)), safe(c.owner(), ZERO),
+      const [name, symbol, supply, active, enabled, amount, rToken, rAmount, rFollowers, ownerAddr, start, end] = await Promise.all([
+        safe(c.name(), "Unknown"),
+        safe(c.symbol(), ""),
+        safe(c.maxSupply(), BigInt(0)),
+        safe(c.isClaimActive(), false),
+        safe(c.claimEnabled(), false),
+        safe(c.amountPerClaim(), BigInt(0)),
+        safe(c.requiredToken(), ZERO),
+        safe(c.requiredTokenAmount(), BigInt(0)),
+        safe(c.requiredFollowers(), BigInt(0)),
+        safe(c.owner(), ZERO),
+        safe(c.startTime(), BigInt(0)),
+        safe(c.endTime(), BigInt(0)),
       ]);
-      setDropName(name); setIsActive(active); setOwner(ownerAddr);
+      setDropName(name);
+      setDropSymbol(symbol);
+      setIsActive(active);
+      setClaimEnabled(enabled);
+      setOwner(ownerAddr);
+      setStartTime(Number(start));
+      setEndTime(Number(end));
       fetchProfile(ownerAddr).then(setCreatorProfile).catch(() => {});
 
       let tokenName = "";
       if (rToken !== ZERO && rAmount > BigInt(0)) {
-        try { const tc = new Contract(rToken, ["function name() view returns (string)"], rpc); tokenName = await tc.name(); }
-        catch { tokenName = `${rToken.slice(0, 6)}...${rToken.slice(-4)}`; }
+        try {
+          const tc = new Contract(rToken, ["function name() view returns (string)"], rpc);
+          tokenName = await tc.name();
+        } catch {
+          tokenName = `${rToken.slice(0, 6)}...${rToken.slice(-4)}`;
+        }
       }
       const hasReqs = (rToken !== ZERO && rAmount > BigInt(0)) || rFollowers > BigInt(0);
       setReqInfo(hasReqs ? { token: rToken, tokenAmount: rAmount, tokenName, followers: rFollowers } : null);
 
       if (type === "LSP7") {
-        const [totalAmount, claimers, decimals] = await Promise.all([c.totalClaimedAmount(), c.totalClaimers(), c.decimals()]);
+        const [, claimers, decimals] = await Promise.all([c.totalClaimedAmount(), c.totalClaimers(), c.decimals()]);
         const dec = Number(decimals);
         setClaimedDisplay(claimers.toString());
-        setSupplyDisplay(supply === BigInt(0) ? "∞" : formatUnits(supply, dec));
+        setSupplyDisplay(supply === BigInt(0) ? "Unlimited" : formatUnits(supply, dec));
         setAmountDisplay(formatUnits(amount, dec) + " tokens");
       } else {
         const totalClaimed = await c.totalClaimed();
         setClaimedDisplay(totalClaimed.toString());
-        setSupplyDisplay(supply === BigInt(0) ? "∞" : supply.toString());
+        setSupplyDisplay(supply === BigInt(0) ? "Unlimited" : supply.toString());
         setAmountDisplay(amount.toString() + (amount === BigInt(1) ? " NFT" : " NFTs"));
       }
 
@@ -76,22 +109,26 @@ export default function ClaimPage() {
         setAlreadyClaimed(claimed);
         setEligibility({ tokenOk: meets.tokenOk, followersOk: meets.followersOk });
       }
-    } catch (e) { console.error("Load error:", e); setDropName("Unknown Drop"); }
+    } catch (e) {
+      console.error("Load error:", e);
+      setDropName("Unknown Drop");
+    } finally {
+      setPageLoading(false);
+    }
   }, [contractAddress]);
 
-  useEffect(() => { loadState(); }, [loadState]);
+  // Load contract state on mount, and reload user-specific state when wallet connects
+  useEffect(() => { loadState(address ?? undefined); }, [loadState, address]);
 
   async function connect() {
-    const p = getProvider();
-    if (!p) { setStatus({ message: "Install the UP Browser Extension", type: "error" }); return; }
-    try {
-      setStatus({ message: "Connecting...", type: "loading" });
-      await ensureLuksoNetwork();
-      const accounts = await p.request({ method: "eth_requestAccounts" });
-      setAddress(accounts[0]); setStatus(null);
-      await loadState(accounts[0]);
-      fetchProfile(accounts[0]).then(setProfile);
-    } catch (e: any) { setStatus({ message: e.message || "Failed", type: "error" }); }
+    setStatus({ message: "Connecting...", type: "loading" });
+    const addr = await walletConnect();
+    if (!addr) {
+      setStatus({ message: "Install the UP Browser Extension", type: "error" });
+      return;
+    }
+    setStatus(null);
+    await loadState(addr);
   }
 
   async function claim() {
@@ -106,107 +143,309 @@ export default function ClaimPage() {
       const tx = await c.claim();
       setStatus({ message: "Waiting for confirmation...", type: "loading" });
       await tx.wait();
-      setStatus({ message: tokenType === "LSP7" ? "🎉 Tokens claimed!" : "🎉 NFT claimed!", type: "success" });
+      setStatus({ message: tokenType === "LSP7" ? "Tokens claimed successfully!" : "NFT claimed successfully!", type: "success" });
       setAlreadyClaimed(true);
       await loadState(address);
     } catch (e: any) {
       setStatus({ message: e.reason || e.message?.slice(0, 100) || "Failed", type: "error" });
-    } finally { setClaiming(false); }
+    } finally {
+      setClaiming(false);
+    }
+  }
+
+  async function shareLink() {
+    const url = window.location.href;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: `Claim ${dropName}`, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
+    } catch {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }
+
+  function formatTime(ts: number): string {
+    if (ts === 0) return "Not set";
+    return new Date(ts * 1000).toLocaleString(undefined, {
+      month: "short", day: "numeric", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
   }
 
   const canClaim = isActive && !alreadyClaimed && !claiming && (!eligibility || (eligibility.tokenOk && eligibility.followersOk));
+  const explorerUrl = `https://explorer.execution.mainnet.lukso.network/address/${contractAddress}`;
+  const hasTimeWindow = startTime > 0 || endTime > 0;
+
+  // Determine claim status label
+  let statusLabel = "";
+  let statusColor = "";
+  if (!claimEnabled) {
+    statusLabel = "Paused";
+    statusColor = "text-yellow-400 bg-yellow-500/10 border-yellow-500/20";
+  } else if (isActive) {
+    statusLabel = "Live";
+    statusColor = "text-green-400 bg-green-500/10 border-green-500/20";
+  } else {
+    statusLabel = "Scheduled";
+    statusColor = "text-blue-400 bg-blue-500/10 border-blue-500/20";
+  }
+
+  if (pageLoading) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4">
+        <div className="max-w-md w-full">
+          <div className="bg-[#12121a] rounded-2xl sm:rounded-3xl p-5 sm:p-8 border border-purple-500/10 animate-pulse">
+            <div className="w-32 h-32 sm:w-48 sm:h-48 rounded-xl sm:rounded-2xl mx-auto mb-4 sm:mb-6 bg-zinc-800" />
+            <div className="h-6 bg-zinc-800 rounded w-1/2 mx-auto mb-3" />
+            <div className="h-4 bg-zinc-800/60 rounded w-1/3 mx-auto mb-6" />
+            <div className="flex justify-center gap-8 mb-6">
+              <div className="h-12 bg-zinc-800/40 rounded w-20" />
+              <div className="h-12 bg-zinc-800/40 rounded w-20" />
+            </div>
+            <div className="h-12 bg-zinc-800 rounded-xl" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4">
       <div className="max-w-md w-full">
         <div className="bg-[#12121a] rounded-2xl sm:rounded-3xl p-5 sm:p-8 text-center border border-purple-500/10">
+          {/* Drop icon */}
           <div className="w-32 h-32 sm:w-48 sm:h-48 rounded-xl sm:rounded-2xl mx-auto mb-4 sm:mb-6 bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-4xl sm:text-6xl">
-            {tokenType === "LSP7" ? "🪙" : "🎵"}
+            {tokenType === "LSP7" ? "🪙" : "🖼"}
           </div>
 
-          <h1 className="text-xl sm:text-2xl font-bold mb-1">{dropName}</h1>
+          {/* Status badge */}
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${statusColor}`}>
+              {statusLabel}
+            </span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">
+              {tokenType === "LSP7" ? "Token" : "NFT"}
+            </span>
+          </div>
+
+          <h1 className="text-xl sm:text-2xl font-bold mb-0.5">{dropName}</h1>
+          {dropSymbol && <p className="text-zinc-600 text-xs mb-1">${dropSymbol}</p>}
 
           {/* Creator */}
           {creatorProfile && (
-            <div className="flex items-center justify-center gap-1.5 mb-2">
+            <div className="flex items-center justify-center gap-1.5 mb-3">
               <span className="text-zinc-500 text-xs">by</span>
-              {creatorProfile.image && <img src={creatorProfile.image} alt="" className="w-4 h-4 rounded-full object-cover" />}
-              <span className="text-zinc-400 text-xs">{creatorProfile.name || (owner ? `${owner.slice(0, 6)}...${owner.slice(-4)}` : "")}</span>
+              {creatorProfile.image && (
+                <img src={creatorProfile.image} alt="" className="w-4 h-4 rounded-full object-cover" />
+              )}
+              <span className="text-zinc-400 text-xs">
+                {creatorProfile.name || (owner ? `${owner.slice(0, 6)}...${owner.slice(-4)}` : "")}
+              </span>
             </div>
           )}
 
-          {address ? (
-            <div className="flex items-center justify-center gap-2 mb-2">
-              {profile?.image && <img src={profile.image} alt="" className="w-6 h-6 rounded-full object-cover" />}
-              <span className="text-zinc-300 text-xs sm:text-sm font-medium">{profile?.name || `${address.slice(0, 6)}...${address.slice(-4)}`}</span>
-              <button onClick={() => { setAddress(null); setProfile(null); setAlreadyClaimed(false); setEligibility(null); }} className="text-zinc-600 hover:text-zinc-400 text-[10px] ml-1">Disconnect</button>
+          {/* Connected user */}
+          {address && (
+            <div className="flex items-center justify-center gap-2 mb-3">
+              {profile?.image && (
+                <img src={profile.image} alt="" className="w-5 h-5 rounded-full object-cover" />
+              )}
+              <span className="text-zinc-300 text-xs sm:text-sm font-medium">
+                {profile?.name || `${address.slice(0, 6)}...${address.slice(-4)}`}
+              </span>
+              <button
+                onClick={() => {
+                  disconnect();
+                  setAlreadyClaimed(false); setEligibility(null);
+                }}
+                className="text-zinc-600 hover:text-zinc-400 text-[10px] ml-1 cursor-pointer"
+              >
+                Disconnect
+              </button>
             </div>
-          ) : (
-            <p className="text-zinc-500 mb-2 text-xs sm:text-sm">Connect your Universal Profile to claim</p>
           )}
 
+          {!address && !alreadyClaimed && (
+            <p className="text-zinc-500 mb-3 text-xs sm:text-sm">
+              Connect your Universal Profile to claim
+            </p>
+          )}
+
+          {/* Amount per claim */}
           {amountDisplay && (
             <div className="inline-block bg-purple-500/10 border border-purple-500/20 text-purple-400 px-3 py-1 rounded-full text-xs font-medium mb-4">
               {amountDisplay} per claim
             </div>
           )}
 
+          {/* Claim window */}
+          {hasTimeWindow && (
+            <div className="bg-zinc-800/40 rounded-xl p-3 mb-4 text-xs">
+              <div className="text-zinc-500 text-[10px] uppercase tracking-wider mb-1.5 font-medium">
+                Claim Window
+              </div>
+              <div className="flex items-center justify-center gap-3 text-zinc-300">
+                <span>{formatTime(startTime)}</span>
+                <span className="text-zinc-600">→</span>
+                <span>{formatTime(endTime)}</span>
+              </div>
+            </div>
+          )}
+
           {/* Requirements */}
           {reqInfo && (
             <div className="bg-zinc-800/50 rounded-xl p-3 sm:p-4 mb-4 text-left text-xs sm:text-sm">
-              <div className="text-zinc-400 text-[10px] uppercase tracking-wider mb-2 text-center font-medium">Requirements</div>
+              <div className="text-zinc-400 text-[10px] uppercase tracking-wider mb-2 text-center font-medium">
+                Requirements
+              </div>
               {reqInfo.token !== ZERO && reqInfo.tokenAmount > BigInt(0) && (
-                <div className="flex items-center justify-between py-1">
-                  <span className="text-zinc-300">Hold {reqInfo.tokenAmount.toString()} {reqInfo.tokenName}</span>
-                  {eligibility && <span className={eligibility.tokenOk ? "text-green-400" : "text-red-400"}>{eligibility.tokenOk ? "✓" : "✗"}</span>}
+                <div className="flex items-center justify-between py-1.5">
+                  <span className="text-zinc-300">
+                    Hold {reqInfo.tokenAmount.toString()} {reqInfo.tokenName}
+                  </span>
+                  {eligibility && (
+                    <span className={eligibility.tokenOk ? "text-green-400" : "text-red-400"}>
+                      {eligibility.tokenOk ? "✓" : "✗"}
+                    </span>
+                  )}
                 </div>
               )}
               {reqInfo.followers > BigInt(0) && (
-                <div className="flex items-center justify-between py-1">
-                  <span className="text-zinc-300">{reqInfo.followers.toString()}+ followers</span>
-                  {eligibility && <span className={eligibility.followersOk ? "text-green-400" : "text-red-400"}>{eligibility.followersOk ? "✓" : "✗"}</span>}
+                <div className="flex items-center justify-between py-1.5">
+                  <span className="text-zinc-300">
+                    {reqInfo.followers.toString()}+ followers
+                  </span>
+                  {eligibility && (
+                    <span className={eligibility.followersOk ? "text-green-400" : "text-red-400"}>
+                      {eligibility.followersOk ? "✓" : "✗"}
+                    </span>
+                  )}
                 </div>
               )}
             </div>
           )}
 
+          {/* Inactive warning */}
           {!isActive && tokenType && (
             <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-3 py-2.5 rounded-xl mb-4 text-xs sm:text-sm">
-              Claim is not active right now
+              {!claimEnabled
+                ? "This drop is currently paused by the creator"
+                : "Claim window has not started yet"}
             </div>
           )}
 
+          {/* Stats */}
           <div className="flex justify-center gap-8 sm:gap-12 mb-6 sm:mb-8">
-            <div><div className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-wider">Claimers</div><div className="text-lg sm:text-xl font-semibold text-purple-400">{claimedDisplay}</div></div>
-            <div><div className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-wider">Max Supply</div><div className="text-lg sm:text-xl font-semibold text-purple-400">{supplyDisplay}</div></div>
+            <div>
+              <div className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-wider">
+                Claimers
+              </div>
+              <div className="text-lg sm:text-xl font-semibold text-purple-400">
+                {claimedDisplay}
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-wider">
+                Max Supply
+              </div>
+              <div className="text-lg sm:text-xl font-semibold text-purple-400">
+                {supplyDisplay}
+              </div>
+            </div>
           </div>
 
+          {/* Action button */}
           {!address ? (
-            <button onClick={connect} className="w-full py-3.5 sm:py-4 rounded-xl sm:rounded-2xl text-base sm:text-lg font-semibold border-2 border-purple-400 text-purple-400 hover:bg-purple-400/10 transition-all cursor-pointer active:scale-[0.97]">
+            <button
+              onClick={connect}
+              className="w-full py-3.5 sm:py-4 rounded-xl sm:rounded-2xl text-base sm:text-lg font-semibold border-2 border-purple-400 text-purple-400 hover:bg-purple-400/10 transition-all cursor-pointer active:scale-[0.97]"
+            >
               Connect Universal Profile
             </button>
           ) : alreadyClaimed ? (
-            <button disabled className="w-full py-3.5 sm:py-4 rounded-xl sm:rounded-2xl text-base sm:text-lg font-semibold bg-purple-400/50 text-white cursor-not-allowed">Already Claimed ✓</button>
+            <button
+              disabled
+              className="w-full py-3.5 sm:py-4 rounded-xl sm:rounded-2xl text-base sm:text-lg font-semibold bg-green-500/20 text-green-400 border border-green-500/30 cursor-not-allowed"
+            >
+              Already Claimed ✓
+            </button>
           ) : (
-            <button onClick={claim} disabled={!canClaim} className="w-full py-3.5 sm:py-4 rounded-xl sm:rounded-2xl text-base sm:text-lg font-semibold bg-purple-400 text-white hover:bg-purple-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.97]">
-              {claiming ? "Claiming..." : !eligibility || (eligibility.tokenOk && eligibility.followersOk) ? (tokenType === "LSP7" ? "Claim Tokens" : "Claim NFT") : "Requirements not met"}
+            <button
+              onClick={claim}
+              disabled={!canClaim}
+              className="w-full py-3.5 sm:py-4 rounded-xl sm:rounded-2xl text-base sm:text-lg font-semibold bg-purple-400 text-white hover:bg-purple-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.97]"
+            >
+              {claiming
+                ? "Claiming..."
+                : !eligibility || (eligibility.tokenOk && eligibility.followersOk)
+                ? tokenType === "LSP7" ? "Claim Tokens" : "Claim NFT"
+                : "Requirements not met"}
             </button>
           )}
 
+          {/* Status message */}
           {status && (
-            <div className={`mt-3 px-3 py-2.5 rounded-xl text-xs sm:text-sm ${status.type === "success" ? "bg-green-500/10 border border-green-500/20 text-green-400" : status.type === "error" ? "bg-red-500/10 border border-red-500/20 text-red-400" : "bg-purple-500/10 border border-purple-500/20 text-purple-400"}`}>
+            <div
+              className={`mt-3 px-3 py-2.5 rounded-xl text-xs sm:text-sm ${
+                status.type === "success"
+                  ? "bg-green-500/10 border border-green-500/20 text-green-400"
+                  : status.type === "error"
+                  ? "bg-red-500/10 border border-red-500/20 text-red-400"
+                  : "bg-purple-500/10 border border-purple-500/20 text-purple-400"
+              }`}
+            >
               {status.message}
             </div>
           )}
         </div>
 
-        <div className="flex justify-between items-center mt-4 sm:mt-6 px-2">
-          <Link href="/" className="text-zinc-600 text-[10px] sm:text-xs hover:text-purple-400">← All drops</Link>
-          {address && owner && address.toLowerCase() === owner.toLowerCase() && (
-            <Link href={`/manage/${contractAddress}`} className="text-zinc-600 text-[10px] sm:text-xs hover:text-purple-400">Manage →</Link>
-          )}
-          <p className="text-zinc-600 text-[10px] sm:text-xs">Powered by <a href="https://lukso.network" target="_blank" className="text-purple-400 hover:underline">LUKSO</a></p>
+        {/* Bottom bar */}
+        <div className="flex items-center justify-between mt-4 sm:mt-6 px-2 gap-2">
+          <Link
+            href="/"
+            className="text-zinc-600 text-[10px] sm:text-xs hover:text-purple-400 transition-colors"
+          >
+            ← All drops
+          </Link>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={shareLink}
+              className="text-zinc-600 text-[10px] sm:text-xs hover:text-purple-400 transition-colors cursor-pointer"
+            >
+              {copied ? "Link copied!" : "Share"}
+            </button>
+            <a
+              href={explorerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-zinc-600 text-[10px] sm:text-xs hover:text-purple-400 transition-colors"
+            >
+              Explorer
+            </a>
+            <CopyButton
+              text={contractAddress}
+              label="Copy address"
+              className="text-[10px] sm:text-xs"
+            />
+            {address && owner && address.toLowerCase() === owner.toLowerCase() && (
+              <Link
+                href={`/manage/${contractAddress}`}
+                className="text-zinc-600 text-[10px] sm:text-xs hover:text-purple-400 transition-colors"
+              >
+                Manage →
+              </Link>
+            )}
+          </div>
         </div>
+
+        <Footer />
       </div>
     </div>
   );
