@@ -289,7 +289,7 @@ export default function ClaimPage() {
             rel="noopener noreferrer"
             className="absolute top-2 right-3 text-[9px] text-faint hover:text-label transition-colors z-10"
           >
-            Beta · Report issues
+            <span className="text-purple-500 font-bold">BETA</span> · Report issues
           </a>
         )}
         <div className={`bg-card rounded-xl text-center border border-border-muted card-elevated ${inIframe ? "p-6" : "p-5 sm:p-8"}`}>

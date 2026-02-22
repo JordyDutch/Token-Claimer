@@ -151,7 +151,7 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
             rel="noopener noreferrer"
             className="absolute top-2 right-4 text-[9px] text-faint hover:text-label transition-colors z-10"
           >
-            Beta · Report issues
+            <span className="text-purple-500 font-bold">BETA</span> · Report issues
           </a>
         )}
 

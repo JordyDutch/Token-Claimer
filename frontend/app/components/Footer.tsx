@@ -15,7 +15,7 @@ export default function Footer() {
         </a>
       </p>
       <p className="text-label text-[10px] sm:text-xs">
-        This app is in beta.{" "}
+        This app is in <span className="text-purple-500 font-bold">BETA</span>.{" "}
         <a
           href="https://github.com/JordyDutch/issue-tracker/issues"
           target="_blank"

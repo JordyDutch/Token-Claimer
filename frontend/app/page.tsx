@@ -208,7 +208,7 @@ export default function HomePage() {
             rel="noopener noreferrer"
             className="absolute top-0 right-0 text-[9px] text-faint hover:text-label transition-colors z-10"
           >
-            Beta · Report issues
+            <span className="text-purple-500 font-bold">BETA</span> · Report issues
           </a>
         )}
         {/* Hero */}
