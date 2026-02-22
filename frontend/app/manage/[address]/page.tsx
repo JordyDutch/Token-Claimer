@@ -416,12 +416,13 @@ export default function ManagePage() {
                       onChange={(v) => setTokenReqs((prev) => prev.map((r, j) => j === i ? { ...r, addr: v } : r))}
                     />
                     <div>
-                      <label className={lbl}>Minimum balance</label>
+                      <label className={lbl}>Minimum balance <span className="text-zinc-600">(min 1)</span></label>
                       <input
                         type="number"
                         value={req.amount}
                         onChange={(e) => setTokenReqs((prev) => prev.map((r, j) => j === i ? { ...r, amount: e.target.value } : r))}
-                        placeholder="0"
+                        placeholder="1"
+                        min="1"
                         className={inp + " mt-1"}
                       />
                     </div>
@@ -448,6 +449,11 @@ export default function ManagePage() {
                 </div>
                 <button
                   onClick={() => {
+                    const invalidTokenReqs = tokenReqs.filter(r => r.addr && r.addr !== ZERO && (!r.amount || Number(r.amount) < 1));
+                    if (invalidTokenReqs.length > 0) {
+                      setStatus({ message: "Token requirements must have a minimum balance of at least 1", type: "error" });
+                      return;
+                    }
                     const tokens = tokenReqs.map((r) => r.addr || ZERO);
                     const amounts = tokenReqs.map((r) => r.amount || "0");
                     sendTx(

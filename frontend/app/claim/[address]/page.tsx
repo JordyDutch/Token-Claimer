@@ -116,7 +116,7 @@ export default function ClaimPage() {
       const rawBalances: bigint[] = reqResult?.minBalances ?? [];
       const tokenEntries = rawTokens
         .map((addr: string, i: number) => ({ addr, amount: rawBalances[i] ?? BigInt(0) }))
-        .filter((e: { addr: string; amount: bigint }) => e.addr !== ZERO && e.amount > BigInt(0));
+        .filter((e: { addr: string; amount: bigint }) => e.addr !== ZERO);
 
       const enrichedTokens = await Promise.all(
         tokenEntries.map(async (e: { addr: string; amount: bigint }) => {
@@ -361,7 +361,8 @@ export default function ClaimPage() {
                       <span className="text-base flex-shrink-0">🪙</span>
                     )}
                     <span className="text-zinc-300 text-xs truncate">
-                      Hold {t.amount.toString()}{" "}
+                      Hold{" "}
+                      {t.amount > BigInt(0) ? t.amount.toString() : "any"}{" "}
                       <span className="font-semibold">{t.name}</span>
                       {t.symbol && t.symbol !== t.name && (
                         <span className="text-zinc-500 ml-1">({t.symbol})</span>
