@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { JsonRpcProvider, Contract } from "ethers";
-import { LSP7_FACTORY, LSP8_FACTORY, FACTORY_ABI, LUKSO_RPC } from "./lib/contracts";
+import { LSP7_FACTORY, LSP8_FACTORY, LSP7_FACTORY_ABI, LSP8_FACTORY_ABI, LUKSO_RPC } from "./lib/contracts";
 import { fetchProfile, ProfileInfo } from "./lib/profile";
 import Link from "next/link";
 import Footer from "./components/Footer";
@@ -38,19 +38,19 @@ export default function HomePage() {
 
   async function loadCampaigns() {
     const rpc = new JsonRpcProvider(LUKSO_RPC);
-    const lsp7 = new Contract(LSP7_FACTORY, FACTORY_ABI, rpc);
-    const lsp8 = new Contract(LSP8_FACTORY, FACTORY_ABI, rpc);
+    const lsp7 = new Contract(LSP7_FACTORY, LSP7_FACTORY_ABI, rpc);
+    const lsp8 = new Contract(LSP8_FACTORY, LSP8_FACTORY_ABI, rpc);
 
     try {
       const [total7, total8] = await Promise.all([
-        lsp7.totalCampaigns().catch(() => BigInt(0)),
-        lsp8.totalCampaigns().catch(() => BigInt(0)),
+        lsp7.totalTokenCampaigns().catch(() => BigInt(0)),
+        lsp8.totalNFTCampaigns().catch(() => BigInt(0)),
       ]);
 
       const all: Campaign[] = [];
 
       if (total7 > BigInt(0)) {
-        const items = await lsp7.getCampaigns(0, total7);
+        const items = await lsp7.getTokenCampaigns(0, total7);
         for (const c of items) {
           all.push({
             contractAddr: c.contractAddr,
@@ -64,7 +64,7 @@ export default function HomePage() {
       }
 
       if (total8 > BigInt(0)) {
-        const items = await lsp8.getCampaigns(0, total8);
+        const items = await lsp8.getNFTCampaigns(0, total8);
         for (const c of items) {
           all.push({
             contractAddr: c.contractAddr,

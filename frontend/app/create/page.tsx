@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { BrowserProvider, Contract } from "ethers";
 import {
-  LSP7_FACTORY, LSP8_FACTORY, FACTORY_ABI,
+  LSP7_FACTORY, LSP8_FACTORY, LSP7_FACTORY_ABI, LSP8_FACTORY_ABI,
   getProvider,
 } from "../lib/contracts";
 import { uploadAndSetLSP4Metadata, type Lsp4Link } from "../lib/lsp4";
@@ -93,22 +93,22 @@ export default function CreatePage() {
       let deployedAddr: string;
 
       if (dropType === "token") {
-        const factory = new Contract(LSP7_FACTORY, FACTORY_ABI, signer);
+        const factory = new Contract(LSP7_FACTORY, LSP7_FACTORY_ABI, signer);
         const tx = await factory.createTokenDrop(name, symbol, amountPerClaim, maxSupply, isNonDivisible);
         setStatus({ message: "Waiting for confirmation...", type: "loading" });
         await tx.wait();
-        const fr = new Contract(LSP7_FACTORY, FACTORY_ABI, provider);
-        const t = await fr.totalCampaigns();
-        const items = await fr.getCampaigns(t - BigInt(1), 1);
+        const fr = new Contract(LSP7_FACTORY, LSP7_FACTORY_ABI, provider);
+        const t = await fr.totalTokenCampaigns();
+        const items = await fr.getTokenCampaigns(t - BigInt(1), 1);
         deployedAddr = items[0].contractAddr;
       } else {
-        const factory = new Contract(LSP8_FACTORY, FACTORY_ABI, signer);
+        const factory = new Contract(LSP8_FACTORY, LSP8_FACTORY_ABI, signer);
         const tx = await factory.createNFTDrop(name, symbol, maxSupply, amountPerClaim);
         setStatus({ message: "Waiting for confirmation...", type: "loading" });
         await tx.wait();
-        const fr = new Contract(LSP8_FACTORY, FACTORY_ABI, provider);
-        const t = await fr.totalCampaigns();
-        const items = await fr.getCampaigns(t - BigInt(1), 1);
+        const fr = new Contract(LSP8_FACTORY, LSP8_FACTORY_ABI, provider);
+        const t = await fr.totalNFTCampaigns();
+        const items = await fr.getNFTCampaigns(t - BigInt(1), 1);
         deployedAddr = items[0].contractAddr;
       }
 

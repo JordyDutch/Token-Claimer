@@ -8,13 +8,24 @@ export const LSP7_FACTORY =
 export const LSP8_FACTORY =
   process.env.NEXT_PUBLIC_LSP8_FACTORY ?? "0x9bc9e8D57a94E0F88ab32CDC1865c3fdeF86f72E";
 
-export const FACTORY_ABI = [
+// LSP7DropFactory ABI
+export const LSP7_FACTORY_ABI = [
   "function createTokenDrop(string,string,uint256,uint256,bool) returns (address)",
-  "function createNFTDrop(string,string,uint256,uint256) returns (address)",
-  "function totalCampaigns() view returns (uint256)",
-  "function getCampaigns(uint256,uint256) view returns (tuple(address contractAddr, address creator, string name, string symbol, uint256 createdAt)[])",
-  "function getCampaignsByCreator(address) view returns (uint256[])",
+  "function totalTokenCampaigns() view returns (uint256)",
+  "function getTokenCampaigns(uint256,uint256) view returns (tuple(address contractAddr, address creator, string name, string symbol, uint256 createdAt)[])",
+  "function getTokenCampaignsByCreator(address) view returns (uint256[])",
 ];
+
+// LSP8DropFactory ABI
+export const LSP8_FACTORY_ABI = [
+  "function createNFTDrop(string,string,uint256,uint256) returns (address)",
+  "function totalNFTCampaigns() view returns (uint256)",
+  "function getNFTCampaigns(uint256,uint256) view returns (tuple(address contractAddr, address creator, string name, string symbol, uint256 createdAt)[])",
+  "function getNFTCampaignsByCreator(address) view returns (uint256[])",
+];
+
+// @deprecated — use LSP7_FACTORY_ABI / LSP8_FACTORY_ABI
+export const FACTORY_ABI = [...LSP7_FACTORY_ABI, ...LSP8_FACTORY_ABI];
 
 export const CLAIM_ABI = [
   "function claim() external",

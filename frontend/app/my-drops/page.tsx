@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { JsonRpcProvider, Contract } from "ethers";
 import {
-  LSP7_FACTORY, LSP8_FACTORY, FACTORY_ABI, CLAIM_ABI,
+  LSP7_FACTORY, LSP8_FACTORY, LSP7_FACTORY_ABI, LSP8_FACTORY_ABI, CLAIM_ABI,
   LSP7_EXTRA_ABI, LSP8_EXTRA_ABI, LUKSO_RPC,
   detectTokenType,
 } from "../lib/contracts";
@@ -34,13 +34,13 @@ export default function MyDropsPage() {
     setLoading(true);
     setError(null);
     const rpc = new JsonRpcProvider(LUKSO_RPC);
-    const lsp7 = new Contract(LSP7_FACTORY, FACTORY_ABI, rpc);
-    const lsp8 = new Contract(LSP8_FACTORY, FACTORY_ABI, rpc);
+    const lsp7 = new Contract(LSP7_FACTORY, LSP7_FACTORY_ABI, rpc);
+    const lsp8 = new Contract(LSP8_FACTORY, LSP8_FACTORY_ABI, rpc);
 
     try {
       const [total7, total8] = await Promise.all([
-        lsp7.totalCampaigns().catch(() => BigInt(0)),
-        lsp8.totalCampaigns().catch(() => BigInt(0)),
+        lsp7.totalTokenCampaigns().catch(() => BigInt(0)),
+        lsp8.totalNFTCampaigns().catch(() => BigInt(0)),
       ]);
 
       interface RawCampaign {
@@ -55,7 +55,7 @@ export default function MyDropsPage() {
       const mine: RawCampaign[] = [];
 
       if (total7 > BigInt(0)) {
-        const items = await lsp7.getCampaigns(0, total7);
+        const items = await lsp7.getTokenCampaigns(0, total7);
         for (const c of items) {
           if (c.creator.toLowerCase() === userAddr.toLowerCase()) {
             mine.push({
@@ -71,7 +71,7 @@ export default function MyDropsPage() {
       }
 
       if (total8 > BigInt(0)) {
-        const items = await lsp8.getCampaigns(0, total8);
+        const items = await lsp8.getNFTCampaigns(0, total8);
         for (const c of items) {
           if (c.creator.toLowerCase() === userAddr.toLowerCase()) {
             mine.push({
