@@ -40,7 +40,11 @@ export default function ManagePage() {
         c.owner(), c.name(), c.claimEnabled(), c.startTime(), c.endTime(),
         c.amountPerClaim(), c.maxSupply(), c.requiredToken(), c.requiredTokenAmount(), c.requiredFollowers(),
       ]);
-      setIsOwner(owner.toLowerCase() === userAddr.toLowerCase());
+      const ownerLower = owner.toLowerCase();
+      const userLower = userAddr.toLowerCase();
+      console.log("OWNER CHECK:", ownerLower, "vs", userLower, "match:", ownerLower === userLower);
+      if (ownerLower !== userLower) alert(`Owner: ${ownerLower}\nYou: ${userLower}`);
+      setIsOwner(ownerLower === userLower);
       setDropName(name); setClaimEnabled(enabled); setAmountPerClaim(amount.toString()); setMaxSupply(supply.toString());
       setReqToken(rT === ZERO ? "" : rT);
       setReqTokenAmount(rA > BigInt(0) ? rA.toString() : "");
