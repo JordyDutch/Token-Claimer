@@ -40,6 +40,9 @@ export default function Header() {
           <Link href="/my-drops" className={linkClass("/my-drops")}>
             My Drops
           </Link>
+          <Link href="/developers" className={linkClass("/developers")}>
+            Devs
+          </Link>
 
           {/* Theme toggle */}
           <button
