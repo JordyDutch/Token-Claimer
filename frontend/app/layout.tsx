@@ -6,6 +6,7 @@ import WalletProvider from "./components/WalletProvider";
 import NetworkProvider from "./components/NetworkProvider";
 import TestnetBanner from "./components/TestnetBanner";
 import ThemeProvider from "./components/ThemeProvider";
+import UPProviderInit from "./components/UPProviderInit";
 import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -44,13 +45,15 @@ export default function RootLayout({
       </head>
       <body className={`${inter.className} antialiased`}>
         <ThemeProvider>
-          <NetworkProvider>
-            <WalletProvider>
-              <Header />
-              <TestnetBanner />
-              {children}
-            </WalletProvider>
-          </NetworkProvider>
+          <UPProviderInit>
+            <NetworkProvider>
+              <WalletProvider>
+                <Header />
+                <TestnetBanner />
+                {children}
+              </WalletProvider>
+            </NetworkProvider>
+          </UPProviderInit>
         </ThemeProvider>
         <Analytics />
       </body>

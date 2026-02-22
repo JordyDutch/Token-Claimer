@@ -70,15 +70,45 @@ export const LSP8_EXTRA_ABI = [
   "function totalClaimed() view returns (uint256)",
 ];
 
+/** Detect if the app is running inside an iframe */
+export function isInIframe(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true; // cross-origin iframes throw on access
+  }
+}
+
+let _upProvider: any = null;
+
+/**
+ * Returns the EIP-1193 provider.
+ * - Inside an iframe (e.g. universaleverything.io grid): uses @lukso/up-provider
+ * - Standalone: uses window.lukso or window.ethereum (browser extension)
+ */
 export function getProvider() {
   if (typeof window === "undefined") return null;
+
+  if (isInIframe()) {
+    return _upProvider; // set by UPProviderInit, null if not yet ready
+  }
+
   return (window as any).lukso || (window as any).ethereum || null;
+}
+
+/** Called once at app startup to set the UP Provider singleton when in iframe */
+export function setUPProvider(provider: any) {
+  _upProvider = provider;
 }
 
 /** Switch the wallet to a specific LUKSO network. Pass a NetworkConfig for testnet support. */
 export async function ensureLuksoNetwork(
   config?: { chainIdHex: string; rpc: string; explorerBase: string; name: string }
 ) {
+  // In iframe context, the parent controls the network — skip switching
+  if (isInIframe()) return;
+
   const p = getProvider();
   if (!p) return;
   const chainId = config?.chainIdHex ?? LUKSO_CHAIN_ID;
