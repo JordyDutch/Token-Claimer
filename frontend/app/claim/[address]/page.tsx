@@ -9,6 +9,7 @@ import {
   getProvider, detectTokenType,
 } from "../../lib/contracts";
 import { fetchProfile, ProfileInfo } from "../../lib/profile";
+import { LSP4_METADATA_KEY } from "../../lib/lsp4";
 import Link from "next/link";
 import CopyButton from "../../components/CopyButton";
 import Footer from "../../components/Footer";
@@ -24,6 +25,7 @@ export default function ClaimPage() {
   const [creatorProfile, setCreatorProfile] = useState<ProfileInfo | null>(null);
   const [dropName, setDropName] = useState("Loading...");
   const [dropSymbol, setDropSymbol] = useState("");
+  const [dropIcon, setDropIcon] = useState<string | null>(null);
   const [tokenType, setTokenType] = useState<"LSP7" | "LSP8" | null>(null);
   const [claimedDisplay, setClaimedDisplay] = useState("-");
   const [supplyDisplay, setSupplyDisplay] = useState("-");
@@ -80,6 +82,27 @@ export default function ClaimPage() {
       ]);
       setDropName(decodeBytes(nameRaw) || "Unknown");
       setDropSymbol(decodeBytes(symbolRaw));
+
+      // Load LSP4Metadata icon (fire-and-forget, non-blocking)
+      safe(c.getData(LSP4_METADATA_KEY), null).then(async (metaRaw: string | null) => {
+        if (!metaRaw || metaRaw === "0x" || metaRaw.length < 10) return;
+        try {
+          // VerifiableURI: 0x6f357c6a (4 bytes) + keccak256 (32 bytes) + ipfs://CID
+          const hex = metaRaw.slice(2); // strip 0x
+          const urlHex = hex.slice((4 + 32) * 2);  // skip magic + hash
+          const ipfsUrl = Buffer.from(urlHex, "hex").toString("utf8");
+          const cid = ipfsUrl.replace("ipfs://", "");
+          const gateway = `https://api.universalprofile.cloud/ipfs/${cid}`;
+          const res = await fetch(gateway);
+          if (!res.ok) return;
+          const json = await res.json();
+          const icon = json?.LSP4Metadata?.icon?.[0]?.url;
+          if (icon) {
+            const iconCid = icon.replace("ipfs://", "");
+            setDropIcon(`https://api.universalprofile.cloud/ipfs/${iconCid}`);
+          }
+        } catch { /* no icon, keep fallback */ }
+      });
       setIsActive(active);
       setClaimEnabled(enabled);
       setOwner(ownerAddr);
@@ -231,8 +254,10 @@ export default function ClaimPage() {
       <div className="max-w-md w-full">
         <div className="bg-[#12121a] rounded-2xl sm:rounded-3xl p-5 sm:p-8 text-center border border-purple-500/10">
           {/* Drop icon */}
-          <div className="w-32 h-32 sm:w-48 sm:h-48 rounded-xl sm:rounded-2xl mx-auto mb-4 sm:mb-6 bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-4xl sm:text-6xl">
-            {tokenType === "LSP7" ? "🪙" : "🖼"}
+          <div className="w-32 h-32 sm:w-48 sm:h-48 rounded-xl sm:rounded-2xl mx-auto mb-4 sm:mb-6 bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-4xl sm:text-6xl overflow-hidden">
+            {dropIcon
+              ? <img src={dropIcon} alt={dropName} className="w-full h-full object-cover" />
+              : (tokenType === "LSP7" ? "🪙" : "🖼")}
           </div>
 
           {/* Status badge */}
