@@ -1,12 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import Header from "./components/Header";
 import WalletProvider from "./components/WalletProvider";
 import NetworkProvider from "./components/NetworkProvider";
-import TestnetBanner from "./components/TestnetBanner";
 import ThemeProvider from "./components/ThemeProvider";
 import UPProviderInit from "./components/UPProviderInit";
+import IframeShell from "./components/IframeShell";
 import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -48,9 +47,9 @@ export default function RootLayout({
           <UPProviderInit>
             <NetworkProvider>
               <WalletProvider>
-                <Header />
-                <TestnetBanner />
-                {children}
+                <IframeShell>
+                  {children}
+                </IframeShell>
               </WalletProvider>
             </NetworkProvider>
           </UPProviderInit>

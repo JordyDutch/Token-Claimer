@@ -20,7 +20,7 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 backdrop-blur-lg bg-bg-transparent border-b border-border-header">
-      <div className="max-w-2xl mx-auto flex items-center justify-between px-4 py-3">
+      <div className="max-w-6xl mx-auto flex items-center justify-between px-4 py-3">
         <Link href="/" className="flex items-center gap-2 group">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-xs font-bold text-white">
             TC

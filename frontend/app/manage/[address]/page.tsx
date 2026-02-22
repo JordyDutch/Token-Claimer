@@ -14,6 +14,7 @@ import CopyButton from "../../components/CopyButton";
 import Footer from "../../components/Footer";
 import { useWallet } from "../../components/WalletProvider";
 import { useNetwork } from "../../components/NetworkProvider";
+import { useUPProvider } from "../../components/UPProviderInit";
 import TokenSearchInput from "../../components/TokenSearchInput";
 
 type Status = { message: string; type: "success" | "error" | "loading" } | null;
@@ -23,6 +24,7 @@ export default function ManagePage() {
   const contractAddress = params.address as string;
   const { address, profile, connect: walletConnect, disconnect } = useWallet();
   const { config: networkConfig } = useNetwork();
+  const { inIframe } = useUPProvider();
 
   const [isOwner, setIsOwner] = useState(false);
   const [status, setStatus] = useState<Status>(null);
@@ -225,8 +227,18 @@ export default function ManagePage() {
   const explorerUrl = `${networkConfig.explorerBase}/address/${contractAddress}`;
 
   return (
-    <div className="min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4">
-      <div className="max-w-lg w-full space-y-3 sm:space-y-4">
+    <div className={inIframe ? "px-4 py-4" : "min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4"}>
+      <div className={inIframe ? "w-full max-w-xl mx-auto space-y-3 sm:space-y-4 relative" : "max-w-2xl w-full space-y-3 sm:space-y-4"}>
+        {inIframe && (
+          <a
+            href="https://github.com/JordyDutch/issue-tracker/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute top-0 right-0 text-[9px] text-faint hover:text-label transition-colors z-10"
+          >
+            Beta · Report issues
+          </a>
+        )}
         {/* Header card */}
         <div className={card}>
           <div className="flex items-center justify-between mb-1">
@@ -713,7 +725,7 @@ export default function ManagePage() {
           <Link href="/" className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors">
             ← All drops
           </Link>
-          <Footer />
+          {!inIframe && <Footer />}
         </div>
       </div>
     </div>

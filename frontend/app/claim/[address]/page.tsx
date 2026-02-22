@@ -16,6 +16,7 @@ import CopyButton from "../../components/CopyButton";
 import Footer from "../../components/Footer";
 import { useWallet } from "../../components/WalletProvider";
 import { useNetwork } from "../../components/NetworkProvider";
+import { useUPProvider } from "../../components/UPProviderInit";
 
 type Status = { message: string; type: "success" | "error" | "loading" } | null;
 
@@ -24,6 +25,7 @@ export default function ClaimPage() {
   const contractAddress = params.address as string;
   const { address, profile, connect: walletConnect, disconnect } = useWallet();
   const { config: networkConfig, networkId } = useNetwork();
+  const { inIframe } = useUPProvider();
 
   const [creatorProfile, setCreatorProfile] = useState<ProfileInfo | null>(null);
   const [dropName, setDropName] = useState("Loading...");
@@ -260,10 +262,10 @@ export default function ClaimPage() {
 
   if (pageLoading) {
     return (
-      <div className="min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4">
-        <div className="max-w-md w-full">
-          <div className="bg-card rounded-xl p-5 sm:p-8 border border-border-muted card-elevated animate-pulse">
-            <div className="w-32 h-32 sm:w-48 sm:h-48 rounded-xl mx-auto mb-4 sm:mb-6 bg-surface" />
+      <div className={inIframe ? "min-h-dvh flex items-center justify-center px-4 py-3" : "min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4"}>
+        <div className={inIframe ? "w-full" : "max-w-2xl w-full"}>
+          <div className={`bg-card rounded-xl border border-border-muted card-elevated animate-pulse ${inIframe ? "p-4" : "p-5 sm:p-8"}`}>
+            <div className={`rounded-xl mx-auto bg-surface ${inIframe ? "w-14 h-14 mb-2" : "w-32 h-32 sm:w-48 sm:h-48 mb-4 sm:mb-6"}`} />
             <div className="h-6 bg-surface rounded w-1/2 mx-auto mb-3" />
             <div className="h-4 bg-surface-subtle rounded w-1/3 mx-auto mb-6" />
             <div className="flex justify-center gap-8 mb-6">
@@ -278,49 +280,96 @@ export default function ClaimPage() {
   }
 
   return (
-    <div className="min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4">
-      <div className="max-w-md w-full">
-        <div className="bg-card rounded-xl p-5 sm:p-8 text-center border border-border-muted card-elevated">
-          {/* Drop icon */}
-          <div className="w-32 h-32 sm:w-48 sm:h-48 rounded-xl mx-auto mb-4 sm:mb-6 bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-4xl sm:text-6xl overflow-hidden">
-            {dropIcon
-              ? <img src={dropIcon} alt={dropName} className="w-full h-full object-cover" />
-              : (tokenType === "LSP7" ? "🪙" : "🖼")}
-          </div>
-
-          {/* Status badge */}
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${statusColor}`}>
-              {statusLabel}
-            </span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface text-label">
-              {tokenType === "LSP7" ? "Token" : "NFT"}
-            </span>
-          </div>
-
-          <h1 className="text-xl sm:text-2xl font-bold mb-0.5">{dropName}</h1>
-          {dropSymbol && <p className="text-faint text-xs mb-1">${dropSymbol}</p>}
-
-          {/* Creator */}
-          {creatorProfile && (
-            <div className="flex items-center justify-center gap-1.5 mb-3">
-              <span className="text-label text-xs">by</span>
-              {creatorProfile.image && (
-                <img src={creatorProfile.image} alt="" className="w-4 h-4 rounded-full object-cover" />
-              )}
-              <span className="text-muted text-xs">
-                {creatorProfile.name || (owner ? `${owner.slice(0, 6)}...${owner.slice(-4)}` : "")}
-              </span>
+    <div className={inIframe ? "min-h-dvh flex items-center justify-center px-4 py-3" : "min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4"}>
+      <div className={inIframe ? "w-full relative" : "max-w-2xl w-full"}>
+        {inIframe && (
+          <a
+            href="https://github.com/JordyDutch/issue-tracker/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute top-2 right-3 text-[9px] text-faint hover:text-label transition-colors z-10"
+          >
+            Beta · Report issues
+          </a>
+        )}
+        <div className={`bg-card rounded-xl text-center border border-border-muted card-elevated ${inIframe ? "p-6" : "p-5 sm:p-8"}`}>
+          {/* Drop header — horizontal in iframe, stacked standalone */}
+          {inIframe ? (
+            <div className="flex items-center gap-4 mb-5">
+              <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-3xl overflow-hidden flex-shrink-0">
+                {dropIcon
+                  ? <img src={dropIcon} alt={dropName} className="w-full h-full object-cover" />
+                  : (tokenType === "LSP7" ? "🪙" : "🖼")}
+              </div>
+              <div className="text-left min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <h1 className="text-xl font-bold truncate">{dropName}</h1>
+                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border flex-shrink-0 ${statusColor}`}>
+                    {statusLabel}
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface text-label flex-shrink-0">
+                    {tokenType === "LSP7" ? "Token" : "NFT"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-label flex-wrap">
+                  {creatorProfile && (
+                    <span className="flex items-center gap-1">
+                      by
+                      {creatorProfile.image && <img src={creatorProfile.image} alt="" className="w-4 h-4 rounded-full object-cover" />}
+                      <span className="text-muted">{creatorProfile.name || (owner ? `${owner.slice(0, 6)}…${owner.slice(-4)}` : "")}</span>
+                    </span>
+                  )}
+                  {amountDisplay && (
+                    <span className="text-purple-600 dark:text-purple-400 font-medium">{amountDisplay}/claim</span>
+                  )}
+                  <span className="text-purple-600 dark:text-purple-400 font-semibold">{claimedDisplay}</span>
+                  <span className="text-faint">/ {supplyDisplay}</span>
+                </div>
+              </div>
             </div>
+          ) : (
+            <>
+              <div className="w-32 h-32 sm:w-48 sm:h-48 rounded-xl mx-auto mb-4 sm:mb-6 bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-4xl sm:text-6xl overflow-hidden">
+                {dropIcon
+                  ? <img src={dropIcon} alt={dropName} className="w-full h-full object-cover" />
+                  : (tokenType === "LSP7" ? "🪙" : "🖼")}
+              </div>
+
+              {/* Status badge */}
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${statusColor}`}>
+                  {statusLabel}
+                </span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface text-label">
+                  {tokenType === "LSP7" ? "Token" : "NFT"}
+                </span>
+              </div>
+
+              <h1 className="text-xl sm:text-2xl font-bold mb-0.5">{dropName}</h1>
+              {dropSymbol && <p className="text-faint text-xs mb-1">${dropSymbol}</p>}
+
+              {/* Creator */}
+              {creatorProfile && (
+                <div className="flex items-center justify-center gap-1.5 mb-3">
+                  <span className="text-label text-xs">by</span>
+                  {creatorProfile.image && (
+                    <img src={creatorProfile.image} alt="" className="w-4 h-4 rounded-full object-cover" />
+                  )}
+                  <span className="text-muted text-xs">
+                    {creatorProfile.name || (owner ? `${owner.slice(0, 6)}...${owner.slice(-4)}` : "")}
+                  </span>
+                </div>
+              )}
+            </>
           )}
 
           {/* Connected user */}
           {address && (
-            <div className="flex items-center justify-center gap-2 mb-3">
+            <div className={`flex items-center justify-center gap-2 ${inIframe ? "mb-4" : "mb-3"}`}>
               {profile?.image && (
                 <img src={profile.image} alt="" className="w-5 h-5 rounded-full object-cover" />
               )}
-              <span className="text-tertiary text-xs sm:text-sm font-medium">
+              <span className="text-tertiary text-xs font-medium">
                 {profile?.name || `${address.slice(0, 6)}...${address.slice(-4)}`}
               </span>
               <button
@@ -336,13 +385,13 @@ export default function ClaimPage() {
           )}
 
           {!address && !alreadyClaimed && (
-            <p className="text-label mb-3 text-xs sm:text-sm">
+            <p className={`text-label text-xs ${inIframe ? "mb-4" : "mb-3 sm:text-sm"}`}>
               Connect your Universal Profile to claim
             </p>
           )}
 
-          {/* Amount per claim */}
-          {amountDisplay && (
+          {/* Amount per claim — hidden in iframe (shown inline in header) */}
+          {!inIframe && amountDisplay && (
             <div className="inline-block bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-400 px-3 py-1 rounded-full text-xs font-medium mb-4">
               {amountDisplay} per claim
             </div>
@@ -350,8 +399,8 @@ export default function ClaimPage() {
 
           {/* Claim window */}
           {hasTimeWindow && (
-            <div className="bg-surface-muted rounded-xl p-3 mb-4 text-xs">
-              <div className="text-label text-[10px] uppercase tracking-wider mb-1.5 font-medium">
+            <div className={`bg-surface-muted rounded-xl text-xs ${inIframe ? "p-3 mb-4" : "p-3 mb-4"}`}>
+              <div className={`text-label text-[10px] uppercase tracking-wider font-medium ${inIframe ? "mb-1" : "mb-1.5"}`}>
                 Claim Window
               </div>
               <div className="flex items-center justify-center gap-3 text-tertiary">
@@ -364,12 +413,12 @@ export default function ClaimPage() {
 
           {/* Requirements */}
           {reqInfo && (
-            <div className="bg-surface-subtle rounded-xl p-3 sm:p-4 mb-4 text-left text-xs sm:text-sm">
-              <div className="text-muted text-[10px] uppercase tracking-wider mb-2 text-center font-medium">
+            <div className={`bg-surface-subtle rounded-xl text-left text-xs ${inIframe ? "p-3 mb-4" : "p-3 sm:p-4 mb-4 sm:text-sm"}`}>
+              <div className={`text-muted text-[10px] uppercase tracking-wider text-center font-medium ${inIframe ? "mb-1" : "mb-2"}`}>
                 Requirements
               </div>
               {reqInfo.tokens.map((t, i) => (
-                <div key={i} className="flex items-center justify-between py-1.5 gap-2">
+                <div key={i} className={`flex items-center justify-between gap-2 ${inIframe ? "py-1" : "py-1.5"}`}>
                   <div className="flex items-center gap-2 min-w-0">
                     {t.icon ? (
                       <img src={t.icon} alt="" className="w-5 h-5 rounded-md object-cover flex-shrink-0" />
@@ -393,8 +442,8 @@ export default function ClaimPage() {
                 </div>
               ))}
               {reqInfo.followers > BigInt(0) && (
-                <div className="flex items-center justify-between py-1.5">
-                  <span className="text-tertiary">
+                <div className={`flex items-center justify-between ${inIframe ? "py-1" : "py-1.5"}`}>
+                  <span className="text-tertiary text-xs">
                     {reqInfo.followers.toString()}+ followers
                   </span>
                   {eligibility && (
@@ -409,53 +458,55 @@ export default function ClaimPage() {
 
           {/* Inactive warning */}
           {!isActive && tokenType && (
-            <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400 px-3 py-2.5 rounded-xl mb-4 text-xs sm:text-sm">
+            <div className={`bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400 rounded-xl text-xs ${inIframe ? "px-3 py-2 mb-4" : "px-3 py-2.5 mb-4 sm:text-sm"}`}>
               {!claimEnabled
                 ? "This drop is currently paused by the creator"
                 : "Claim window has not started yet"}
             </div>
           )}
 
-          {/* Stats */}
-          <div className="flex justify-center gap-8 sm:gap-12 mb-6 sm:mb-8">
-            <div>
-              <div className="text-[10px] sm:text-xs text-label uppercase tracking-wider">
-                Claimers
+          {/* Stats — hidden in iframe (shown inline in header) */}
+          {!inIframe && (
+            <div className="flex justify-center gap-8 sm:gap-12 mb-6 sm:mb-8">
+              <div>
+                <div className="text-[10px] sm:text-xs text-label uppercase tracking-wider">
+                  Claimers
+                </div>
+                <div className="text-lg sm:text-xl font-semibold text-purple-600 dark:text-purple-400">
+                  {claimedDisplay}
+                </div>
               </div>
-              <div className="text-lg sm:text-xl font-semibold text-purple-600 dark:text-purple-400">
-                {claimedDisplay}
+              <div>
+                <div className="text-[10px] sm:text-xs text-label uppercase tracking-wider">
+                  Max Supply
+                </div>
+                <div className="text-lg sm:text-xl font-semibold text-purple-600 dark:text-purple-400">
+                  {supplyDisplay}
+                </div>
               </div>
             </div>
-            <div>
-              <div className="text-[10px] sm:text-xs text-label uppercase tracking-wider">
-                Max Supply
-              </div>
-              <div className="text-lg sm:text-xl font-semibold text-purple-600 dark:text-purple-400">
-                {supplyDisplay}
-              </div>
-            </div>
-          </div>
+          )}
 
           {/* Action button */}
           {!address ? (
             <button
               onClick={connect}
-              className="w-full py-3.5 sm:py-4 rounded-xl text-base sm:text-lg font-semibold border-2 border-purple-400 text-purple-400 hover:bg-purple-400/10 transition-all cursor-pointer active:scale-[0.97]"
+              className={`w-full rounded-xl font-semibold border-2 border-purple-400 text-purple-400 hover:bg-purple-400/10 transition-all cursor-pointer active:scale-[0.97] ${inIframe ? "py-3 text-sm" : "py-3.5 sm:py-4 text-base sm:text-lg"}`}
             >
               Connect Universal Profile
             </button>
           ) : alreadyClaimed ? (
             <button
               disabled
-              className="w-full py-3.5 sm:py-4 rounded-xl text-base sm:text-lg font-semibold bg-green-50 dark:bg-green-500/20 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-500/30 cursor-not-allowed"
+              className={`w-full rounded-xl font-semibold bg-green-50 dark:bg-green-500/20 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-500/30 cursor-not-allowed ${inIframe ? "py-3 text-sm" : "py-3.5 sm:py-4 text-base sm:text-lg"}`}
             >
               Already Claimed ✓
             </button>
           ) : (
             <>
               {codewordRequired && (
-                <div className="mb-3">
-                  <label className="text-[10px] text-label uppercase tracking-wider block mb-1.5 text-center">
+                <div className={inIframe ? "mb-4" : "mb-3"}>
+                  <label className={`text-[10px] text-label uppercase tracking-wider block text-center ${inIframe ? "mb-1" : "mb-1.5"}`}>
                     🔑 Codeword required
                   </label>
                   <input
@@ -464,7 +515,7 @@ export default function ClaimPage() {
                     onChange={(e) => setCodewordInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && canClaim && claim()}
                     placeholder="Enter codeword..."
-                    className="w-full bg-surface border border-border-default rounded-xl px-4 py-3 text-sm text-secondary focus:outline-none focus:border-purple-400 transition-colors text-center tracking-widest placeholder:tracking-normal"
+                    className={`w-full bg-surface border border-border-default rounded-xl text-sm text-secondary focus:outline-none focus:border-purple-400 transition-colors text-center tracking-widest placeholder:tracking-normal ${inIframe ? "px-4 py-2.5" : "px-4 py-3"}`}
                     autoComplete="off"
                     spellCheck={false}
                   />
@@ -473,7 +524,7 @@ export default function ClaimPage() {
             <button
               onClick={claim}
               disabled={!canClaim}
-              className="w-full py-3.5 sm:py-4 rounded-xl text-base sm:text-lg font-semibold bg-purple-400 text-white hover:bg-purple-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.97]"
+              className={`w-full rounded-xl font-semibold bg-purple-400 text-white hover:bg-purple-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.97] ${inIframe ? "py-3 text-sm" : "py-3.5 sm:py-4 text-base sm:text-lg"}`}
             >
               {claiming
                 ? "Claiming..."
@@ -487,7 +538,7 @@ export default function ClaimPage() {
           {/* Status message */}
           {status && (
             <div
-              className={`mt-3 px-3 py-2.5 rounded-xl text-xs sm:text-sm ${
+              className={`mt-2 px-3 py-2 rounded-xl text-xs ${
                 status.type === "success"
                   ? "bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 text-green-700 dark:text-green-400"
                   : status.type === "error"
@@ -500,47 +551,49 @@ export default function ClaimPage() {
           )}
         </div>
 
-        {/* Bottom bar */}
-        <div className="flex items-center justify-between mt-4 sm:mt-6 px-2 gap-2">
-          <Link
-            href="/"
-            className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors"
-          >
-            ← All drops
-          </Link>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={shareLink}
-              className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors cursor-pointer"
-            >
-              {copied ? "Link copied!" : "Share"}
-            </button>
-            <a
-              href={explorerUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+        {/* Bottom bar — hidden in iframe */}
+        {!inIframe && (
+          <div className="flex items-center justify-between mt-4 sm:mt-6 px-2 gap-2">
+            <Link
+              href="/"
               className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors"
             >
-              Explorer
-            </a>
-            <CopyButton
-              text={contractAddress}
-              label="Copy address"
-              className="text-[10px] sm:text-xs"
-            />
-            {address && owner && address.toLowerCase() === owner.toLowerCase() && (
-              <Link
-                href={`/manage/${contractAddress}`}
+              ← All drops
+            </Link>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={shareLink}
+                className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors cursor-pointer"
+              >
+                {copied ? "Link copied!" : "Share"}
+              </button>
+              <a
+                href={explorerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors"
               >
-                Manage →
-              </Link>
-            )}
+                Explorer
+              </a>
+              <CopyButton
+                text={contractAddress}
+                label="Copy address"
+                className="text-[10px] sm:text-xs"
+              />
+              {address && owner && address.toLowerCase() === owner.toLowerCase() && (
+                <Link
+                  href={`/manage/${contractAddress}`}
+                  className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors"
+                >
+                  Manage →
+                </Link>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
-        <Footer />
+        {!inIframe && <Footer />}
       </div>
     </div>
   );

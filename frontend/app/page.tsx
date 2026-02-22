@@ -34,6 +34,7 @@ import Link from "next/link";
 import Footer from "./components/Footer";
 import { useWallet } from "./components/WalletProvider";
 import { useNetwork } from "./components/NetworkProvider";
+import { useUPProvider } from "./components/UPProviderInit";
 
 interface Campaign {
   contractAddr: string;
@@ -55,6 +56,7 @@ export default function HomePage() {
   const [search, setSearch] = useState("");
   const { address: walletAddress, connect: walletConnect } = useWallet();
   const { config: networkConfig, networkId } = useNetwork();
+  const { inIframe } = useUPProvider();
 
   useEffect(() => {
     loadCampaigns(networkConfig);
@@ -197,8 +199,18 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-dvh px-3 py-6 sm:p-8">
-      <div className="max-w-2xl mx-auto">
+    <div className={inIframe ? "px-4 py-4" : "min-h-dvh px-3 py-6 sm:p-8"}>
+      <div className={inIframe ? "w-full relative" : "max-w-6xl mx-auto"}>
+        {inIframe && (
+          <a
+            href="https://github.com/JordyDutch/issue-tracker/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute top-0 right-0 text-[9px] text-faint hover:text-label transition-colors z-10"
+          >
+            Beta · Report issues
+          </a>
+        )}
         {/* Hero */}
         <div className="text-center mb-8 sm:mb-10">
           <h1 className="text-3xl sm:text-4xl font-bold mb-2">
@@ -344,7 +356,7 @@ export default function HomePage() {
           ))}
         </div>
 
-        <Footer />
+        {!inIframe && <Footer />}
       </div>
     </div>
   );
