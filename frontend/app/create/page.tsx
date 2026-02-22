@@ -6,7 +6,7 @@ import {
   LSP7_FACTORY, LSP8_FACTORY, LSP7_FACTORY_ABI, LSP8_FACTORY_ABI,
   getProvider,
 } from "../lib/contracts";
-import { uploadAndSetLSP4Metadata, type Lsp4Link } from "../lib/lsp4";
+import { uploadAndSetLSP4Metadata, addToLSP12IssuedAssets, type Lsp4Link } from "../lib/lsp4";
 import Link from "next/link";
 import CopyButton from "../components/CopyButton";
 import Footer from "../components/Footer";
@@ -115,6 +115,7 @@ export default function CreatePage() {
       // LSP4 metadata — always set
       const validLinks = links.filter((l) => l.title.trim() && l.url.trim());
 
+      // Step 2: LSP4 metadata + LSP4Creators[] in one tx
       await uploadAndSetLSP4Metadata(
         deployedAddr,
         signer,
@@ -125,6 +126,15 @@ export default function CreatePage() {
           links: validLinks,
           assetFiles: assetFiles.length > 0 ? assetFiles : undefined,
         },
+        (msg) => setStatus({ message: msg, type: "loading" }),
+        address,  // sets LSP4Creators[] on the contract
+      );
+
+      // Step 3: LSP12IssuedAssets[] on creator's UP → "Verified creator" badge
+      await addToLSP12IssuedAssets(
+        address,
+        deployedAddr,
+        signer,
         (msg) => setStatus({ message: msg, type: "loading" })
       );
 
