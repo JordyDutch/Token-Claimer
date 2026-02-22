@@ -24,7 +24,7 @@ export default function CreatePage() {
   const [symbol, setSymbol] = useState("");
   const [maxSupply, setMaxSupply] = useState("100");
   const [amountPerClaim, setAmountPerClaim] = useState("1");
-  const [decimals, setDecimals] = useState("0");
+  const [isNonDivisible, setIsNonDivisible] = useState(true);
   const [deployedAddress, setDeployedAddress] = useState<string | null>(null);
   const [deploying, setDeploying] = useState(false);
 
@@ -81,7 +81,7 @@ export default function CreatePage() {
 
       if (dropType === "token") {
         const factory = new Contract(LSP7_FACTORY, FACTORY_ABI, signer);
-        const tx = await factory.createTokenDrop(name, symbol, amountPerClaim, maxSupply, decimals);
+        const tx = await factory.createTokenDrop(name, symbol, amountPerClaim, maxSupply, isNonDivisible);
         setStatus({ message: "Waiting for confirmation...", type: "loading" });
         await tx.wait();
         const fr = new Contract(LSP7_FACTORY, FACTORY_ABI, provider);
@@ -259,15 +259,23 @@ export default function CreatePage() {
                 </div>
                 {dropType === "token" && (
                   <div>
-                    <label className={lbl}>Decimals (0 = whole, 18 = standard)</label>
-                    <input
-                      type="number"
-                      value={decimals}
-                      onChange={(e) => setDecimals(e.target.value)}
-                      className={inp}
-                      min="0"
-                      max="18"
-                    />
+                    <label className={lbl}>Token divisibility</label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsNonDivisible(false)}
+                        className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${!isNonDivisible ? "bg-purple-500/20 text-purple-400 border border-purple-500/30" : "bg-zinc-800 text-zinc-400 border border-zinc-700"}`}
+                      >
+                        Divisible (18 decimals)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsNonDivisible(true)}
+                        className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${isNonDivisible ? "bg-purple-500/20 text-purple-400 border border-purple-500/30" : "bg-zinc-800 text-zinc-400 border border-zinc-700"}`}
+                      >
+                        Non-divisible (whole units)
+                      </button>
+                    </div>
                   </div>
                 )}
 
