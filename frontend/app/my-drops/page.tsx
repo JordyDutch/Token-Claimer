@@ -36,6 +36,7 @@ import CopyButton from "../components/CopyButton";
 import Footer from "../components/Footer";
 import { useWallet } from "../components/WalletProvider";
 import { useNetwork } from "../components/NetworkProvider";
+import { useUPProvider } from "../components/UPProviderInit";
 
 interface MyDrop {
   contractAddr: string;
@@ -53,6 +54,7 @@ interface MyDrop {
 export default function MyDropsPage() {
   const { address, profile, connect: walletConnect, disconnect } = useWallet();
   const { config: networkConfig, networkId } = useNetwork();
+  const { inIframe } = useUPProvider();
   const [drops, setDrops] = useState<MyDrop[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -211,8 +213,18 @@ export default function MyDropsPage() {
   const card = "bg-card rounded-xl p-4 sm:p-6 border border-border-muted card-elevated";
 
   return (
-    <div className="min-h-dvh px-3 py-6 sm:p-8">
-      <div className="max-w-2xl mx-auto">
+    <div className={inIframe ? "px-4 py-4" : "min-h-dvh px-3 py-6 sm:p-8"}>
+      <div className={inIframe ? "w-full relative" : "max-w-6xl mx-auto"}>
+        {inIframe && (
+          <a
+            href="https://github.com/JordyDutch/issue-tracker/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute top-0 right-0 text-[9px] text-faint hover:text-label transition-colors z-10"
+          >
+            Beta · Report issues
+          </a>
+        )}
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -377,7 +389,7 @@ export default function MyDropsPage() {
           </div>
         )}
 
-        <Footer />
+        {!inIframe && <Footer />}
       </div>
     </div>
   );

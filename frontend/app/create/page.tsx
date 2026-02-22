@@ -12,6 +12,7 @@ import CopyButton from "../components/CopyButton";
 import Footer from "../components/Footer";
 import { useWallet } from "../components/WalletProvider";
 import { useNetwork } from "../components/NetworkProvider";
+import { useUPProvider } from "../components/UPProviderInit";
 import TokenSearchInput from "../components/TokenSearchInput";
 import UPSearchInput from "../components/UPSearchInput";
 
@@ -20,6 +21,7 @@ type Status = { message: string; type: "success" | "error" | "loading" } | null;
 export default function CreatePage() {
   const { address, profile, connect: walletConnect, disconnect } = useWallet();
   const { config: networkConfig } = useNetwork();
+  const { inIframe } = useUPProvider();
   const [status, setStatus] = useState<Status>(null);
   const [dropType, setDropType] = useState<"token" | "nft" | "secret">("nft");
 
@@ -237,8 +239,8 @@ export default function CreatePage() {
   if (secretDropId) {
     const shareUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/secret-drop/${secretDropId}`;
     return (
-      <div className="min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4">
-        <div className={card + " max-w-md w-full text-center"}>
+      <div className={inIframe ? "px-4 py-4" : "min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4"}>
+        <div className={card + (inIframe ? " max-w-xl w-full mx-auto text-center" : " max-w-lg w-full text-center")}>
           <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-violet-500/20 to-violet-400/10 border border-violet-500/20 flex items-center justify-center text-4xl mx-auto mb-4">
             🔐
           </div>
@@ -262,8 +264,8 @@ export default function CreatePage() {
   // Regular on-chain success screen
   if (deployedAddress) {
     return (
-      <div className="min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4">
-        <div className={card + " max-w-md w-full text-center"}>
+      <div className={inIframe ? "px-4 py-4" : "min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4"}>
+        <div className={card + (inIframe ? " max-w-xl w-full mx-auto text-center" : " max-w-lg w-full text-center")}>
           <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-green-500/20 to-green-400/10 border border-green-500/20 flex items-center justify-center text-4xl mx-auto mb-4">
             ✓
           </div>
@@ -331,8 +333,18 @@ export default function CreatePage() {
   const canDeploy = nameValid && symbolValid && supplyValid && amountValid && descriptionValid && iconValid && !deploying;
 
   return (
-    <div className="min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4">
-      <div className="max-w-md w-full space-y-4">
+    <div className={inIframe ? "px-4 py-4" : "min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4"}>
+      <div className={inIframe ? "w-full max-w-xl mx-auto space-y-4 relative" : "max-w-2xl w-full space-y-4"}>
+        {inIframe && (
+          <a
+            href="https://github.com/JordyDutch/issue-tracker/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute top-0 right-0 text-[9px] text-faint hover:text-label transition-colors z-10"
+          >
+            Beta · Report issues
+          </a>
+        )}
         <div className={card}>
           <Link href="/" className="text-label text-xs hover:text-purple-400 transition-colors">
             ← Back
@@ -772,7 +784,7 @@ export default function CreatePage() {
           </div>
         )}
 
-        <Footer />
+        {!inIframe && <Footer />}
       </div>
     </div>
   );

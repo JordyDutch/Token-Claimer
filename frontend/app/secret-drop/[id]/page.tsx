@@ -6,6 +6,7 @@ import Link from "next/link";
 import Footer from "../../components/Footer";
 import { useWallet } from "../../components/WalletProvider";
 import { useNetwork } from "../../components/NetworkProvider";
+import { useUPProvider } from "../../components/UPProviderInit";
 import { getProvider } from "../../lib/contracts";
 import { PublicDropInfo, TokenReq } from "../../lib/secret-drop";
 import { IPFS_GATEWAY, fetchAssetByAddress } from "../../lib/envio";
@@ -29,6 +30,7 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
   const { id } = use(params);
   const { address, connect: walletConnect } = useWallet();
   const { networkId } = useNetwork();
+  const { inIframe } = useUPProvider();
 
   const [drop, setDrop] = useState<PublicDropInfo | null>(null);
   const [tokenInfos, setTokenInfos] = useState<TokenInfo[]>([]);
@@ -120,7 +122,7 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-bg flex items-center justify-center">
+      <div className={inIframe ? "flex items-center justify-center py-12" : "min-h-screen bg-bg flex items-center justify-center"}>
         <div className="w-6 h-6 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
       </div>
     );
@@ -128,7 +130,7 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
 
   if (notFound || !drop) {
     return (
-      <div className="min-h-screen bg-bg flex flex-col items-center justify-center gap-4">
+      <div className={inIframe ? "flex flex-col items-center justify-center gap-4 py-12" : "min-h-screen bg-bg flex flex-col items-center justify-center gap-4"}>
         <p className="text-muted">Drop not found</p>
         <Link href="/" className="text-purple-400 text-sm hover:underline">Back home</Link>
       </div>
@@ -140,8 +142,18 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
   const isActive = drop.active && !poolEmpty;
 
   return (
-    <div className="min-h-screen bg-bg text-primary">
-      <div className="max-w-lg mx-auto px-4 py-12 pb-32">
+    <div className={inIframe ? "text-primary" : "min-h-screen bg-bg text-primary"}>
+      <div className={inIframe ? "w-full px-4 py-4 relative" : "max-w-2xl mx-auto px-4 py-12 pb-32"}>
+        {inIframe && (
+          <a
+            href="https://github.com/JordyDutch/issue-tracker/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute top-2 right-4 text-[9px] text-faint hover:text-label transition-colors z-10"
+          >
+            Beta · Report issues
+          </a>
+        )}
 
         {/* Badge */}
         <div className="flex items-center gap-2 mb-6">
@@ -278,7 +290,7 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
         )}
 
       </div>
-      <Footer />
+      {!inIframe && <Footer />}
     </div>
   );
 }
