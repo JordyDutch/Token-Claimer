@@ -4,9 +4,9 @@ export const LUKSO_CHAIN_ID = "0x2a";
 export const ZERO = "0x0000000000000000000000000000000000000000";
 
 export const LSP7_FACTORY =
-  process.env.NEXT_PUBLIC_LSP7_FACTORY ?? "0x65Ae23D3A7a4fBFE5D296A4fE6A8df4662300845";
+  process.env.NEXT_PUBLIC_LSP7_FACTORY ?? "0xE618ddD88869E43E433eD103b0d896E1a05d5b40";
 export const LSP8_FACTORY =
-  process.env.NEXT_PUBLIC_LSP8_FACTORY ?? "0x0A6f9751FAb9D366890531489a15d2B9a29a2Dc2";
+  process.env.NEXT_PUBLIC_LSP8_FACTORY ?? "0x9bc9e8D57a94E0F88ab32CDC1865c3fdeF86f72E";
 
 export const FACTORY_ABI = [
   "function createTokenDrop(string,string,uint256,uint256,bool) returns (address)",
