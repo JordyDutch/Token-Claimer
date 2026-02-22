@@ -39,9 +39,10 @@ export default function ClaimPage() {
       const type = await detectTokenType(c);
       setTokenType(type);
 
+      const safe = (p: Promise<any>, fallback: any = null) => p.catch(() => fallback);
       const [name, supply, active, amount, rToken, rAmount, rFollowers, ownerAddr] = await Promise.all([
-        c.name(), c.maxSupply(), c.isClaimActive(), c.amountPerClaim(),
-        c.requiredToken(), c.requiredTokenAmount(), c.requiredFollowers(), c.owner(),
+        safe(c.name(), "Unknown"), safe(c.maxSupply(), BigInt(0)), safe(c.isClaimActive(), false), safe(c.amountPerClaim(), BigInt(0)),
+        safe(c.requiredToken(), ZERO), safe(c.requiredTokenAmount(), BigInt(0)), safe(c.requiredFollowers(), BigInt(0)), safe(c.owner(), ZERO),
       ]);
       setDropName(name); setIsActive(active); setOwner(ownerAddr);
       fetchProfile(ownerAddr).then(setCreatorProfile).catch(() => {});
