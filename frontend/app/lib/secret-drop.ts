@@ -29,6 +29,8 @@ export interface SecretDropConfig {
   mode: SecretDropMode;
   codeUsageLimit: number;  // shared mode only: how many times each code can be given out
   active: boolean;
+  isPublic: boolean;       // opt-in to show on Explore feed (default false)
+  image: string | null;    // IPFS CID of drop icon (default null)
   network: "mainnet" | "testnet";
   tokenRequirements: TokenReq[];
   followerRequirement: FollowerReq | null; // must follow this address
@@ -55,6 +57,9 @@ export interface SecretDropSummary {
   title: string;
   mode: SecretDropMode;
   active: boolean;
+  isPublic: boolean;
+  creator: string;
+  image: string | null;
   network: "mainnet" | "testnet";
   createdAt: number;
   totalCodes: number;

@@ -40,13 +40,17 @@ export async function verifySig(
     const recovered = verifyMessage(message, signature);
     if (recovered.toLowerCase() === expectedAddress.toLowerCase()) return true;
 
+    console.log("[verifySig] EOA mismatch:", { recovered, expectedAddress, network });
+
     // 2. Fallback: EIP-1271 smart-contract signature (Universal Profile)
     const rpc = new JsonRpcProvider(network === "testnet" ? TESTNET_RPC : MAINNET_RPC);
     const hash = hashMessage(message);
     const contract = new Contract(expectedAddress, EIP1271_ABI, rpc);
     const result: string = await contract.isValidSignature(hash, signature);
+    console.log("[verifySig] EIP-1271 result:", result);
     return result.toLowerCase() === EIP1271_MAGIC;
-  } catch {
+  } catch (err) {
+    console.error("[verifySig] EIP-1271 failed:", err);
     return false;
   }
 }
@@ -69,6 +73,16 @@ export function parseCreateMessage(message: string): { address: string; ts: numb
   const m = message.match(/^Create secret drop as (0x[a-fA-F0-9]{40}) at (\d+)$/);
   if (!m) return null;
   return { address: m[1], ts: parseInt(m[2], 10) };
+}
+
+/**
+ * Parse the manage-drop challenge message.
+ * Expected format: "Manage secret drop {id} as {address} at {timestamp}"
+ */
+export function parseManageMessage(message: string): { dropId: string; address: string; ts: number } | null {
+  const m = message.match(/^Manage secret drop ([a-z0-9-]+) as (0x[a-fA-F0-9]{40}) at (\d+)$/);
+  if (!m) return null;
+  return { dropId: m[1], address: m[2], ts: parseInt(m[3], 10) };
 }
 
 /** Returns true if timestamp is within the last 5 minutes. */

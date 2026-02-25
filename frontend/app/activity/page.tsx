@@ -70,9 +70,9 @@ async function buildDropMap(
     ...cfg.allLsp7Factories.map(async (addr) => {
       try {
         const f = new Contract(addr, LSP7_FACTORY_ABI, rpc);
-        const total = await f.totalTokenCampaigns().catch(() => BigInt(0));
+        const total = await f.totalCampaigns().catch(() => BigInt(0));
         if (total <= BigInt(0)) return;
-        const campaigns = await f.getTokenCampaigns(0, total);
+        const campaigns = await f.getCampaigns(0, total);
         for (const c of campaigns) {
           map.set(c.contractAddr.toLowerCase(), {
             name: c.name, symbol: c.symbol, isNFT: false, creator: c.creator,

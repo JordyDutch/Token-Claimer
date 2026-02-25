@@ -12,9 +12,9 @@ export const LSP8_FACTORY =
 // LSP7DropFactory ABI
 export const LSP7_FACTORY_ABI = [
   "function createTokenDrop(string,string,uint256,uint256,bool) returns (address)",
-  "function totalTokenCampaigns() view returns (uint256)",
-  "function getTokenCampaigns(uint256,uint256) view returns (tuple(address contractAddr, address creator, string name, string symbol, uint256 createdAt)[])",
-  "function getTokenCampaignsByCreator(address) view returns (uint256[])",
+  "function totalCampaigns() view returns (uint256)",
+  "function getCampaigns(uint256,uint256) view returns (tuple(address contractAddr, address creator, string name, string symbol, uint256 createdAt)[])",
+  "function getCampaignsByCreator(address) view returns (uint256[])",
 ];
 
 // LSP8DropFactory ABI

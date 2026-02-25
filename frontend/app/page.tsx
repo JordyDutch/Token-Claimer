@@ -5,6 +5,7 @@ import { JsonRpcProvider, Contract } from "ethers";
 import { LSP7_FACTORY_ABI, LSP8_FACTORY_ABI } from "./lib/contracts";
 import { fetchProfile, ProfileInfo } from "./lib/profile";
 import { LSP4_METADATA_KEY } from "./lib/lsp4";
+import { SecretDropSummary } from "./lib/secret-drop";
 
 const IPFS_GATEWAY = "https://api.universalprofile.cloud/ipfs";
 const GET_DATA_ABI = ["function getData(bytes32 key) view returns (bytes memory)"];
@@ -47,10 +48,15 @@ interface Campaign {
   icon?: string | null;
 }
 
-type FilterTab = "all" | "tokens" | "nfts" | "mine";
+type FilterTab = "all" | "tokens" | "nfts" | "secret" | "mine";
+
+type FeedItem =
+  | { kind: "onchain"; data: Campaign }
+  | { kind: "secret"; data: SecretDropSummary };
 
 export default function HomePage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [secretDrops, setSecretDrops] = useState<SecretDropSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterTab>("all");
   const [search, setSearch] = useState("");
@@ -61,8 +67,10 @@ export default function HomePage() {
   useEffect(() => {
     let stale = false;
     setCampaigns([]);
+    setSecretDrops([]);
     setLoading(true);
     loadCampaigns(networkConfig, () => stale);
+    loadSecretDrops(networkConfig.id, () => stale);
     return () => { stale = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [networkId]);
@@ -84,9 +92,9 @@ export default function HomePage() {
         cfg.allLsp7Factories.map(async (factoryAddr) => {
           try {
             const lsp7 = new Contract(factoryAddr, LSP7_FACTORY_ABI, rpc);
-            const total = await lsp7.totalTokenCampaigns().catch(() => BigInt(0));
+            const total = await lsp7.totalCampaigns().catch(() => BigInt(0));
             if (total <= BigInt(0)) return;
-            const items = await lsp7.getTokenCampaigns(0, total);
+            const items = await lsp7.getCampaigns(0, total);
             for (const c of items) {
               const addr = c.contractAddr.toLowerCase();
               if (seen.has(addr)) continue;
@@ -174,18 +182,66 @@ export default function HomePage() {
     }
   }
 
-  const filtered = campaigns.filter((c) => {
-    if (filter === "tokens" && c.isNFT) return false;
-    if (filter === "nfts" && !c.isNFT) return false;
-    if (filter === "mine" && walletAddress && c.creator.toLowerCase() !== walletAddress.toLowerCase()) return false;
+  async function loadSecretDrops(networkId: string, isStale: () => boolean) {
+    try {
+      const res = await fetch(`/api/secret-drop/explore?network=${networkId}`);
+      if (!res.ok || isStale()) return;
+      const data = await res.json();
+      if (isStale()) return;
+      const drops: SecretDropSummary[] = data.drops ?? [];
+      setSecretDrops(drops);
+
+      // Fetch creator profiles for secret drops
+      const uniqueCreators = [...new Set(drops.map((d) => d.creator))];
+      const profiles = new Map<string, ProfileInfo | null>();
+      await Promise.all(
+        uniqueCreators.map(async (addr) => {
+          try { profiles.set(addr, await fetchProfile(addr)); }
+          catch { profiles.set(addr, null); }
+        })
+      );
+      if (isStale()) return;
+      setSecretDrops((prev) =>
+        prev.map((d) => ({ ...d, _creatorProfile: profiles.get(d.creator) }))
+      );
+    } catch {
+      // Secret drops are non-critical — don't block the page
+    }
+  }
+
+  // Build unified feed
+  const feedItems: FeedItem[] = [
+    ...campaigns.map((c): FeedItem => ({ kind: "onchain", data: c })),
+    ...secretDrops.map((s): FeedItem => ({ kind: "secret", data: s })),
+  ];
+  feedItems.sort((a, b) => {
+    const aTime = a.kind === "onchain" ? a.data.createdAt : a.data.createdAt;
+    const bTime = b.kind === "onchain" ? b.data.createdAt : b.data.createdAt;
+    return bTime - aTime;
+  });
+
+  const filtered = feedItems.filter((item) => {
+    // Tab filter
+    if (filter === "tokens") { if (item.kind !== "onchain" || item.data.isNFT) return false; }
+    else if (filter === "nfts") { if (item.kind !== "onchain" || !item.data.isNFT) return false; }
+    else if (filter === "secret") { if (item.kind !== "secret") return false; }
+    else if (filter === "mine" && walletAddress) {
+      const creator = item.kind === "onchain" ? item.data.creator : item.data.creator;
+      if (creator.toLowerCase() !== walletAddress.toLowerCase()) return false;
+    }
+    // Search filter
     if (search) {
       const q = search.toLowerCase();
-      return (
-        c.name.toLowerCase().includes(q) ||
-        c.symbol.toLowerCase().includes(q) ||
-        c.contractAddr.toLowerCase().includes(q) ||
-        (c.creatorProfile?.name || "").toLowerCase().includes(q)
-      );
+      if (item.kind === "onchain") {
+        const c = item.data;
+        return (
+          c.name.toLowerCase().includes(q) ||
+          c.symbol.toLowerCase().includes(q) ||
+          c.contractAddr.toLowerCase().includes(q) ||
+          (c.creatorProfile?.name || "").toLowerCase().includes(q)
+        );
+      }
+      return item.data.title.toLowerCase().includes(q);
     }
     return true;
   });
@@ -254,6 +310,9 @@ export default function HomePage() {
             <button onClick={() => setFilter("nfts")} className={tabClass("nfts")}>
               NFTs
             </button>
+            <button onClick={() => setFilter("secret")} className={tabClass("secret")}>
+              Secret
+            </button>
             <button
               onClick={() => {
                 if (!walletAddress) {
@@ -314,54 +373,101 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Campaign list */}
+        {/* Feed list */}
         <div className="space-y-3">
-          {filtered.map((c) => (
-            <Link
-              key={c.contractAddr}
-              href={`/claim/${c.contractAddr}`}
-              className="block bg-card rounded-xl p-4 sm:p-5 border border-border-muted hover:border-purple-500/30 card-elevated transition-all group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden">
-                  {c.icon ? (
-                    <img src={c.icon} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    c.isNFT ? "🖼" : "🪙"
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-sm sm:text-base truncate group-hover:text-purple-400 transition-colors">
-                      {c.name}
-                    </h3>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface text-muted flex-shrink-0">
-                      {c.isNFT ? "NFT" : "Token"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    {c.creatorProfile?.image && (
-                      <img
-                        src={c.creatorProfile.image}
-                        alt=""
-                        className="w-4 h-4 rounded-full object-cover"
-                      />
+          {filtered.map((item) =>
+            item.kind === "onchain" ? (
+              <Link
+                key={item.data.contractAddr}
+                href={`/claim/${item.data.contractAddr}`}
+                className="block bg-card rounded-xl p-4 sm:p-5 border border-border-muted hover:border-purple-500/30 card-elevated transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden">
+                    {item.data.icon ? (
+                      <img src={item.data.icon} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      item.data.isNFT ? "🖼" : "🪙"
                     )}
-                    <span className="text-label text-xs truncate">
-                      {c.creatorProfile?.name ||
-                        `${c.creator.slice(0, 6)}...${c.creator.slice(-4)}`}
-                    </span>
-                    <span className="text-ghost text-xs flex-shrink-0">
-                      {timeSince(c.createdAt)}
-                    </span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-sm sm:text-base truncate group-hover:text-purple-400 transition-colors">
+                        {item.data.name}
+                      </h3>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface text-muted flex-shrink-0">
+                        {item.data.isNFT ? "NFT" : "Token"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      {item.data.creatorProfile?.image && (
+                        <img
+                          src={item.data.creatorProfile.image}
+                          alt=""
+                          className="w-4 h-4 rounded-full object-cover"
+                        />
+                      )}
+                      <span className="text-label text-xs truncate">
+                        {item.data.creatorProfile?.name ||
+                          `${item.data.creator.slice(0, 6)}...${item.data.creator.slice(-4)}`}
+                      </span>
+                      <span className="text-ghost text-xs flex-shrink-0">
+                        {timeSince(item.data.createdAt)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-faint group-hover:text-purple-400 transition-colors flex-shrink-0 text-lg">
+                    →
                   </div>
                 </div>
-                <div className="text-faint group-hover:text-purple-400 transition-colors flex-shrink-0 text-lg">
-                  →
+              </Link>
+            ) : (
+              <Link
+                key={item.data.id}
+                href={`/secret-drop/${item.data.id}`}
+                className="block bg-card rounded-xl p-4 sm:p-5 border border-border-muted hover:border-violet-500/30 card-elevated transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden">
+                    {item.data.image ? (
+                      <img src={`${IPFS_GATEWAY}/${item.data.image}`} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      "🔒"
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-sm sm:text-base truncate group-hover:text-violet-400 transition-colors">
+                        {item.data.title}
+                      </h3>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-400 border border-violet-500/30 flex-shrink-0">
+                        Secret
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      {(item.data as any)._creatorProfile?.image && (
+                        <img
+                          src={(item.data as any)._creatorProfile.image}
+                          alt=""
+                          className="w-4 h-4 rounded-full object-cover"
+                        />
+                      )}
+                      <span className="text-label text-xs truncate">
+                        {(item.data as any)._creatorProfile?.name ||
+                          `${item.data.creator.slice(0, 6)}...${item.data.creator.slice(-4)}`}
+                      </span>
+                      <span className="text-ghost text-xs flex-shrink-0">
+                        {timeSince(item.data.createdAt)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-faint group-hover:text-violet-400 transition-colors flex-shrink-0 text-lg">
+                    →
+                  </div>
                 </div>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            )
+          )}
         </div>
 
         {!inIframe && <Footer />}

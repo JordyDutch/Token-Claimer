@@ -23,6 +23,8 @@ export async function POST(req: NextRequest) {
       tokenRequirements,
       followerRequirement,
       minFollowers,
+      isPublic,
+      image,
     } = body;
 
     // 1. Parse & verify freshness first, then verify signature
@@ -61,6 +63,8 @@ export async function POST(req: NextRequest) {
       mode: cleanCodes.length === 1 && limit > 1 ? "shared" : "pool",
       codeUsageLimit: limit,
       active: true,
+      isPublic: !!isPublic,
+      image: typeof image === "string" && image.trim() ? image.trim() : null,
       network: network === "testnet" ? "testnet" : "mainnet",
       tokenRequirements: tokenRequirements ?? [],
       followerRequirement: followerRequirement ?? null,
@@ -72,6 +76,9 @@ export async function POST(req: NextRequest) {
     // 4. Store in KV
     await kv.set(`sdrop:${id}`, config);
     await kv.rpush(`sdrop:creator:${creator}`, id);
+    if (config.isPublic) {
+      await kv.rpush(`sdrop:public:${config.network}`, id);
+    }
 
     if (config.mode === "pool") {
       // Push all codes into a LIST (RPUSH so LPOP gives first-in first-out)

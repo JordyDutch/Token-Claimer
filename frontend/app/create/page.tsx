@@ -34,12 +34,15 @@ export default function CreatePage() {
   const [secretTokenReqs, setSecretTokenReqs] = useState<Array<{ address: string; minBalance: string }>>([]);
   const [secretMinFollowers, setSecretMinFollowers] = useState("0");
   const [secretFollowAddress, setSecretFollowAddress] = useState("");
+  const [secretIsPublic, setSecretIsPublic] = useState(false);
+  const [secretImageFile, setSecretImageFile] = useState<File | null>(null);
+  const [secretImagePreview, setSecretImagePreview] = useState<string | null>(null);
   const [secretDropId, setSecretDropId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
   const [maxSupply, setMaxSupply] = useState("100");
   const [amountPerClaim, setAmountPerClaim] = useState("1");
-  const [isNonDivisible, setIsNonDivisible] = useState(true);
+  const [isNonDivisible, setIsNonDivisible] = useState(false);
   const [deployedAddress, setDeployedAddress] = useState<string | null>(null);
   const [deploying, setDeploying] = useState(false);
 
@@ -51,6 +54,7 @@ export default function CreatePage() {
   const [assetFiles, setAssetFiles] = useState<File[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const assetRef = useRef<HTMLInputElement>(null);
+  const secretImageRef = useRef<HTMLInputElement>(null);
 
   function handleIconChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
@@ -117,8 +121,8 @@ export default function CreatePage() {
         setStatus({ message: "Waiting for confirmation...", type: "loading" });
         await tx.wait();
         const fr = new Contract(networkConfig.lsp7Factory, LSP7_FACTORY_ABI, provider);
-        const t = await fr.totalTokenCampaigns();
-        const items = await fr.getTokenCampaigns(t - BigInt(1), 1);
+        const t = await fr.totalCampaigns();
+        const items = await fr.getCampaigns(t - BigInt(1), 1);
         deployedAddr = items[0].contractAddr;
       } else {
         const factory = new Contract(networkConfig.lsp8Factory, LSP8_FACTORY_ABI, signer);
@@ -185,6 +189,18 @@ export default function CreatePage() {
       const ts = Math.floor(Date.now() / 1000);
       const message = `Create secret drop as ${address} at ${ts}`;
       const signature = await signer.signMessage(message);
+      // Upload image to IPFS if provided
+      let imageCid: string | null = null;
+      if (secretImageFile) {
+        setStatus({ message: "Uploading image…", type: "loading" });
+        const form = new FormData();
+        form.append("file", secretImageFile, secretImageFile.name);
+        const uploadRes = await fetch("/api/ipfs", { method: "POST", body: form });
+        if (!uploadRes.ok) { setStatus({ message: "Image upload failed", type: "error" }); setDeploying(false); return; }
+        const { IpfsHash } = await uploadRes.json();
+        imageCid = IpfsHash;
+      }
+
       setStatus({ message: "Creating drop…", type: "loading" });
       const tokenRequirements = secretTokenReqs
         .filter((r) => r.address.startsWith("0x") && r.address.length === 42)
@@ -213,6 +229,8 @@ export default function CreatePage() {
           tokenRequirements,
           followerRequirement,
           minFollowers: Number(secretMinFollowers) || 0,
+          isPublic: secretIsPublic,
+          image: imageCid,
         }),
       });
       const data = await res.json();
@@ -745,6 +763,79 @@ export default function CreatePage() {
                         onChange={setSecretFollowAddress}
                         placeholder="Search by name or paste 0x address…"
                       />
+                    </div>
+                  </div>
+
+                  {/* Image upload */}
+                  <div>
+                    <label className={lbl}>Drop Image <span className="text-faint">(optional — shown on Explore and claim page)</span></label>
+                    <div className="flex items-center gap-3">
+                      {secretImagePreview ? (
+                        <img
+                          src={secretImagePreview}
+                          alt="Preview"
+                          className="w-10 h-10 rounded-lg object-cover border border-border-default"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-surface border border-border-default flex items-center justify-center text-faint text-sm">
+                          🔒
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => secretImageRef.current?.click()}
+                        className="text-xs text-purple-400 hover:text-purple-300 border border-purple-500/30 rounded-lg px-3 py-1.5 transition-colors cursor-pointer"
+                      >
+                        {secretImageFile ? "Change image" : "Upload image"}
+                      </button>
+                      {secretImageFile && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSecretImageFile(null);
+                            setSecretImagePreview(null);
+                            if (secretImageRef.current) secretImageRef.current.value = "";
+                          }}
+                          className="text-xs text-label hover:text-red-400 transition-colors cursor-pointer"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      ref={secretImageRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] ?? null;
+                        setSecretImageFile(file);
+                        setSecretImagePreview(file ? URL.createObjectURL(file) : null);
+                      }}
+                      className="hidden"
+                    />
+                    {secretImageFile && (
+                      <p className="text-[10px] text-faint mt-1">{secretImageFile.name}</p>
+                    )}
+                  </div>
+
+                  {/* Show on Explore toggle */}
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setSecretIsPublic(!secretIsPublic)}
+                      className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${
+                        secretIsPublic ? "bg-violet-500" : "bg-surface-hover"
+                      }`}
+                    >
+                      <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                        secretIsPublic ? "translate-x-5" : "translate-x-0.5"
+                      }`} />
+                    </button>
+                    <div>
+                      <span className="text-xs text-secondary">Show on Explore page</span>
+                      <p className="text-[10px] text-faint">
+                        {secretIsPublic ? "Anyone can discover this drop" : "Only accessible via direct link"}
+                      </p>
                     </div>
                   </div>
 

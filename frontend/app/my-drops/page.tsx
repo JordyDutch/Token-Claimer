@@ -84,9 +84,9 @@ export default function MyDropsPage() {
         networkConfig.allLsp7Factories.map(async (factoryAddr) => {
           try {
             const lsp7 = new Contract(factoryAddr, LSP7_FACTORY_ABI, rpc);
-            const total = await lsp7.totalTokenCampaigns().catch(() => BigInt(0));
+            const total = await lsp7.totalCampaigns().catch(() => BigInt(0));
             if (total <= BigInt(0)) return;
-            const items = await lsp7.getTokenCampaigns(0, total);
+            const items = await lsp7.getCampaigns(0, total);
             for (const c of items) {
               if (c.creator.toLowerCase() !== userAddr.toLowerCase()) continue;
               const addr = c.contractAddr.toLowerCase();
@@ -183,15 +183,16 @@ export default function MyDropsPage() {
 
       // Fetch secret drops from KV
       try {
-        const res = await fetch(
-          `/api/secret-drop/by-creator?address=${encodeURIComponent(userAddr)}&network=${networkId}`
-        );
+        const url = `/api/secret-drop/by-creator?address=${encodeURIComponent(userAddr)}&network=${networkId}`;
+        console.log("[my-drops] fetching secret drops:", url);
+        const res = await fetch(url);
+        const data = await res.json();
+        console.log("[my-drops] secret drops response:", res.status, data);
         if (res.ok) {
-          const data = await res.json();
           setSecretDrops(data.drops ?? []);
         }
-      } catch {
-        // Non-critical — don't block the page
+      } catch (err) {
+        console.error("[my-drops] secret drops fetch failed:", err);
       }
 
       // Fetch icons in background
@@ -410,8 +411,12 @@ export default function MyDropsPage() {
                   <div key={item.data.id} className={card}>
                     <div className="flex items-start gap-4">
                       {/* Icon */}
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-2xl flex-shrink-0">
-                        🔒
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden">
+                        {item.data.image ? (
+                          <img src={`https://api.universalprofile.cloud/ipfs/${item.data.image}`} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          "🔒"
+                        )}
                       </div>
 
                       {/* Info */}
@@ -454,6 +459,12 @@ export default function MyDropsPage() {
 
                         {/* Actions */}
                         <div className="flex items-center gap-2 flex-wrap">
+                          <Link
+                            href={`/secret-drop/${item.data.id}/manage`}
+                            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition-all"
+                          >
+                            Manage
+                          </Link>
                           <Link
                             href={`/secret-drop/${item.data.id}`}
                             className="px-3 py-1.5 rounded-lg text-xs font-medium text-muted border border-border-default hover:border-border-muted hover:text-tertiary transition-all"

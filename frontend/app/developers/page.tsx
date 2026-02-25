@@ -284,8 +284,8 @@ function createNFTDrop(
               <div>
                 <h3 className="text-sm font-semibold mb-2">Factory — Query Drops</h3>
                 <CodeBlock>{`// LSP7
-function totalTokenCampaigns() view returns (uint256)
-function getTokenCampaigns(uint256 offset, uint256 limit)
+function totalCampaigns() view returns (uint256)
+function getCampaigns(uint256 offset, uint256 limit)
   view returns (Campaign[] memory)
 
 // LSP8
@@ -426,16 +426,16 @@ const rpc = new JsonRpcProvider("https://rpc.mainnet.lukso.network");
 const factory = new Contract(
   "${contracts.mainnet.lsp7Factory}",
   [
-    "function totalTokenCampaigns() view returns (uint256)",
-    "function getTokenCampaigns(uint256,uint256) view returns " +
+    "function totalCampaigns() view returns (uint256)",
+    "function getCampaigns(uint256,uint256) view returns " +
       "(tuple(address contractAddr, address creator, " +
       "string name, string symbol, uint256 createdAt)[])",
   ],
   rpc
 );
 
-const total = await factory.totalTokenCampaigns();
-const campaigns = await factory.getTokenCampaigns(0, total);
+const total = await factory.totalCampaigns();
+const campaigns = await factory.getCampaigns(0, total);
 
 campaigns.forEach(c => {
   console.log(c.name, c.contractAddr);

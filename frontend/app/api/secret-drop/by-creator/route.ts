@@ -12,7 +12,10 @@ export async function GET(req: NextRequest) {
   }
 
   // Read creator index
-  const rawIds: string[] = await kv.lrange(`sdrop:creator:${address}`, 0, -1);
+  const key = `sdrop:creator:${address}`;
+  console.log("[by-creator] looking up:", key, "network:", network);
+  const rawIds: string[] = await kv.lrange(key, 0, -1);
+  console.log("[by-creator] rawIds:", rawIds);
   if (!rawIds || rawIds.length === 0) {
     return NextResponse.json({ drops: [] });
   }
@@ -39,6 +42,9 @@ export async function GET(req: NextRequest) {
       title: cfg.title,
       mode: cfg.mode,
       active: cfg.active,
+      isPublic: cfg.isPublic ?? false,
+      creator: cfg.creator,
+      image: cfg.image ?? null,
       network: cfg.network,
       createdAt: cfg.createdAt,
       totalCodes: cfg.totalCodes,
