@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { BrowserProvider, Contract, JsonRpcProvider } from "ethers";
-import { uploadAndSetLSP4Metadata, setLSP4Creators, addToLSP12IssuedAssets, type Lsp4Link } from "../../lib/lsp4";
+import { uploadAndSetLSP4Metadata, setLSP4Creators, addToLSP12IssuedAssets, LSP4_METADATA_KEY, type Lsp4Link, type Lsp4Icon } from "../../lib/lsp4";
 import {
   CLAIM_ABI, LSP7_EXTRA_ABI, LSP8_EXTRA_ABI, ZERO,
   LSP4_TOKEN_NAME_KEY,
@@ -46,6 +46,7 @@ export default function ManagePage() {
   const [metaDescription, setMetaDescription] = useState("");
   const [metaIconFile, setMetaIconFile] = useState<File | null>(null);
   const [metaIconPreview, setMetaIconPreview] = useState<string | null>(null);
+  const [existingIcon, setExistingIcon] = useState<Lsp4Icon | null>(null);
   const [metaLinks, setMetaLinks] = useState<Lsp4Link[]>([{ title: "", url: "" }]);
   const [metaAssetFiles, setMetaAssetFiles] = useState<File[]>([]);
   const [metaSaving, setMetaSaving] = useState(false);
@@ -121,6 +122,33 @@ export default function ManagePage() {
           setTotalClaimed(cl.toString());
         }
       } catch { setTotalClaimed("?"); }
+
+      // Load existing LSP4 metadata to pre-fill the form
+      safe(c.getData(LSP4_METADATA_KEY), null).then(async (metaRaw: string | null) => {
+        if (!metaRaw || metaRaw === "0x" || metaRaw.length < 10) return;
+        try {
+          const hex = metaRaw.slice(2);
+          const urlHex = hex.slice((4 + 32) * 2);
+          const ipfsUrl = Buffer.from(urlHex, "hex").toString("utf8");
+          const cid = ipfsUrl.replace("ipfs://", "");
+          const res = await fetch(`https://api.universalprofile.cloud/ipfs/${cid}`);
+          if (!res.ok) return;
+          const json = await res.json();
+          const meta = json?.LSP4Metadata;
+          if (!meta) return;
+          if (meta.description) setMetaDescription(meta.description);
+          const iconObj = meta.icon?.[0] ?? meta.images?.[0]?.[0];
+          if (iconObj?.url) {
+            const iconCid = iconObj.url.replace("ipfs://", "");
+            setMetaIconPreview(`https://api.universalprofile.cloud/ipfs/${iconCid}`);
+            setExistingIcon({ url: iconObj.url, verification: iconObj.verification });
+          }
+          const links = meta.links;
+          if (Array.isArray(links) && links.length > 0) {
+            setMetaLinks(links.map((l: any) => ({ title: l.title ?? "", url: l.url ?? "" })));
+          }
+        } catch { /* no existing metadata */ }
+      });
     } catch (e) { console.error(e); }
   }, [contractAddress, networkConfig]);
 
@@ -223,6 +251,7 @@ export default function ManagePage() {
           name: dropName,
           description: metaDescription.trim(),
           iconFile: metaIconFile,
+          existingIcon: metaIconFile ? null : existingIcon,
           links: validLinks,
           assetFiles: metaAssetFiles.length > 0 ? metaAssetFiles : undefined,
         },
@@ -615,7 +644,13 @@ export default function ManagePage() {
                   <label className={lbl}>Icon</label>
                   <div className="flex items-center gap-3 mt-1">
                     {metaIconPreview ? (
-                      <img src={metaIconPreview} alt="" className="w-10 h-10 rounded-lg object-cover border border-border-default" />
+                      <img
+                        src={metaIconPreview}
+                        alt=""
+                        className="w-10 h-10 rounded-lg object-cover border border-border-default cursor-pointer hover:opacity-50 transition-opacity"
+                        title="Click to remove"
+                        onClick={() => { setMetaIconFile(null); setMetaIconPreview(null); setExistingIcon(null); if (metaIconRef.current) metaIconRef.current.value = ""; }}
+                      />
                     ) : (
                       <div className="w-10 h-10 rounded-lg bg-surface border border-border-default flex items-center justify-center text-faint text-xs">IMG</div>
                     )}
@@ -749,7 +784,7 @@ export default function ManagePage() {
 
                 <button
                   onClick={updateMetadata}
-                  disabled={metaSaving || !metaDescription.trim()}
+                  disabled={metaSaving || !metaDescription.trim() || (!metaIconFile && !existingIcon)}
                   className={btn + " disabled:opacity-50 disabled:cursor-not-allowed"}
                 >
                   {metaSaving ? "Saving..." : "Save Metadata"}

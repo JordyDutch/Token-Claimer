@@ -24,10 +24,16 @@ export interface Lsp4Link {
   url: string;
 }
 
+export interface Lsp4Icon {
+  url: string;
+  verification?: { method: string; data: string };
+}
+
 export interface Lsp4Input {
   name: string;
   description: string;
   iconFile?: File | null;
+  existingIcon?: Lsp4Icon | null; // keep current icon when no new file uploaded
   links?: Lsp4Link[];
   assetFiles?: File[];
 }
@@ -71,7 +77,7 @@ export async function uploadAndSetLSP4Metadata(
 ): Promise<void> {
   const log = onProgress ?? (() => {});
 
-  // 1. Upload icon if provided
+  // 1. Upload icon if provided, otherwise keep existing
   let iconArray: object[] = [];
   if (input.iconFile) {
     log("Uploading icon to IPFS...");
@@ -88,6 +94,8 @@ export async function uploadAndSetLSP4Metadata(
         },
       },
     ];
+  } else if (input.existingIcon) {
+    iconArray = [{ width: 0, height: 0, ...input.existingIcon }];
   }
 
   // 2. Upload asset files if provided
