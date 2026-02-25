@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.27;
 
 /// @title ILSP7Balance
 /// @notice Minimal interface for querying an LSP7 or LSP8 token balance.

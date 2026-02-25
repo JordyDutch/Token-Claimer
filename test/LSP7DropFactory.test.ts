@@ -1,13 +1,13 @@
 /**
  * LSP7DropFactory.test.ts
  *
- * Full test suite for LSP7DropFactory:
- *   - createTokenDrop() — deploys LSP7ClaimableToken, stores campaign, emits event
+ * Full test suite for LSP7DropFactory (EIP-1167 proxy pattern):
+ *   - createTokenDrop() — clones implementation, initializes proxy, stores campaign, emits event
  *   - totalCampaigns()
  *   - getCampaignsByCreator()
  *   - getCampaigns() pagination — offset, limit, boundary conditions
  *   - Multiple creators tracked independently
- *   - Deployed child contracts have correct owner and initial state
+ *   - Deployed child proxies have correct owner and initial state
  *
  * Note: this factory was split from the unified TokenClaimerFactory to keep
  * each factory's runtime bytecode under the 24 576-byte EIP-170 limit.
@@ -48,6 +48,10 @@ describe("LSP7DropFactory", function () {
 
     it("getCampaignsByCreator() returns empty array for unknown address", async function () {
       expect(await factory.getCampaignsByCreator(creator1.address)).to.deep.equal([]);
+    });
+
+    it("implementation address is set and non-zero", async function () {
+      expect(await factory.implementation()).to.not.equal(ethers.ZeroAddress);
     });
   });
 
@@ -108,6 +112,27 @@ describe("LSP7DropFactory", function () {
       expect(await token.owner()).to.equal(creator1.address);
     });
 
+    it("deployed LSP7 token has correct tokenSupplyCap (unlimited → type(uint256).max)", async function () {
+      await factory.connect(creator1).createTokenDrop("T", "T", AMOUNT_PER_CLAIM, 0n, false);
+      const { contractAddr } = await factory.tokenCampaigns(0);
+      const token = (await ethers.getContractAt(
+        "LSP7ClaimableToken",
+        contractAddr
+      )) as LSP7ClaimableToken;
+      expect(await token.tokenSupplyCap()).to.equal(ethers.MaxUint256);
+    });
+
+    it("deployed LSP7 token has correct tokenSupplyCap (specific value)", async function () {
+      const supply = AMOUNT_PER_CLAIM * 5n;
+      await factory.connect(creator1).createTokenDrop("T", "T", AMOUNT_PER_CLAIM, supply, false);
+      const { contractAddr } = await factory.tokenCampaigns(0);
+      const token = (await ethers.getContractAt(
+        "LSP7ClaimableToken",
+        contractAddr
+      )) as LSP7ClaimableToken;
+      expect(await token.tokenSupplyCap()).to.equal(supply);
+    });
+
     it("deployed LSP7 token has correct amountPerClaim", async function () {
       await factory.connect(creator1).createTokenDrop("T", "T", AMOUNT_PER_CLAIM, 0n, false);
       const { contractAddr } = await factory.tokenCampaigns(0);
@@ -142,18 +167,12 @@ describe("LSP7DropFactory", function () {
       expect(await token.decimals()).to.equal(0n);
     });
 
-    it("deployed token has correct maxSupply", async function () {
-      const supply = AMOUNT_PER_CLAIM * 5n; // 5 claims worth
-      await factory.connect(creator1).createTokenDrop("T", "T", AMOUNT_PER_CLAIM, supply, false);
-      const { contractAddr } = await factory.tokenCampaigns(0);
-      const token = (await ethers.getContractAt("LSP7ClaimableToken", contractAddr)) as LSP7ClaimableToken;
-      expect(await token.maxSupply()).to.equal(supply);
-    });
-
-    it("reverts when maxSupply < amountPerClaim", async function () {
+    it("reverts when maxSupply < amountPerClaim (non-zero maxSupply)", async function () {
+      const TokenFactory = await ethers.getContractFactory("LSP7ClaimableToken");
+      const impl = await TokenFactory.deploy();
       await expect(
         factory.connect(creator1).createTokenDrop("T", "T", AMOUNT_PER_CLAIM, 1n, false)
-      ).to.be.revertedWith("maxSupply < amountPerClaim");
+      ).to.be.revertedWithCustomError(impl, "MaxSupplyBelowAmountPerClaim");
     });
   });
 
