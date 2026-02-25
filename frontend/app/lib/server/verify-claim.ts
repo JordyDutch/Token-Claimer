@@ -3,12 +3,17 @@
  * Never imported by client code.
  */
 
-import { verifyMessage, JsonRpcProvider, Contract, getAddress } from "ethers";
+import { verifyMessage, hashMessage, JsonRpcProvider, Contract, getAddress } from "ethers";
 import { TokenReq, FollowerReq } from "../secret-drop";
 
 const MAINNET_RPC = "https://rpc.mainnet.lukso.network";
 const TESTNET_RPC = "https://rpc.testnet.lukso.network";
 const LSP26_REGISTRY = "0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA";
+
+const EIP1271_MAGIC = "0x1626ba7e";
+const EIP1271_ABI = [
+  "function isValidSignature(bytes32 hash, bytes signature) view returns (bytes4)",
+];
 
 const LSP26_ABI = [
   "function followerCount(address addr) view returns (uint256)",
@@ -20,13 +25,27 @@ const TOKEN_ABI = [
 ];
 
 /**
- * Verify an EIP-191 personal_sign signature.
- * Returns true if the recovered address matches `expectedAddress`.
+ * Verify a signature against an expected address.
+ * First tries EIP-191 recovery (works for EOAs).
+ * Falls back to EIP-1271 on-chain verification (works for Universal Profiles / smart contract wallets).
  */
-export function verifySig(message: string, signature: string, expectedAddress: string): boolean {
+export async function verifySig(
+  message: string,
+  signature: string,
+  expectedAddress: string,
+  network: "mainnet" | "testnet" = "mainnet"
+): Promise<boolean> {
   try {
+    // 1. Try standard EOA recovery
     const recovered = verifyMessage(message, signature);
-    return recovered.toLowerCase() === expectedAddress.toLowerCase();
+    if (recovered.toLowerCase() === expectedAddress.toLowerCase()) return true;
+
+    // 2. Fallback: EIP-1271 smart-contract signature (Universal Profile)
+    const rpc = new JsonRpcProvider(network === "testnet" ? TESTNET_RPC : MAINNET_RPC);
+    const hash = hashMessage(message);
+    const contract = new Contract(expectedAddress, EIP1271_ABI, rpc);
+    const result: string = await contract.isValidSignature(hash, signature);
+    return result.toLowerCase() === EIP1271_MAGIC;
   } catch {
     return false;
   }

@@ -48,3 +48,15 @@ export type PublicDropInfo = Omit<SecretDropConfig, "creator"> & {
   creator: string;
   remaining: number | null; // null if shared mode
 };
+
+// Summary returned by /api/secret-drop/by-creator for listing
+export interface SecretDropSummary {
+  id: string;
+  title: string;
+  mode: SecretDropMode;
+  active: boolean;
+  network: "mainnet" | "testnet";
+  createdAt: number;
+  totalCodes: number;
+  remaining: number | null; // null if shared mode
+}

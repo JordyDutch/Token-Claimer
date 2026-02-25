@@ -59,7 +59,11 @@ export default function HomePage() {
   const { inIframe } = useUPProvider();
 
   useEffect(() => {
-    loadCampaigns(networkConfig);
+    let stale = false;
+    setCampaigns([]);
+    setLoading(true);
+    loadCampaigns(networkConfig, () => stale);
+    return () => { stale = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [networkId]);
 
@@ -68,7 +72,7 @@ export default function HomePage() {
     if (addr) setFilter("mine");
   }
 
-  async function loadCampaigns(cfg: typeof networkConfig) {
+  async function loadCampaigns(cfg: typeof networkConfig, isStale: () => boolean) {
     const rpc = new JsonRpcProvider(cfg.rpc);
 
     try {
@@ -125,6 +129,8 @@ export default function HomePage() {
         })
       );
 
+      if (isStale()) return; // network changed — discard results
+
       all.sort((a, b) => b.createdAt - a.createdAt);
 
       // Show campaigns immediately, then fetch profiles
@@ -145,6 +151,7 @@ export default function HomePage() {
           }
         }),
       ]);
+      if (isStale()) return;
       setCampaigns((prev) =>
         prev.map((c) => ({ ...c, creatorProfile: profiles.get(c.creator) }))
       );
@@ -152,8 +159,9 @@ export default function HomePage() {
       // Fetch icons separately so they stream in as they resolve
       await Promise.all(
         all.map(async (c) => {
+          if (isStale()) return;
           const icon = await fetchCampaignIcon(c.contractAddr, rpc);
-          if (icon) {
+          if (icon && !isStale()) {
             setCampaigns((prev) =>
               prev.map((p) => p.contractAddr === c.contractAddr ? { ...p, icon } : p)
             );
@@ -162,7 +170,7 @@ export default function HomePage() {
       );
     } catch (e) {
       console.error("Failed to load campaigns:", e);
-      setLoading(false);
+      if (!isStale()) setLoading(false);
     }
   }
 

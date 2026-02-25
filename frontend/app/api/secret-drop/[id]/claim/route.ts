@@ -35,13 +35,8 @@ export async function POST(
     if (!isFresh(parsed.ts)) {
       return NextResponse.json({ error: "Signature expired — please try again" }, { status: 400 });
     }
-    if (!verifySig(message, signature, parsed.address)) {
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-    }
 
-    const address = normaliseAddress(parsed.address);
-
-    // 2. Load drop config
+    // 2. Load drop config (need network for EIP-1271 sig verification)
     const config = await kv.get<SecretDropConfig>(`sdrop:${id}`);
     if (!config) {
       return NextResponse.json({ error: "Drop not found" }, { status: 404 });
@@ -49,6 +44,12 @@ export async function POST(
     if (!config.active) {
       return NextResponse.json({ error: "This drop is no longer active" }, { status: 410 });
     }
+
+    if (!await verifySig(message, signature, parsed.address, config.network)) {
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    }
+
+    const address = normaliseAddress(parsed.address);
 
     // 3. Check if already claimed
     const existing = await kv.get<ClaimRecord>(`sdrop:${id}:claimed:${address}`);

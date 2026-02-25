@@ -45,6 +45,7 @@ export default function ClaimPage() {
     followers: bigint;
   } | null>(null);
   const [eligibility, setEligibility] = useState<{ tokenOk: boolean; followersOk: boolean } | null>(null);
+  const [tokenMet, setTokenMet] = useState<boolean[]>([]);
   const [owner, setOwner] = useState<string | null>(null);
   const [startTime, setStartTime] = useState<number>(0);
   const [endTime, setEndTime] = useState<number>(0);
@@ -143,13 +144,17 @@ export default function ClaimPage() {
       setReqInfo(hasReqs ? { tokens: enrichedTokens, followers: rFollowers } : null);
 
       if (type === "LSP7") {
-        const [, claimers, decimals] = await Promise.all([c.totalClaimedAmount(), c.totalClaimers(), c.decimals()]);
+        const [, claimers, decimals] = await Promise.all([
+          c.totalClaimedAmount().catch(() => BigInt(0)),
+          c.totalClaimers().catch(() => BigInt(0)),
+          c.decimals(),
+        ]);
         const dec = Number(decimals);
         setClaimedDisplay(claimers.toString());
         setSupplyDisplay(supply === BigInt(0) ? "Unlimited" : formatUnits(supply, dec));
         setAmountDisplay(formatUnits(amount, dec) + " tokens");
       } else {
-        const totalClaimed = await c.totalClaimed();
+        const totalClaimed = await c.totalClaimed().catch(() => BigInt(0));
         setClaimedDisplay(totalClaimed.toString());
         setSupplyDisplay(supply === BigInt(0) ? "Unlimited" : supply.toString());
         setAmountDisplay(amount.toString() + (amount === BigInt(1) ? " NFT" : " NFTs"));
@@ -162,6 +167,25 @@ export default function ClaimPage() {
         ]);
         setAlreadyClaimed(claimed);
         setEligibility({ tokenOk: meets.tokenOk, followersOk: meets.followersOk });
+
+        // Check each token requirement individually
+        if (enrichedTokens.length > 0) {
+          const balanceAbi = ["function balanceOf(address) view returns (uint256)"];
+          const perToken = await Promise.all(
+            enrichedTokens.map(async (t) => {
+              try {
+                const tokenContract = new Contract(t.addr, balanceAbi, rpc);
+                const balance: bigint = await tokenContract.balanceOf(userAddr);
+                return t.amount > BigInt(0) ? balance >= t.amount : balance > BigInt(0);
+              } catch {
+                return false;
+              }
+            })
+          );
+          setTokenMet(perToken);
+        } else {
+          setTokenMet([]);
+        }
       }
     } catch (e) {
       console.error("Load error:", e);
@@ -387,7 +411,7 @@ export default function ClaimPage() {
               <button
                 onClick={() => {
                   disconnect();
-                  setAlreadyClaimed(false); setEligibility(null);
+                  setAlreadyClaimed(false); setEligibility(null); setTokenMet([]);
                 }}
                 className="text-faint hover:text-muted text-[10px] ml-1 cursor-pointer"
               >
@@ -446,9 +470,9 @@ export default function ClaimPage() {
                       )}
                     </span>
                   </div>
-                  {eligibility && (
-                    <span className={eligibility.tokenOk ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
-                      {eligibility.tokenOk ? "✓" : "✗"}
+                  {tokenMet.length > 0 && (
+                    <span className={tokenMet[i] ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                      {tokenMet[i] ? "✓" : "✗"}
                     </span>
                   )}
                 </div>

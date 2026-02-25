@@ -8,6 +8,7 @@ import {
   detectTokenType,
 } from "../lib/contracts";
 import { LSP4_METADATA_KEY } from "../lib/lsp4";
+import { SecretDropSummary } from "../lib/secret-drop";
 
 const IPFS_GATEWAY = "https://api.universalprofile.cloud/ipfs";
 const GET_DATA_ABI = ["function getData(bytes32 key) view returns (bytes memory)"];
@@ -56,6 +57,7 @@ export default function MyDropsPage() {
   const { config: networkConfig, networkId } = useNetwork();
   const { inIframe } = useUPProvider();
   const [drops, setDrops] = useState<MyDrop[]>([]);
+  const [secretDrops, setSecretDrops] = useState<SecretDropSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -179,6 +181,19 @@ export default function MyDropsPage() {
 
       setDrops(withStats);
 
+      // Fetch secret drops from KV
+      try {
+        const res = await fetch(
+          `/api/secret-drop/by-creator?address=${encodeURIComponent(userAddr)}&network=${networkId}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setSecretDrops(data.drops ?? []);
+        }
+      } catch {
+        // Non-critical — don't block the page
+      }
+
       // Fetch icons in background
       withStats.forEach(async (drop) => {
         const icon = await fetchDropIcon(drop.contractAddr, rpc);
@@ -194,7 +209,7 @@ export default function MyDropsPage() {
     } finally {
       setLoading(false);
     }
-  }, [networkConfig]);
+  }, [networkConfig, networkId]);
 
   async function connect() {
     setError(null);
@@ -267,7 +282,7 @@ export default function MyDropsPage() {
               {profile?.name || `${address.slice(0, 6)}...${address.slice(-4)}`}
             </span>
             <button
-              onClick={() => { disconnect(); setDrops([]); }}
+              onClick={() => { disconnect(); setDrops([]); setSecretDrops([]); }}
               className="text-faint text-[10px] hover:text-muted ml-1 cursor-pointer"
             >
               Disconnect
@@ -300,7 +315,7 @@ export default function MyDropsPage() {
         )}
 
         {/* Empty state */}
-        {address && !loading && drops.length === 0 && (
+        {address && !loading && drops.length === 0 && secretDrops.length === 0 && (
           <div className={card + " text-center"}>
             <div className="text-4xl mb-3">🚀</div>
             <p className="text-muted text-sm mb-2">You haven't created any drops yet</p>
@@ -313,79 +328,149 @@ export default function MyDropsPage() {
           </div>
         )}
 
-        {/* Drops list */}
-        {drops.length > 0 && (
+        {/* Drops list — merge on-chain + secret, sorted by createdAt */}
+        {(drops.length > 0 || secretDrops.length > 0) && (
           <div className="space-y-3">
-            {drops.map((drop) => (
-              <div key={drop.contractAddr} className={card}>
-                <div className="flex items-start gap-4">
-                  {/* Icon */}
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden">
-                    {drop.icon ? (
-                      <img src={drop.icon} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      drop.isNFT ? "🖼" : "🪙"
-                    )}
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <h3 className="font-semibold text-sm sm:text-base truncate">
-                        {drop.name}
-                      </h3>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface text-label flex-shrink-0">
-                        {drop.isNFT ? "NFT" : "Token"}
-                      </span>
-                      {/* Status badge */}
-                      {drop.claimEnabled ? (
-                        drop.isActive ? (
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-500/20 flex-shrink-0">
-                            Live
-                          </span>
+            {[
+              ...drops.map((d) => ({ type: "onchain" as const, createdAt: d.createdAt, data: d })),
+              ...secretDrops.map((s) => ({ type: "secret" as const, createdAt: s.createdAt, data: s })),
+            ]
+              .sort((a, b) => b.createdAt - a.createdAt)
+              .map((item) =>
+                item.type === "onchain" ? (
+                  <div key={item.data.contractAddr} className={card}>
+                    <div className="flex items-start gap-4">
+                      {/* Icon */}
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden">
+                        {item.data.icon ? (
+                          <img src={item.data.icon} alt="" className="w-full h-full object-cover" />
                         ) : (
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-300 dark:border-blue-500/20 flex-shrink-0">
-                            Scheduled
+                          item.data.isNFT ? "🖼" : "🪙"
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <h3 className="font-semibold text-sm sm:text-base truncate">
+                            {item.data.name}
+                          </h3>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface text-label flex-shrink-0">
+                            {item.data.isNFT ? "NFT" : "Token"}
                           </span>
-                        )
-                      ) : (
-                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-yellow-50 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border border-yellow-300 dark:border-yellow-500/20 flex-shrink-0">
-                          Paused
-                        </span>
-                      )}
-                    </div>
+                          {/* Status badge */}
+                          {item.data.claimEnabled ? (
+                            item.data.isActive ? (
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-500/20 flex-shrink-0">
+                                Live
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-300 dark:border-blue-500/20 flex-shrink-0">
+                                Scheduled
+                              </span>
+                            )
+                          ) : (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-yellow-50 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border border-yellow-300 dark:border-yellow-500/20 flex-shrink-0">
+                              Paused
+                            </span>
+                          )}
+                        </div>
 
-                    {/* Stats row */}
-                    <div className="flex items-center gap-4 text-[10px] sm:text-xs text-label mb-3">
-                      <span>{drop.totalClaimed} claimed</span>
-                      <span>Supply: {drop.maxSupply}</span>
-                      <span>{new Date(drop.createdAt * 1000).toLocaleDateString()}</span>
-                    </div>
+                        {/* Stats row */}
+                        <div className="flex items-center gap-4 text-[10px] sm:text-xs text-label mb-3">
+                          <span>{item.data.totalClaimed} claimed</span>
+                          <span>Supply: {item.data.maxSupply}</span>
+                          <span>{new Date(item.data.createdAt * 1000).toLocaleDateString()}</span>
+                        </div>
 
-                    {/* Actions */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Link
-                        href={`/manage/${drop.contractAddr}`}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition-all"
-                      >
-                        Manage
-                      </Link>
-                      <Link
-                        href={`/claim/${drop.contractAddr}`}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium text-muted border border-border-default hover:border-border-muted hover:text-tertiary transition-all"
-                      >
-                        View claim page
-                      </Link>
-                      <CopyButton
-                        text={typeof window !== "undefined" ? `${window.location.origin}/claim/${drop.contractAddr}` : `/claim/${drop.contractAddr}`}
-                        label="Copy link"
-                        className="px-3 py-1.5 rounded-lg text-xs border border-border-muted hover:border-border-default"
-                      />
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Link
+                            href={`/manage/${item.data.contractAddr}`}
+                            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition-all"
+                          >
+                            Manage
+                          </Link>
+                          <Link
+                            href={`/claim/${item.data.contractAddr}`}
+                            className="px-3 py-1.5 rounded-lg text-xs font-medium text-muted border border-border-default hover:border-border-muted hover:text-tertiary transition-all"
+                          >
+                            View claim page
+                          </Link>
+                          <CopyButton
+                            text={typeof window !== "undefined" ? `${window.location.origin}/claim/${item.data.contractAddr}` : `/claim/${item.data.contractAddr}`}
+                            label="Copy link"
+                            className="px-3 py-1.5 rounded-lg text-xs border border-border-muted hover:border-border-default"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            ))}
+                ) : (
+                  <div key={item.data.id} className={card}>
+                    <div className="flex items-start gap-4">
+                      {/* Icon */}
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-2xl flex-shrink-0">
+                        🔒
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <h3 className="font-semibold text-sm sm:text-base truncate">
+                            {item.data.title}
+                          </h3>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-400 border border-violet-500/30 flex-shrink-0">
+                            Secret
+                          </span>
+                          {/* Status badge */}
+                          {item.data.active ? (
+                            item.data.mode === "pool" && item.data.remaining === 0 ? (
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-gray-50 dark:bg-gray-500/10 text-gray-700 dark:text-gray-400 border border-gray-300 dark:border-gray-500/20 flex-shrink-0">
+                                All claimed
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-500/20 flex-shrink-0">
+                                Live
+                              </span>
+                            )
+                          ) : (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-yellow-50 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border border-yellow-300 dark:border-yellow-500/20 flex-shrink-0">
+                              Paused
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Stats row */}
+                        <div className="flex items-center gap-4 text-[10px] sm:text-xs text-label mb-3">
+                          {item.data.mode === "pool" && item.data.remaining !== null && (
+                            <span>{item.data.remaining}/{item.data.totalCodes} remaining</span>
+                          )}
+                          {item.data.mode === "shared" && (
+                            <span>{item.data.totalCodes} code{item.data.totalCodes !== 1 ? "s" : ""}</span>
+                          )}
+                          <span>{new Date(item.data.createdAt * 1000).toLocaleDateString()}</span>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Link
+                            href={`/secret-drop/${item.data.id}`}
+                            className="px-3 py-1.5 rounded-lg text-xs font-medium text-muted border border-border-default hover:border-border-muted hover:text-tertiary transition-all"
+                          >
+                            View claim page
+                          </Link>
+                          <CopyButton
+                            text={typeof window !== "undefined" ? `${window.location.origin}/secret-drop/${item.data.id}` : `/secret-drop/${item.data.id}`}
+                            label="Copy link"
+                            className="px-3 py-1.5 rounded-lg text-xs border border-border-muted hover:border-border-default"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              )}
           </div>
         )}
 
