@@ -85,6 +85,16 @@ export function parseManageMessage(message: string): { dropId: string; address: 
   return { dropId: m[1], address: m[2], ts: parseInt(m[3], 10) };
 }
 
+/**
+ * Parse the visibility toggle message for on-chain drops.
+ * Expected format: "Toggle visibility for {contractAddress} as {address} at {timestamp}"
+ */
+export function parseVisibilityMessage(message: string): { contractAddress: string; address: string; ts: number } | null {
+  const m = message.match(/^Toggle visibility for (0x[a-fA-F0-9]{40}) as (0x[a-fA-F0-9]{40}) at (\d+)$/);
+  if (!m) return null;
+  return { contractAddress: m[1], address: m[2], ts: parseInt(m[3], 10) };
+}
+
 /** Returns true if timestamp is within the last 5 minutes. */
 export function isFresh(ts: number): boolean {
   const now = Math.floor(Date.now() / 1000);

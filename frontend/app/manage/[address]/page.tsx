@@ -39,6 +39,8 @@ export default function ManagePage() {
   const [tokenReqs, setTokenReqs] = useState<{ addr: string; amount: string }[]>([]);
   const [reqFollowers, setReqFollowers] = useState("");
   const [linkCopied, setLinkCopied] = useState(false);
+  const [exploreVisible, setExploreVisible] = useState(true);
+  const [visibilitySaving, setVisibilitySaving] = useState(false);
 
   // LSP4 metadata state
   const [metaDescription, setMetaDescription] = useState("");
@@ -122,6 +124,17 @@ export default function ManagePage() {
     } catch (e) { console.error(e); }
   }, [contractAddress, networkConfig]);
 
+  // Load visibility state from KV
+  useEffect(() => {
+    fetch(`/api/drop-visibility?network=${networkConfig.id}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const hidden: string[] = data.hidden ?? [];
+        setExploreVisible(!hidden.includes(contractAddress.toLowerCase()));
+      })
+      .catch(() => {});
+  }, [contractAddress, networkConfig.id]);
+
   // Auto-load when wallet is already connected
   useEffect(() => {
     if (address) loadState(address);
@@ -160,6 +173,38 @@ export default function ManagePage() {
     navigator.clipboard.writeText(url);
     setLinkCopied(true);
     setTimeout(() => setLinkCopied(false), 2000);
+  }
+
+  async function toggleExploreVisibility() {
+    const p = getProvider();
+    if (!p || !address) return;
+    try {
+      setVisibilitySaving(true);
+      const newVisible = !exploreVisible;
+      const ts = Math.floor(Date.now() / 1000);
+      const message = `Toggle visibility for ${contractAddress} as ${address} at ${ts}`;
+      const provider = new BrowserProvider(p);
+      const signer = await provider.getSigner();
+      const signature = await signer.signMessage(message);
+      const res = await fetch("/api/drop-visibility", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message,
+          signature,
+          visible: newVisible,
+          network: networkConfig.id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update visibility");
+      setExploreVisible(newVisible);
+      setStatus({ message: newVisible ? "Drop is now visible on Explore" : "Drop hidden from Explore", type: "success" });
+    } catch (e: any) {
+      setStatus({ message: e.message?.slice(0, 100) || "Failed to toggle visibility", type: "error" });
+    } finally {
+      setVisibilitySaving(false);
+    }
   }
 
   async function updateMetadata() {
@@ -342,6 +387,30 @@ export default function ManagePage() {
                 }`}
               >
                 {claimEnabled ? "Pause Claims" : "Enable Claims"}
+              </button>
+            </div>
+
+            {/* Explore visibility */}
+            <div className={card}>
+              <h2 className="text-xs font-semibold text-tertiary mb-1">Explore Visibility</h2>
+              <p className="text-[10px] text-faint mb-3">
+                Control whether this drop appears on the Explore page. Hidden drops can still be accessed via direct link.
+              </p>
+              <div className="flex items-center justify-between mb-3">
+                <span className={`text-xs font-semibold ${exploreVisible ? "text-green-600 dark:text-green-400" : "text-label"}`}>
+                  {exploreVisible ? "Visible on Explore" : "Hidden from Explore"}
+                </span>
+              </div>
+              <button
+                onClick={toggleExploreVisibility}
+                disabled={visibilitySaving}
+                className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed ${
+                  exploreVisible
+                    ? "bg-red-50 dark:bg-red-500/20 text-red-700 dark:text-red-400 border border-red-300 dark:border-red-500/30 hover:bg-red-100 dark:hover:bg-red-500/30"
+                    : "bg-green-50 dark:bg-green-500/20 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-500/30 hover:bg-green-100 dark:hover:bg-green-500/30"
+                }`}
+              >
+                {visibilitySaving ? "Saving..." : exploreVisible ? "Hide from Explore" : "Show on Explore"}
               </button>
             </div>
 

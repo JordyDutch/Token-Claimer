@@ -57,6 +57,7 @@ type FeedItem =
 export default function HomePage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [secretDrops, setSecretDrops] = useState<SecretDropSummary[]>([]);
+  const [hiddenDrops, setHiddenDrops] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterTab>("all");
   const [search, setSearch] = useState("");
@@ -68,9 +69,11 @@ export default function HomePage() {
     let stale = false;
     setCampaigns([]);
     setSecretDrops([]);
+    setHiddenDrops(new Set());
     setLoading(true);
     loadCampaigns(networkConfig, () => stale);
     loadSecretDrops(networkConfig.id, () => stale);
+    loadHiddenDrops(networkConfig.id, () => stale);
     return () => { stale = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [networkId]);
@@ -209,9 +212,25 @@ export default function HomePage() {
     }
   }
 
-  // Build unified feed
+  async function loadHiddenDrops(networkId: string, isStale: () => boolean) {
+    try {
+      const res = await fetch(`/api/drop-visibility?network=${networkId}`);
+      if (!res.ok || isStale()) return;
+      const data = await res.json();
+      if (isStale()) return;
+      const hidden: string[] = data.hidden ?? [];
+      setHiddenDrops(new Set(hidden.map((a: string) => a.toLowerCase())));
+    } catch {
+      // Non-critical — show all drops if fetch fails
+    }
+  }
+
+  // Build unified feed — exclude hidden on-chain drops
+  const visibleCampaigns = campaigns.filter(
+    (c) => !hiddenDrops.has(c.contractAddr.toLowerCase())
+  );
   const feedItems: FeedItem[] = [
-    ...campaigns.map((c): FeedItem => ({ kind: "onchain", data: c })),
+    ...visibleCampaigns.map((c): FeedItem => ({ kind: "onchain", data: c })),
     ...secretDrops.map((s): FeedItem => ({ kind: "secret", data: s })),
   ];
   feedItems.sort((a, b) => {
