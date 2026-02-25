@@ -127,20 +127,24 @@ export default function ManagePage() {
       safe(c.getData(LSP4_METADATA_KEY), null).then(async (metaRaw: string | null) => {
         if (!metaRaw || metaRaw === "0x" || metaRaw.length < 10) return;
         try {
-          const hex = metaRaw.slice(2);
-          const urlHex = hex.slice((4 + 32) * 2);
-          const ipfsUrl = Buffer.from(urlHex, "hex").toString("utf8");
-          const cid = ipfsUrl.replace("ipfs://", "");
+          const bytes = Buffer.from(metaRaw.replace(/^0x/, ""), "hex");
+          const text = bytes.toString("utf8");
+          const idx = text.indexOf("ipfs://");
+          if (idx === -1) return;
+          const cid = text.slice(idx).replace("ipfs://", "");
           const res = await fetch(`https://api.universalprofile.cloud/ipfs/${cid}`);
           if (!res.ok) return;
           const json = await res.json();
           const meta = json?.LSP4Metadata;
           if (!meta) return;
           if (meta.description) setMetaDescription(meta.description);
-          const iconObj = meta.icon?.[0] ?? meta.images?.[0]?.[0];
+          const iconObj = meta.images?.[0]?.[0] ?? meta.icon?.[0];
           if (iconObj?.url) {
-            const iconCid = iconObj.url.replace("ipfs://", "");
-            setMetaIconPreview(`https://api.universalprofile.cloud/ipfs/${iconCid}`);
+            if (iconObj.url.startsWith("https://") || iconObj.url.startsWith("http://")) {
+              setMetaIconPreview(iconObj.url);
+            } else {
+              setMetaIconPreview(`https://api.universalprofile.cloud/ipfs/${iconObj.url.replace("ipfs://", "")}`);
+            }
             setExistingIcon({ url: iconObj.url, verification: iconObj.verification });
           }
           const links = meta.links;

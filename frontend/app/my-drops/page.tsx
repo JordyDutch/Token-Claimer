@@ -18,16 +18,18 @@ async function fetchDropIcon(contractAddr: string, provider: JsonRpcProvider): P
     const c = new Contract(contractAddr, GET_DATA_ABI, provider);
     const raw: string = await c.getData(LSP4_METADATA_KEY);
     if (!raw || raw === "0x" || raw.length < 10) return null;
-    const urlHex = raw.slice(2 + 8 + 64);
-    if (!urlHex || urlHex.length < 8) return null;
-    const ipfsUrl = Buffer.from(urlHex, "hex").toString("utf8");
-    const cid = ipfsUrl.replace("ipfs://", "");
+    const bytes = Buffer.from(raw.replace(/^0x/, ""), "hex");
+    const text = bytes.toString("utf8");
+    const idx = text.indexOf("ipfs://");
+    if (idx === -1) return null;
+    const cid = text.slice(idx).replace("ipfs://", "");
     const res = await fetch(`${IPFS_GATEWAY}/${cid}`);
     if (!res.ok) return null;
     const json = await res.json();
-    const icon = json?.LSP4Metadata?.icon?.[0]?.url
-      ?? json?.LSP4Metadata?.images?.[0]?.[0]?.url;
+    const icon = json?.LSP4Metadata?.images?.[0]?.[0]?.url
+      ?? json?.LSP4Metadata?.icon?.[0]?.url;
     if (!icon) return null;
+    if (icon.startsWith("https://") || icon.startsWith("http://")) return icon;
     return `${IPFS_GATEWAY}/${icon.replace("ipfs://", "")}`;
   } catch {
     return null;

@@ -126,20 +126,22 @@ export default function ClaimPage() {
       safe(c.getData(LSP4_METADATA_KEY), null).then(async (metaRaw: string | null) => {
         if (!metaRaw || metaRaw === "0x" || metaRaw.length < 10) return;
         try {
-          // VerifiableURI: 0x6f357c6a (4 bytes) + keccak256 (32 bytes) + ipfs://CID
-          const hex = metaRaw.slice(2); // strip 0x
-          const urlHex = hex.slice((4 + 32) * 2);  // skip magic + hash
-          const ipfsUrl = Buffer.from(urlHex, "hex").toString("utf8");
-          const cid = ipfsUrl.replace("ipfs://", "");
-          const gateway = `https://api.universalprofile.cloud/ipfs/${cid}`;
-          const res = await fetch(gateway);
+          const bytes = Buffer.from(metaRaw.replace(/^0x/, ""), "hex");
+          const text = bytes.toString("utf8");
+          const idx = text.indexOf("ipfs://");
+          if (idx === -1) return;
+          const cid = text.slice(idx).replace("ipfs://", "");
+          const res = await fetch(`https://api.universalprofile.cloud/ipfs/${cid}`);
           if (!res.ok) return;
           const json = await res.json();
-          const icon = json?.LSP4Metadata?.icon?.[0]?.url
-            ?? json?.LSP4Metadata?.images?.[0]?.[0]?.url;
+          const icon = json?.LSP4Metadata?.images?.[0]?.[0]?.url
+            ?? json?.LSP4Metadata?.icon?.[0]?.url;
           if (icon) {
-            const iconCid = icon.replace("ipfs://", "");
-            setDropIcon(`https://api.universalprofile.cloud/ipfs/${iconCid}`);
+            if (icon.startsWith("https://") || icon.startsWith("http://")) {
+              setDropIcon(icon);
+            } else {
+              setDropIcon(`https://api.universalprofile.cloud/ipfs/${icon.replace("ipfs://", "")}`);
+            }
           }
         } catch { /* no icon, keep fallback */ }
       });
