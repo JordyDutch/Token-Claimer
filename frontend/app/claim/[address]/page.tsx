@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
-import { BrowserProvider, Contract, JsonRpcProvider, formatUnits } from "ethers";
+import { BrowserProvider, Contract, JsonRpcProvider, formatUnits, Interface, id } from "ethers";
 import {
   CLAIM_ABI, LSP7_EXTRA_ABI, LSP8_EXTRA_ABI, ZERO,
   LSP4_TOKEN_NAME_KEY, LSP4_TOKEN_SYMBOL_KEY,
@@ -17,6 +17,31 @@ import Footer from "../../components/Footer";
 import { useWallet } from "../../components/WalletProvider";
 import { useNetwork } from "../../components/NetworkProvider";
 import { useUPProvider } from "../../components/UPProviderInit";
+
+/* ---------- Event topics for claimers list ---------- */
+const TOPIC_TOKEN_CLAIMED = id("TokensClaimed(address,uint256)");
+const TOPIC_NFT_CLAIMED = id("NFTsClaimed(address,uint256,uint256)");
+const claimIface = new Interface([
+  "event TokensClaimed(address indexed claimer, uint256 amount)",
+  "event NFTsClaimed(address indexed claimer, uint256 firstTokenId, uint256 amount)",
+]);
+
+interface ClaimerInfo {
+  address: string;
+  blockNumber: number;
+  timestamp: number;
+  profile?: ProfileInfo | null;
+}
+
+function timeSince(timestamp: number): string {
+  if (!timestamp) return "";
+  const seconds = Math.floor(Date.now() / 1000 - timestamp);
+  if (seconds < 60) return "just now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 2592000) return `${Math.floor(seconds / 86400)}d ago`;
+  return new Date(timestamp * 1000).toLocaleDateString();
+}
 
 type Status = { message: string; type: "success" | "error" | "loading" } | null;
 
@@ -53,6 +78,10 @@ export default function ClaimPage() {
   const [copied, setCopied] = useState(false);
   const [codewordRequired, setCodewordRequired] = useState(false);
   const [codewordInput, setCodewordInput] = useState("");
+  const [claimers, setClaimers] = useState<ClaimerInfo[]>([]);
+  const [claimersLoading, setClaimersLoading] = useState(true);
+  const [showAllClaimers, setShowAllClaimers] = useState(false);
+  const claimersVersion = useRef(0);
 
   const loadState = useCallback(async (userAddr?: string) => {
     if (!contractAddress) return;
@@ -198,6 +227,80 @@ export default function ClaimPage() {
   // Load contract state on mount, reload when wallet connects or network changes
   useEffect(() => { loadState(address ?? undefined); }, [loadState, address]);
 
+  // Fetch claimers list from on-chain events
+  const loadClaimers = useCallback(async () => {
+    if (!contractAddress) return;
+    const version = ++claimersVersion.current;
+    setClaimersLoading(true);
+    const rpc = new JsonRpcProvider(networkConfig.rpc);
+    try {
+      const currentBlock = await rpc.getBlockNumber();
+      // Fetch all claim events for this contract (scan last ~600k blocks ≈ 35 days)
+      const fromBlock = Math.max(0, currentBlock - 600_000);
+      const logs: any[] = await rpc.send("eth_getLogs", [{
+        address: [contractAddress],
+        topics: [[TOPIC_TOKEN_CLAIMED, TOPIC_NFT_CLAIMED]],
+        fromBlock: `0x${fromBlock.toString(16)}`,
+        toBlock: "latest",
+      }]);
+      if (version !== claimersVersion.current) return;
+
+      // Parse logs → claimer entries
+      const parsed: ClaimerInfo[] = [];
+      for (const log of logs) {
+        try {
+          const p = claimIface.parseLog({ topics: log.topics, data: log.data });
+          if (!p) continue;
+          parsed.push({
+            address: p.args[0],
+            blockNumber: parseInt(log.blockNumber, 16),
+            timestamp: 0,
+          });
+        } catch { /* skip */ }
+      }
+
+      // Deduplicate by address, keep most recent
+      const byAddr = new Map<string, ClaimerInfo>();
+      for (const c of parsed) {
+        const key = c.address.toLowerCase();
+        const existing = byAddr.get(key);
+        if (!existing || c.blockNumber > existing.blockNumber) byAddr.set(key, c);
+      }
+      const unique = [...byAddr.values()].sort((a, b) => b.blockNumber - a.blockNumber);
+
+      // Fetch block timestamps
+      const uniqueBlocks = [...new Set(unique.map((c) => c.blockNumber))];
+      const tsMap = new Map<number, number>();
+      await Promise.all(
+        uniqueBlocks.map(async (bn) => {
+          try {
+            const block = await rpc.getBlock(bn);
+            if (block) tsMap.set(bn, block.timestamp);
+          } catch { /* skip */ }
+        }),
+      );
+      for (const c of unique) c.timestamp = tsMap.get(c.blockNumber) ?? 0;
+
+      if (version !== claimersVersion.current) return;
+      setClaimers(unique);
+      setClaimersLoading(false);
+
+      // Enrich with profiles (fire-and-forget)
+      const profiles = await Promise.all(
+        unique.map(async (c) => {
+          try { return await fetchProfile(c.address); }
+          catch { return null; }
+        }),
+      );
+      if (version !== claimersVersion.current) return;
+      setClaimers(unique.map((c, i) => ({ ...c, profile: profiles[i] })));
+    } catch {
+      if (version === claimersVersion.current) setClaimersLoading(false);
+    }
+  }, [contractAddress, networkConfig]);
+
+  useEffect(() => { loadClaimers(); }, [loadClaimers]);
+
   async function connect() {
     setStatus({ message: "Connecting...", type: "loading" });
     const addr = await walletConnect();
@@ -231,6 +334,7 @@ export default function ClaimPage() {
       setStatus({ message: tokenType === "LSP7" ? "Tokens claimed successfully!" : "NFT claimed successfully!", type: "success" });
       setAlreadyClaimed(true);
       await loadState(address);
+      loadClaimers();
     } catch (e: any) {
       const msg = e.data || e.reason || e.message?.slice(0, 200) || "Failed";
       const errorMap: Record<string, string> = {
@@ -630,6 +734,44 @@ export default function ClaimPage() {
               </div>
             );
           })()}
+
+          {/* Recent claimers */}
+          {!inIframe && claimers.length > 0 && (
+            <div className="mt-6 pt-5 border-t border-border-muted">
+              <div className="text-[10px] text-label uppercase tracking-wider text-center font-medium mb-3">
+                Recent Claimers
+              </div>
+              <div className="space-y-2">
+                {(showAllClaimers ? claimers : claimers.slice(0, 10)).map((c) => (
+                  <div key={c.address} className="flex items-center gap-2.5 px-2 py-1.5">
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                      {c.profile?.image ? (
+                        <img src={c.profile.image} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-white font-medium text-[8px]">
+                          {c.address.slice(2, 4).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-secondary truncate flex-1 text-left">
+                      {c.profile?.name || `${c.address.slice(0, 6)}...${c.address.slice(-4)}`}
+                    </span>
+                    <span className="text-[10px] text-faint flex-shrink-0">
+                      {timeSince(c.timestamp)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {claimers.length > 10 && (
+                <button
+                  onClick={() => setShowAllClaimers(!showAllClaimers)}
+                  className="text-[10px] text-purple-500 hover:text-purple-400 text-center mt-2 w-full cursor-pointer transition-colors"
+                >
+                  {showAllClaimers ? "Show less" : `Show all ${claimers.length} claimers`}
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Bottom bar — hidden in iframe */}
