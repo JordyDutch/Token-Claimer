@@ -135,7 +135,8 @@ export default function ClaimPage() {
           const res = await fetch(gateway);
           if (!res.ok) return;
           const json = await res.json();
-          const icon = json?.LSP4Metadata?.icon?.[0]?.url;
+          const icon = json?.LSP4Metadata?.icon?.[0]?.url
+            ?? json?.LSP4Metadata?.images?.[0]?.[0]?.url;
           if (icon) {
             const iconCid = icon.replace("ipfs://", "");
             setDropIcon(`https://api.universalprofile.cloud/ipfs/${iconCid}`);

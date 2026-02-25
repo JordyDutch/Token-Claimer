@@ -109,13 +109,16 @@ export async function uploadAndSetLSP4Metadata(
   }
 
   // 3. Build LSP4Metadata JSON
+  // images: array of image arrays — each inner array holds size variants of one image.
+  // Populate from the icon so platforms like universal.page can display the NFT image.
+  const imagesArray: object[][] = iconArray.length > 0 ? [iconArray] : [];
   const metadata = {
     LSP4Metadata: {
       name: input.name,
       description: input.description,
       links: (input.links ?? []).filter((l) => l.title && l.url),
       icon: iconArray,
-      images: [],
+      images: imagesArray,
       assets: assetsArray,
       attributes: [],
     },

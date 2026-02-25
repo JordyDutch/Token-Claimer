@@ -23,7 +23,8 @@ async function fetchCampaignIcon(contractAddr: string, provider: JsonRpcProvider
     const res = await fetch(`${IPFS_GATEWAY}/${cid}`);
     if (!res.ok) return null;
     const json = await res.json();
-    const icon = json?.LSP4Metadata?.icon?.[0]?.url;
+    const icon = json?.LSP4Metadata?.icon?.[0]?.url
+      ?? json?.LSP4Metadata?.images?.[0]?.[0]?.url;
     if (!icon) return null;
     const iconCid = icon.replace("ipfs://", "");
     return `${IPFS_GATEWAY}/${iconCid}`;
