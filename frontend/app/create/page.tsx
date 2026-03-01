@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { BrowserProvider, Contract } from "ethers";
 import {
-  LSP7_FACTORY_ABI, LSP8_FACTORY_ABI,
+  LSP7_FACTORY_ABI,
   getProvider,
 } from "../lib/contracts";
 import { uploadAndSetLSP4Metadata, addToLSP12IssuedAssets, type Lsp4Link } from "../lib/lsp4";
@@ -42,7 +42,6 @@ export default function CreatePage() {
   const [symbol, setSymbol] = useState("");
   const [maxSupply, setMaxSupply] = useState("100");
   const [amountPerClaim, setAmountPerClaim] = useState("1");
-  const [isNonDivisible, setIsNonDivisible] = useState(false);
   const [deployedAddress, setDeployedAddress] = useState<string | null>(null);
   const [deploying, setDeploying] = useState(false);
 
@@ -115,23 +114,15 @@ export default function CreatePage() {
       const signer = await provider.getSigner();
       let deployedAddr: string;
 
-      if (dropType === "token") {
+      {
         const factory = new Contract(networkConfig.lsp7Factory, LSP7_FACTORY_ABI, signer);
-        const tx = await factory.createTokenDrop(name, symbol, amountPerClaim, maxSupply, isNonDivisible);
+        const nonDivisible = dropType === "nft";
+        const tx = await factory.createTokenDrop(name, symbol, amountPerClaim, maxSupply, nonDivisible);
         setStatus({ message: "Waiting for confirmation...", type: "loading" });
         await tx.wait();
         const fr = new Contract(networkConfig.lsp7Factory, LSP7_FACTORY_ABI, provider);
         const t = await fr.totalCampaigns();
         const items = await fr.getCampaigns(t - BigInt(1), 1);
-        deployedAddr = items[0].contractAddr;
-      } else {
-        const factory = new Contract(networkConfig.lsp8Factory, LSP8_FACTORY_ABI, signer);
-        const tx = await factory.createNFTDrop(name, symbol, maxSupply, amountPerClaim);
-        setStatus({ message: "Waiting for confirmation...", type: "loading" });
-        await tx.wait();
-        const fr = new Contract(networkConfig.lsp8Factory, LSP8_FACTORY_ABI, provider);
-        const t = await fr.totalNFTCampaigns();
-        const items = await fr.getNFTCampaigns(t - BigInt(1), 1);
         deployedAddr = items[0].contractAddr;
       }
 
@@ -476,35 +467,6 @@ export default function CreatePage() {
                     min="1"
                   />
                 </div>
-                {dropType === "token" && (
-                  <div>
-                    <label className={lbl}>Token divisibility</label>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setIsNonDivisible(false)}
-                        className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                          !isNonDivisible
-                            ? "bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 border border-purple-300 dark:border-purple-500/30"
-                            : "bg-surface text-muted border border-border-default"
-                        }`}
-                      >
-                        Divisible (18 decimals)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setIsNonDivisible(true)}
-                        className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                          isNonDivisible
-                            ? "bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 border border-purple-300 dark:border-purple-500/30"
-                            : "bg-surface text-muted border border-border-default"
-                        }`}
-                      >
-                        Non-divisible (whole)
-                      </button>
-                    </div>
-                  </div>
-                )}
 
                 {/* LSP4 Metadata */}
                 <div className="border-t border-border-muted pt-4 mt-1">
