@@ -5,16 +5,22 @@ export const LUKSO_CHAIN_ID = "0x2a";
 export const ZERO = "0x0000000000000000000000000000000000000000";
 
 export const LSP7_FACTORY =
-  process.env.NEXT_PUBLIC_LSP7_FACTORY ?? "0x9b132E764f92c6E6F5E91E276E310758C33dB08F";
+  process.env.NEXT_PUBLIC_LSP7_FACTORY ?? "0xE2932677195f46341c9d13dD0BBa016ac19B4E05";
 export const LSP8_FACTORY =
-  process.env.NEXT_PUBLIC_LSP8_FACTORY ?? "0xBd545E98F133282bD79dc4a6ac422437478A58b6";
+  process.env.NEXT_PUBLIC_LSP8_FACTORY ?? "0x649Ccee0D46283102De6fEef3456c2e0a6c37461";
 
 // LSP7DropFactory ABI
+// Includes both old (`totalTokenCampaigns`) and new (`totalCampaigns`) names —
+// the frontend uses .catch() fallbacks to handle both factory versions gracefully.
 export const LSP7_FACTORY_ABI = [
   "function createTokenDrop(string,string,uint256,uint256,bool) returns (address)",
-  "function totalCampaigns() view returns (uint256)",
+  "function totalCampaigns() view returns (uint256)",          // v5 (EIP-1167 proxy factories)
+  "function totalTokenCampaigns() view returns (uint256)",     // v3/v4 (legacy)
   "function getCampaigns(uint256,uint256) view returns (tuple(address contractAddr, address creator, string name, string symbol, uint256 createdAt)[])",
+  "function getTokenCampaigns(uint256,uint256) view returns (tuple(address contractAddr, address creator, string name, string symbol, uint256 createdAt)[])",
   "function getCampaignsByCreator(address) view returns (uint256[])",
+  "function getTokenCampaignsByCreator(address) view returns (uint256[])",
+  "function implementation() view returns (address)",          // v5 only
 ];
 
 // LSP8DropFactory ABI
@@ -42,7 +48,8 @@ export const CLAIM_ABI = [
   "function claimEnabled() view returns (bool)",
   "function startTime() view returns (uint256)",
   "function endTime() view returns (uint256)",
-  "function maxSupply() view returns (uint256)",
+  "function maxSupply() view returns (uint256)",         // v3/v4 legacy
+  "function tokenSupplyCap() view returns (uint256)",   // v5 proxy tokens
   "function isClaimActive() view returns (bool)",
   "function hasClaimed(address) view returns (bool)",
   "function getData(bytes32) view returns (bytes)",
@@ -61,7 +68,13 @@ export const CLAIM_ABI = [
 ];
 
 export const LSP7_EXTRA_ABI = [
+  // v5 (proxy): uses totalSupply() from CappedSupply base + tokenSupplyCap()
+  "function totalSupply() view returns (uint256)",
+  "function tokenSupplyCap() view returns (uint256)",
+  // v3/v4 (legacy constructor): kept for backward compat
   "function totalClaimedAmount() view returns (uint256)",
+  "function maxSupply() view returns (uint256)",
+  // shared
   "function totalClaimers() view returns (uint256)",
   "function decimals() view returns (uint8)",
 ];
@@ -141,4 +154,21 @@ export async function detectTokenType(contract: any): Promise<"LSP7" | "LSP8"> {
   } catch {
     return "LSP8";
   }
+}
+
+const REVERT_ERRORS: Record<string, string> = {
+  "0x24fbaa90": "Claim is not active",
+  "0x646cf558": "You have already claimed",
+  "0xcd3b2d03": "Claim is outside the allowed time window",
+  "0xd05cb609": "Max supply has been reached",
+  "0xe4455cae": "You don't hold enough required tokens",
+  "0x94303d52": "You don't have enough followers",
+  "0x4aa20f9c": "Incorrect codeword",
+  "0x8beb9d16": "Transaction failed, please try again",
+  "0xb8eaf7a1": "Rescue failed",
+};
+
+export function friendlyRevert(e: any, fallback = "Transaction failed"): string {
+  const selector = (e.data ?? e.error?.data ?? "").slice(0, 10);
+  return REVERT_ERRORS[selector] ?? e.reason ?? e.message?.slice(0, 100) ?? fallback;
 }

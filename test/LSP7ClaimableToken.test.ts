@@ -1,8 +1,8 @@
 /**
  * LSP7ClaimableToken.test.ts
  *
- * Full test suite for LSP7ClaimableToken:
- *   - Deployment + constructor validation
+ * Full test suite for LSP7ClaimableToken (proxy/init pattern):
+ *   - Deployment via clone + initialize() validation
  *   - Owner control functions (setClaimEnabled, setClaimWindow, setAmountPerClaim,
  *     setRequirements, rescueLYX)
  *   - claim() — happy path, all revert paths, reentrancy guard
@@ -32,7 +32,7 @@ const LSP4_TOKEN_NAME_KEY =
 const LSP4_TOKEN_SYMBOL_KEY =
   "0x2f0a68ab07768e01943a599e73362a0e17a63a72e94dd2e384d2c1d4db932756";
 const AMOUNT_PER_CLAIM = ethers.parseEther("100");
-const MAX_SUPPLY_UNLIMITED = 0n;
+const MAX_SUPPLY_UNLIMITED = ethers.MaxUint256; // type(uint256).max for "unlimited"
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -57,6 +57,60 @@ async function timeTravel(seconds: number): Promise<void> {
 async function now(): Promise<number> {
   const block = await ethers.provider.getBlock("latest");
   return block!.timestamp;
+}
+
+/** Deploy implementation + clone + initialize a fresh LSP7ClaimableToken proxy */
+async function deployTokenProxy(
+  owner: SignerWithAddress,
+  name: string = "Test Token",
+  symbol: string = "TST",
+  amountPerClaim: bigint = AMOUNT_PER_CLAIM,
+  maxSupply: bigint = MAX_SUPPLY_UNLIMITED,
+  isNonDivisible: boolean = false
+): Promise<LSP7ClaimableToken> {
+  const Factory = await ethers.getContractFactory("LSP7ClaimableToken");
+
+  // Deploy implementation
+  const impl = await Factory.deploy();
+  await impl.waitForDeployment();
+
+  // Clone via OZ Clones library helper — we use a minimal inline approach:
+  // Deploy a proxy by calling clone on-chain, or just use ethers to call initialize
+  // For test simplicity, use the factory pattern: deploy impl, get bytecode, create clone
+  // Actually simplest: just deploy as a new instance and call initialize for testing.
+  // But to truly test the proxy pattern, let's use the factory or manual clone.
+
+  // For unit tests, we can deploy a fresh instance and just call initialize().
+  // The constructor calls _disableInitializers(), but for testing the token directly
+  // we need to use the factory or use a minimal clone helper.
+
+  // Use the DropFactory instead:
+  const DropFactory = await ethers.getContractFactory("LSP7DropFactory");
+  const factory = await DropFactory.deploy();
+  await factory.waitForDeployment();
+
+  // The factory normalizes maxSupply=0 to type(uint256).max internally,
+  // but for tests we pass the value directly. When we want "unlimited", pass 0
+  // and the factory converts it.
+  const adjustedMaxSupply = maxSupply === MAX_SUPPLY_UNLIMITED ? 0n : maxSupply;
+
+  const tx = await factory.createTokenDrop(name, symbol, amountPerClaim, adjustedMaxSupply, isNonDivisible);
+  const receipt = await tx.wait();
+
+  // Get the deployed proxy address from the event
+  const event = receipt!.logs.find(
+    (log: any) => {
+      try {
+        return factory.interface.parseLog({ topics: log.topics as string[], data: log.data })?.name === "TokenCampaignCreated";
+      } catch { return false; }
+    }
+  );
+  const parsed = factory.interface.parseLog({ topics: event!.topics as string[], data: event!.data });
+  const proxyAddr = parsed!.args.contractAddr;
+
+  // Transfer ownership to the test owner (factory sets msg.sender as owner, which is the signer)
+  const token = Factory.attach(proxyAddr) as LSP7ClaimableToken;
+  return token;
 }
 
 // ── Suite ──────────────────────────────────────────────────────────────────
@@ -85,15 +139,7 @@ describe("LSP7ClaimableToken", function () {
     claimer2 = await deployAccount();
     claimer3 = await deployAccount();
 
-    const TokenFactory = await ethers.getContractFactory("LSP7ClaimableToken");
-    token = (await TokenFactory.deploy(
-      "Test Token",
-      "TST",
-      owner.address,
-      AMOUNT_PER_CLAIM,
-      MAX_SUPPLY_UNLIMITED,
-      false
-    )) as LSP7ClaimableToken;
+    token = await deployTokenProxy(owner);
   });
 
   // ── 1. Deployment ────────────────────────────────────────────────────────
@@ -113,63 +159,67 @@ describe("LSP7ClaimableToken", function () {
       expect(await token.amountPerClaim()).to.equal(AMOUNT_PER_CLAIM);
     });
 
-    it("sets maxSupply (unlimited = 0)", async function () {
-      expect(await token.maxSupply()).to.equal(0n);
+    it("sets tokenSupplyCap (unlimited = type(uint256).max)", async function () {
+      expect(await token.tokenSupplyCap()).to.equal(MAX_SUPPLY_UNLIMITED);
     });
 
     it("disables claiming by default", async function () {
       expect(await token.claimEnabled()).to.be.false;
     });
 
-    it("starts with totalClaimedAmount = 0", async function () {
-      expect(await token.totalClaimedAmount()).to.equal(0n);
+    it("starts with totalSupply = 0", async function () {
+      expect(await token.totalSupply()).to.equal(0n);
     });
 
     it("starts with claimerCount = 0", async function () {
       expect(await token.claimerCount()).to.equal(0n);
     });
 
-    it("sets owner to the constructor argument", async function () {
+    it("sets owner to the caller of createTokenDrop", async function () {
       expect(await token.owner()).to.equal(owner.address);
     });
 
     it("uses 18 decimals when isNonDivisible_=false", async function () {
-      const Factory = await ethers.getContractFactory("LSP7ClaimableToken");
-      const t = await Factory.deploy("D", "D", owner.address, 1n, 0n, false);
+      const t = await deployTokenProxy(owner, "D", "D", 1n, MAX_SUPPLY_UNLIMITED, false);
       expect(await t.decimals()).to.equal(18n);
     });
 
     it("uses 0 decimals when isNonDivisible_=true", async function () {
-      const Factory = await ethers.getContractFactory("LSP7ClaimableToken");
-      const t = await Factory.deploy("D", "D", owner.address, 1n, 0n, true);
+      const t = await deployTokenProxy(owner, "D", "D", 1n, MAX_SUPPLY_UNLIMITED, true);
       expect(await t.decimals()).to.equal(0n);
     });
 
     it("reverts when amountPerClaim_ is 0", async function () {
-      const Factory = await ethers.getContractFactory("LSP7ClaimableToken");
+      const DropFactory = await ethers.getContractFactory("LSP7DropFactory");
+      const factory = await DropFactory.deploy();
       await expect(
-        Factory.deploy("D", "D", owner.address, 0n, 0n, false)
-      ).to.be.revertedWith("amountPerClaim must be > 0");
+        factory.createTokenDrop("D", "D", 0n, 0n, false)
+      ).to.be.revertedWithCustomError(
+        await ethers.getContractFactory("LSP7ClaimableToken").then(f => f.deploy()),
+        "AmountPerClaimZero"
+      );
     });
 
     it("reverts when maxSupply < amountPerClaim (non-zero maxSupply)", async function () {
-      const Factory = await ethers.getContractFactory("LSP7ClaimableToken");
+      const DropFactory = await ethers.getContractFactory("LSP7DropFactory");
+      const factory = await DropFactory.deploy();
       await expect(
-        Factory.deploy("D", "D", owner.address, 100n, 50n, false)
-      ).to.be.revertedWith("maxSupply < amountPerClaim");
+        factory.createTokenDrop("D", "D", 100n, 50n, false)
+      ).to.be.revertedWithCustomError(
+        await ethers.getContractFactory("LSP7ClaimableToken").then(f => f.deploy()),
+        "MaxSupplyBelowAmountPerClaim"
+      );
     });
 
     it("allows maxSupply == amountPerClaim", async function () {
-      const Factory = await ethers.getContractFactory("LSP7ClaimableToken");
       await expect(
-        Factory.deploy("D", "D", owner.address, 100n, 100n, false)
+        deployTokenProxy(owner, "D", "D", 100n, 100n, false)
       ).to.not.be.reverted;
     });
 
-    it("allows maxSupply == 0 (unlimited)", async function () {
-      const Factory = await ethers.getContractFactory("LSP7ClaimableToken");
+    it("allows maxSupply == 0 (unlimited → type(uint256).max)", async function () {
       await expect(
-        Factory.deploy("D", "D", owner.address, 100n, 0n, false)
+        deployTokenProxy(owner, "D", "D", 100n, MAX_SUPPLY_UNLIMITED, false)
       ).to.not.be.reverted;
     });
 
@@ -177,6 +227,12 @@ describe("LSP7ClaimableToken", function () {
       const [tokens, balances] = await token.getTokenRequirements();
       expect(tokens.length).to.equal(0);
       expect(balances.length).to.equal(0);
+    });
+
+    it("cannot be initialized twice", async function () {
+      await expect(
+        token.initialize("X", "X", owner.address, 1n, MAX_SUPPLY_UNLIMITED, false)
+      ).to.be.reverted;
     });
   });
 
@@ -217,6 +273,11 @@ describe("LSP7ClaimableToken", function () {
         .withArgs(false);
     });
 
+    it("reverts with ClaimEnabledNoChange when value unchanged", async function () {
+      await expect(token.setClaimEnabled(false))
+        .to.be.revertedWithCustomError(token, "ClaimEnabledNoChange");
+    });
+
     it("reverts when called by non-owner", async function () {
       await expect(
         token.connect(stranger).setClaimEnabled(true)
@@ -252,15 +313,15 @@ describe("LSP7ClaimableToken", function () {
 
     it("reverts when end <= start (and end != 0)", async function () {
       const t = await now();
-      await expect(token.setClaimWindow(t + 100, t + 50)).to.be.revertedWith(
-        "Invalid window"
+      await expect(token.setClaimWindow(t + 100, t + 50)).to.be.revertedWithCustomError(
+        token, "InvalidClaimWindow"
       );
     });
 
     it("reverts when end == start (and end != 0)", async function () {
       const t = await now();
-      await expect(token.setClaimWindow(t, t)).to.be.revertedWith(
-        "Invalid window"
+      await expect(token.setClaimWindow(t, t)).to.be.revertedWithCustomError(
+        token, "InvalidClaimWindow"
       );
     });
 
@@ -289,15 +350,15 @@ describe("LSP7ClaimableToken", function () {
     });
 
     it("reverts when amount is 0", async function () {
-      await expect(token.setAmountPerClaim(0n)).to.be.revertedWith(
-        "Out of range"
+      await expect(token.setAmountPerClaim(0n)).to.be.revertedWithCustomError(
+        token, "AmountOutOfRange"
       );
     });
 
     it("reverts when amount exceeds 1e24", async function () {
       const tooMuch = ethers.parseUnits("1", 25);
-      await expect(token.setAmountPerClaim(tooMuch)).to.be.revertedWith(
-        "Out of range"
+      await expect(token.setAmountPerClaim(tooMuch)).to.be.revertedWithCustomError(
+        token, "AmountOutOfRange"
       );
     });
 
@@ -306,19 +367,19 @@ describe("LSP7ClaimableToken", function () {
       await expect(token.setAmountPerClaim(max)).to.not.be.reverted;
     });
 
-    it("reverts when amount would exceed a non-zero maxSupply", async function () {
-      const Factory = await ethers.getContractFactory("LSP7ClaimableToken");
-      const limited = await Factory.deploy("L", "L", owner.address, 10n, 100n, false);
-      await expect(limited.setAmountPerClaim(101n)).to.be.revertedWith("Would exceed maxSupply");
+    it("reverts when amount would exceed a non-zero tokenSupplyCap", async function () {
+      const limited = await deployTokenProxy(owner, "L", "L", 10n, 100n, false);
+      await expect(limited.setAmountPerClaim(101n)).to.be.revertedWithCustomError(
+        limited, "AmountExceedsMaxSupply"
+      );
     });
 
-    it("allows amount == maxSupply (single-claim supply)", async function () {
-      const Factory = await ethers.getContractFactory("LSP7ClaimableToken");
-      const limited = await Factory.deploy("L", "L", owner.address, 10n, 100n, false);
+    it("allows amount == tokenSupplyCap (single-claim supply)", async function () {
+      const limited = await deployTokenProxy(owner, "L", "L", 10n, 100n, false);
       await expect(limited.setAmountPerClaim(100n)).to.not.be.reverted;
     });
 
-    it("allows raising amount freely when maxSupply is unlimited (0)", async function () {
+    it("allows raising amount freely when supply is unlimited", async function () {
       await expect(token.setAmountPerClaim(ethers.parseUnits("1", 24))).to.not.be.reverted;
     });
 
@@ -382,7 +443,7 @@ describe("LSP7ClaimableToken", function () {
       const tokenAddr = await mockToken.getAddress();
       await expect(
         token.setRequirements([tokenAddr], [100n, 200n], 0n)
-      ).to.be.revertedWith("Length mismatch");
+      ).to.be.revertedWithCustomError(token, "RequirementsLengthMismatch");
     });
 
     it("reverts when more than 10 token requirements are provided", async function () {
@@ -390,7 +451,7 @@ describe("LSP7ClaimableToken", function () {
       const amounts = Array(11).fill(1n);
       await expect(
         token.setRequirements(addrs, amounts, 0n)
-      ).to.be.revertedWith("Max 10 token requirements");
+      ).to.be.revertedWithCustomError(token, "TooManyTokenRequirements");
     });
 
     it("accepts exactly 10 token requirements", async function () {
@@ -509,15 +570,9 @@ describe("LSP7ClaimableToken", function () {
     });
 
     it("reverts with MaxSupplyReached when supply is full", async function () {
-      const Factory = await ethers.getContractFactory("LSP7ClaimableToken");
-      const limited = (await Factory.deploy(
-        "Limited",
-        "LTD",
-        owner.address,
-        AMOUNT_PER_CLAIM,
-        AMOUNT_PER_CLAIM,
-        false
-      )) as LSP7ClaimableToken;
+      const limited = await deployTokenProxy(
+        owner, "Limited", "LTD", AMOUNT_PER_CLAIM, AMOUNT_PER_CLAIM, false
+      );
       await limited.setClaimEnabled(true);
       await claimer1.doClaim(await limited.getAddress());
       await expect(claimer2.doClaim(await limited.getAddress())).to.be.revertedWithCustomError(
@@ -579,9 +634,9 @@ describe("LSP7ClaimableToken", function () {
       expect(await token.balanceOf(addr)).to.equal(AMOUNT_PER_CLAIM);
     });
 
-    it("increments totalClaimedAmount by amountPerClaim", async function () {
+    it("increments totalSupply by amountPerClaim", async function () {
       await claimer1.doClaim(await token.getAddress());
-      expect(await token.totalClaimedAmount()).to.equal(AMOUNT_PER_CLAIM);
+      expect(await token.totalSupply()).to.equal(AMOUNT_PER_CLAIM);
     });
 
     it("increments claimerCount", async function () {
@@ -601,7 +656,7 @@ describe("LSP7ClaimableToken", function () {
       await claimer2.doClaim(await token.getAddress());
       await claimer3.doClaim(await token.getAddress());
       expect(await token.claimerCount()).to.equal(3n);
-      expect(await token.totalClaimedAmount()).to.equal(AMOUNT_PER_CLAIM * 3n);
+      expect(await token.totalSupply()).to.equal(AMOUNT_PER_CLAIM * 3n);
     });
 
     it("works when single requiredToken balance is exactly the minimum", async function () {
@@ -750,16 +805,10 @@ describe("LSP7ClaimableToken", function () {
       expect(await token.isClaimActive()).to.be.false;
     });
 
-    it("returns false when maxSupply is exhausted", async function () {
-      const Factory = await ethers.getContractFactory("LSP7ClaimableToken");
-      const limited = (await Factory.deploy(
-        "L",
-        "L",
-        owner.address,
-        AMOUNT_PER_CLAIM,
-        AMOUNT_PER_CLAIM,
-        false
-      )) as LSP7ClaimableToken;
+    it("returns false when supply is exhausted", async function () {
+      const limited = await deployTokenProxy(
+        owner, "L", "L", AMOUNT_PER_CLAIM, AMOUNT_PER_CLAIM, false
+      );
       await limited.setClaimEnabled(true);
       await claimer1.doClaim(await limited.getAddress());
       expect(await limited.isClaimActive()).to.be.false;

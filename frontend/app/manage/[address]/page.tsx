@@ -7,7 +7,7 @@ import { uploadAndSetLSP4Metadata, setLSP4Creators, addToLSP12IssuedAssets, LSP4
 import {
   CLAIM_ABI, LSP7_EXTRA_ABI, LSP8_EXTRA_ABI, ZERO,
   LSP4_TOKEN_NAME_KEY,
-  getProvider, detectTokenType,
+  getProvider, detectTokenType, friendlyRevert,
 } from "../../lib/contracts";
 import Link from "next/link";
 import CopyButton from "../../components/CopyButton";
@@ -17,7 +17,7 @@ import { useNetwork } from "../../components/NetworkProvider";
 import { useUPProvider } from "../../components/UPProviderInit";
 import TokenSearchInput from "../../components/TokenSearchInput";
 
-type Status = { message: string; type: "success" | "error" | "loading" } | null;
+type Status = { message: string; type: "success" | "error" | "loading"; link?: string } | null;
 
 export default function ManagePage() {
   const params = useParams();
@@ -94,7 +94,8 @@ export default function ManagePage() {
         safe(c.startTime(), BigInt(0)),
         safe(c.endTime(), BigInt(0)),
         safe(c.amountPerClaim(), BigInt(0)),
-        safe(c.maxSupply(), BigInt(0)),
+        // v5 proxy tokens use tokenSupplyCap(), v3/v4 use maxSupply()
+        c.tokenSupplyCap().catch(() => c.maxSupply()).catch(() => BigInt(0)),
         safe(c.getTokenRequirements(), { tokens: [], minBalances: [] }),
         safe(c.requiredFollowers(), BigInt(0)),
         safe(c.codewordEnabled(), false),
@@ -103,7 +104,9 @@ export default function ManagePage() {
       setDropName(nameRaw && nameRaw !== "0x" ? Buffer.from(nameRaw.replace(/^0x/, ""), "hex").toString("utf8") : "");
       setClaimEnabled(enabled);
       setAmountPerClaim(amount ? amount.toString() : "0");
-      setMaxSupply(supply ? supply.toString() : "0");
+      // type(uint256).max from v5 proxy = unlimited; treat as "0" for display
+      const isUnlimited = supply === BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+      setMaxSupply(isUnlimited ? "0" : (supply ? supply.toString() : "0"));
       // Load multi-token requirements
       const tokensArr: string[] = reqResult?.tokens ?? [];
       const balancesArr: bigint[] = reqResult?.minBalances ?? [];
@@ -180,7 +183,10 @@ export default function ManagePage() {
     setStatus({ message: "Connecting...", type: "loading" });
     const addr = await walletConnect();
     if (!addr) {
-      setStatus({ message: "Install the UP Browser Extension", type: "error" });
+      const mobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+      setStatus(mobile
+        ? { message: "Open in Mobile UP App", type: "error", link: "https://universalprofile.cloud/" }
+        : { message: "Install the UP Browser Extension", type: "error", link: "https://chromewebstore.google.com/detail/universal-profiles/abchhpf8hn4lfpcnhbmgfkbiimhmbpkh" });
       return;
     }
     setStatus(null);
@@ -200,7 +206,7 @@ export default function ManagePage() {
       setStatus({ message: "Updated successfully!", type: "success" });
       await loadState(address);
     } catch (e: any) {
-      setStatus({ message: e.reason || e.message?.slice(0, 100) || "Failed", type: "error" });
+      setStatus({ message: friendlyRevert(e), type: "error" });
     }
   }
 
@@ -267,7 +273,7 @@ export default function ManagePage() {
       );
       setStatus({ message: "Metadata updated!", type: "success" });
     } catch (e: any) {
-      setStatus({ message: e.reason || e.message?.slice(0, 100) || "Metadata update failed", type: "error" });
+      setStatus({ message: friendlyRevert(e, "Metadata update failed"), type: "error" });
     } finally {
       setMetaSaving(false);
     }
@@ -296,7 +302,7 @@ export default function ManagePage() {
       );
       setStatus({ message: "Creator verified! Badge should appear on marketplaces.", type: "success" });
     } catch (e: any) {
-      setStatus({ message: e.reason || e.message?.slice(0, 100) || "Verification failed", type: "error" });
+      setStatus({ message: friendlyRevert(e, "Verification failed"), type: "error" });
     } finally {
       setVerifying(false);
     }
@@ -828,7 +834,11 @@ export default function ManagePage() {
                 : "bg-dropdown border border-purple-300 dark:border-purple-500/30 text-purple-700 dark:text-purple-400"
             }`}
           >
-            {status.message}
+            {status.link ? (
+                <a href={status.link} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+                  {status.message}
+                </a>
+              ) : status.message}
           </div>
         )}
 

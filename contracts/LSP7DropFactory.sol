@@ -1,23 +1,24 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.27;
 
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {LSP7ClaimableToken} from "./LSP7ClaimableToken.sol";
 
 /// @title LSP7DropFactory
 /// @author Token Claimer
-/// @notice Factory for deploying LSP7 fungible token drop campaigns.
-///         Each call to `createTokenDrop` deploys a fresh LSP7ClaimableToken
-///         with `msg.sender` as owner and records the campaign on-chain.
-/// @dev Separated from LSP8DropFactory to keep each factory's bytecode under the
-///      24 576-byte EIP-170 (Spurious Dragon) contract size limit. The unified
-///      TokenClaimerFactory embedded both child contracts' creation bytecode,
-///      pushing it to ~36 KB. Each split factory stays at ~16–18 KB.   
+/// @notice Factory for deploying LSP7 fungible token drop campaigns using EIP-1167
+///         minimal proxies. Each call to `createTokenDrop` clones the implementation
+///         and calls `initialize(...)` on the fresh proxy, with `msg.sender` as owner.
+/// @dev Uses OZ `Clones.clone()` for cheap deterministic-free deployments.
+///      The implementation contract is set once at factory deployment and is immutable.
+///      When `maxSupply_` is 0 (unlimited), the factory passes `type(uint256).max`
+///      to the token's `initialize(...)`, making the cap effectively infinite.
 contract LSP7DropFactory {
 
     // ──────────────────── Types ────────────────────
 
     /// @notice Metadata stored for each deployed LSP7 campaign.
-    /// @param contractAddr The deployed LSP7ClaimableToken address.
+    /// @param contractAddr The deployed LSP7ClaimableToken proxy address.
     /// @param creator      The address (Universal Profile) that created the campaign.
     /// @param name         Human-readable token name.
     /// @param symbol       Ticker symbol.
@@ -32,6 +33,9 @@ contract LSP7DropFactory {
 
     // ──────────────────── Storage ────────────────────
 
+    /// @notice The LSP7ClaimableToken implementation contract that all proxies delegate to.
+    address public immutable implementation;
+
     /// @notice All LSP7 token drop campaigns, in deployment order.
     Campaign[] public tokenCampaigns;
 
@@ -43,7 +47,7 @@ contract LSP7DropFactory {
     /// @notice Emitted when a new LSP7 token drop campaign is created.
     /// @param campaignId   Index in the `tokenCampaigns` array.
     /// @param creator      The address that deployed it.
-    /// @param contractAddr The deployed LSP7ClaimableToken address.
+    /// @param contractAddr The deployed LSP7ClaimableToken proxy address.
     /// @param name         Token name.
     /// @param symbol       Token symbol.
     event TokenCampaignCreated(
@@ -54,15 +58,22 @@ contract LSP7DropFactory {
         string symbol
     );
 
+    // ──────────────────── Constructor ────────────────────
+
+    /// @notice Deploys the factory and creates the implementation contract.
+    constructor() {
+        implementation = address(new LSP7ClaimableToken());
+    }
+
     // ──────────────────── Create ────────────────────
 
-    /// @notice Deploys a new LSP7 claimable token drop.
+    /// @notice Deploys a new LSP7 claimable token drop as an EIP-1167 minimal proxy.
     /// @param name_           Token name.
     /// @param symbol_         Token symbol.
     /// @param amountPerClaim_ Tokens minted per claim.
     /// @param maxSupply_      Hard cap on total tokens (0 = unlimited).
     /// @param isNonDivisible_ True for 0 decimals (whole units), false for 18 decimals.
-    /// @return The address of the deployed LSP7ClaimableToken.
+    /// @return The address of the deployed LSP7ClaimableToken proxy.
     function createTokenDrop(
         string memory name_,
         string memory symbol_,
@@ -70,13 +81,20 @@ contract LSP7DropFactory {
         uint256 maxSupply_,
         bool isNonDivisible_
     ) external returns (address) {
-        LSP7ClaimableToken token = new LSP7ClaimableToken(
-            name_, symbol_, msg.sender, amountPerClaim_, maxSupply_, isNonDivisible_
+        // Clone the implementation
+        address proxy = Clones.clone(implementation);
+
+        // Normalize unlimited supply: 0 → type(uint256).max (CappedSupply requires cap > 0)
+        uint256 cap = maxSupply_ == 0 ? type(uint256).max : maxSupply_;
+
+        // Initialize the proxy
+        LSP7ClaimableToken(payable(proxy)).initialize(
+            name_, symbol_, msg.sender, amountPerClaim_, cap, isNonDivisible_
         );
 
         uint256 id = tokenCampaigns.length;
         tokenCampaigns.push(Campaign({
-            contractAddr: address(token),
+            contractAddr: proxy,
             creator:      msg.sender,
             name:         name_,
             symbol:       symbol_,
@@ -84,8 +102,8 @@ contract LSP7DropFactory {
         }));
         tokenCampaignsByCreator[msg.sender].push(id);
 
-        emit TokenCampaignCreated(id, msg.sender, address(token), name_, symbol_);
-        return address(token);
+        emit TokenCampaignCreated(id, msg.sender, proxy, name_, symbol_);
+        return proxy;
     }
 
     // ──────────────────── Views ────────────────────

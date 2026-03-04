@@ -6,7 +6,7 @@ import { BrowserProvider, Contract, JsonRpcProvider, formatUnits, Interface, id 
 import {
   CLAIM_ABI, LSP7_EXTRA_ABI, LSP8_EXTRA_ABI, ZERO,
   LSP4_TOKEN_NAME_KEY, LSP4_TOKEN_SYMBOL_KEY,
-  getProvider, detectTokenType,
+  getProvider, detectTokenType, friendlyRevert,
 } from "../../lib/contracts";
 import { fetchProfile, ProfileInfo } from "../../lib/profile";
 import { LSP4_METADATA_KEY } from "../../lib/lsp4";
@@ -43,7 +43,7 @@ function timeSince(timestamp: number): string {
   return new Date(timestamp * 1000).toLocaleDateString();
 }
 
-type Status = { message: string; type: "success" | "error" | "loading" } | null;
+type Status = { message: string; type: "success" | "error" | "loading"; link?: string } | null;
 
 export default function ClaimPage() {
   const params = useParams();
@@ -108,7 +108,8 @@ export default function ClaimPage() {
       const [nameRaw, symbolRaw, supply, active, enabled, amount, reqResult, rFollowers, ownerAddr, start, end, codeEnabled] = await Promise.all([
         safe(c.getData(LSP4_TOKEN_NAME_KEY), null),
         safe(c.getData(LSP4_TOKEN_SYMBOL_KEY), null),
-        safe(c.maxSupply(), BigInt(0)),
+        // v5 proxy tokens use tokenSupplyCap(), v3/v4 use maxSupply()
+        c.tokenSupplyCap().catch(() => c.maxSupply()).catch(() => BigInt(0)),
         safe(c.isClaimActive(), false),
         safe(c.claimEnabled(), false),
         safe(c.amountPerClaim(), BigInt(0)),
@@ -176,9 +177,11 @@ export default function ClaimPage() {
       const hasReqs = enrichedTokens.length > 0 || rFollowers > BigInt(0);
       setReqInfo(hasReqs ? { tokens: enrichedTokens, followers: rFollowers } : null);
 
+      const MAX_UINT256 = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
       if (type === "LSP7") {
+        // v5 proxy: totalSupply() replaces totalClaimedAmount() (removed in proxy refactor)
         const [, claimers, decimals] = await Promise.all([
-          c.totalClaimedAmount().catch(() => BigInt(0)),
+          c.totalClaimedAmount().catch(() => c.totalSupply().catch(() => BigInt(0))),
           c.totalClaimers().catch(() => BigInt(0)),
           c.decimals(),
         ]);
@@ -186,18 +189,20 @@ export default function ClaimPage() {
         const nft = dec === 0;
         setIsNftStyle(nft);
         setClaimedDisplay(claimers.toString());
+        const isUnlimited = supply === BigInt(0) || supply === MAX_UINT256;
         if (nft) {
-          setSupplyDisplay(supply === BigInt(0) ? "Unlimited" : supply.toString());
+          setSupplyDisplay(isUnlimited ? "Unlimited" : supply.toString());
           setAmountDisplay(amount.toString() + (amount === BigInt(1) ? " NFT" : " NFTs"));
         } else {
-          setSupplyDisplay(supply === BigInt(0) ? "Unlimited" : formatUnits(supply, dec));
+          setSupplyDisplay(isUnlimited ? "Unlimited" : formatUnits(supply, dec));
           setAmountDisplay(formatUnits(amount, dec) + " tokens");
         }
       } else {
         setIsNftStyle(true);
         const totalClaimed = await c.totalClaimed().catch(() => BigInt(0));
         setClaimedDisplay(totalClaimed.toString());
-        setSupplyDisplay(supply === BigInt(0) ? "Unlimited" : supply.toString());
+        const isLSP8Unlimited = supply === BigInt(0) || supply === MAX_UINT256;
+        setSupplyDisplay(isLSP8Unlimited ? "Unlimited" : supply.toString());
         setAmountDisplay(amount.toString() + (amount === BigInt(1) ? " NFT" : " NFTs"));
       }
 
@@ -317,7 +322,10 @@ export default function ClaimPage() {
     setStatus({ message: "Connecting...", type: "loading" });
     const addr = await walletConnect();
     if (!addr) {
-      setStatus({ message: "Install the UP Browser Extension", type: "error" });
+      const mobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+      setStatus(mobile
+        ? { message: "Open in Mobile UP App", type: "error", link: "https://universalprofile.cloud/" }
+        : { message: "Install the UP Browser Extension", type: "error", link: "https://chromewebstore.google.com/detail/universal-profiles/abchhpf8hn4lfpcnhbmgfkbiimhmbpkh" });
       return;
     }
     setStatus(null);
@@ -348,21 +356,7 @@ export default function ClaimPage() {
       await loadState(address);
       loadClaimers();
     } catch (e: any) {
-      const msg = e.data || e.reason || e.message?.slice(0, 200) || "Failed";
-      const errorMap: Record<string, string> = {
-        "0x4aa20f9c": "Incorrect codeword",
-        "0x646cf558": "You have already claimed this drop",
-        "0x24fbaa90": "Claiming is not active right now",
-        "0xcd3b2d03": "Outside the claim window",
-        "0xd05cb609": "Max supply has been reached",
-        "0xe4455cae": "You don't hold the required tokens",
-        "0x94303d52": "You don't have enough followers",
-      };
-      const selector = typeof msg === "string" ? msg.slice(0, 10) : "";
-      const friendly = errorMap[selector]
-        || (typeof msg === "string" && msg.includes("WrongCodeword") ? "Incorrect codeword" : null)
-        || (typeof msg === "string" ? msg.slice(0, 100) : "Transaction failed");
-      setStatus({ message: friendly, type: "error" });
+      setStatus({ message: friendlyRevert(e, "Claim failed"), type: "error" });
     } finally {
       setClaiming(false);
     }
@@ -698,7 +692,11 @@ export default function ClaimPage() {
                   : "bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-400"
               }`}
             >
-              {status.message}
+              {status.link ? (
+                <a href={status.link} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+                  {status.message}
+                </a>
+              ) : status.message}
             </div>
           )}
 

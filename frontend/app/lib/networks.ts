@@ -16,6 +16,21 @@ export interface NetworkConfig {
   faucet?: string;
 }
 
+// ─── Factory history ──────────────────────────────────────────────────────────
+// When redeploying factories, add the old address to allLsp7Factories /
+// allLsp8Factories (oldest first) BEFORE updating lsp7Factory / lsp8Factory.
+// The frontend queries ALL listed factories so existing drops stay visible.
+//
+// Mainnet LSP7 factory history:
+//   v3  (codeword support)  : 0x9b132E764f92c6E6F5E91E276E310758C33dB08F
+//   v4  (multi-creator)     : 0xE618ddD88869E43E433eD103b0d896E1a05d5b40
+//   v5  (EIP-1167 proxies)  : 0xE2932677195f46341c9d13dD0BBa016ac19B4E05  ← active
+//
+// Mainnet LSP8 factory history:
+//   v3  (codeword support)  : 0xBd545E98F133282bD79dc4a6ac422437478A58b6
+//   v4  (multi-creator)     : 0x9bc9e8D57a94E0F88ab32CDC1865c3fdeF86f72E
+//   v5  (constructor pattern, OWASP fixes) : 0x649Ccee0D46283102De6fEef3456c2e0a6c37461  ← active
+
 export const NETWORKS: Record<NetworkId, NetworkConfig> = {
   mainnet: {
     id: "mainnet",
@@ -25,20 +40,23 @@ export const NETWORKS: Record<NetworkId, NetworkConfig> = {
     rpc:
       process.env.NEXT_PUBLIC_LUKSO_RPC ??
       "https://rpc.mainnet.lukso.network",
+    // Active factory — used when creating new drops
     lsp7Factory:
       process.env.NEXT_PUBLIC_LSP7_FACTORY ??
-      "0x9b132E764f92c6E6F5E91E276E310758C33dB08F",
+      "0xE2932677195f46341c9d13dD0BBa016ac19B4E05",
     lsp8Factory:
       process.env.NEXT_PUBLIC_LSP8_FACTORY ??
-      "0xBd545E98F133282bD79dc4a6ac422437478A58b6",
-    // To preserve drops across factory redeployments, add the old factory address
-    // here before updating lsp7Factory/lsp8Factory above.
-    // Example: allLsp7Factories: ["0xOldFactory...", "0xNewerFactory...", activeFactory]
+      "0x649Ccee0D46283102De6fEef3456c2e0a6c37461",
+    // All historical factories — queried when listing existing drops
     allLsp7Factories: [
-      process.env.NEXT_PUBLIC_LSP7_FACTORY ?? "0x9b132E764f92c6E6F5E91E276E310758C33dB08F",
+      "0x9b132E764f92c6E6F5E91E276E310758C33dB08F", // v3: codeword support
+      "0xE618ddD88869E43E433eD103b0d896E1a05d5b40", // v4: multi-creator
+      process.env.NEXT_PUBLIC_LSP7_FACTORY ?? "0xE2932677195f46341c9d13dD0BBa016ac19B4E05", // v5: EIP-1167 proxies (active)
     ],
     allLsp8Factories: [
-      process.env.NEXT_PUBLIC_LSP8_FACTORY ?? "0xBd545E98F133282bD79dc4a6ac422437478A58b6",
+      "0xBd545E98F133282bD79dc4a6ac422437478A58b6", // v3: codeword support
+      "0x9bc9e8D57a94E0F88ab32CDC1865c3fdeF86f72E", // v4: multi-creator
+      process.env.NEXT_PUBLIC_LSP8_FACTORY ?? "0x649Ccee0D46283102De6fEef3456c2e0a6c37461", // v5: OWASP fixes (active)
     ],
     explorerBase: "https://explorer.execution.mainnet.lukso.network",
   },
@@ -50,17 +68,20 @@ export const NETWORKS: Record<NetworkId, NetworkConfig> = {
     rpc:
       process.env.NEXT_PUBLIC_TESTNET_LUKSO_RPC ??
       "https://rpc.testnet.lukso.network",
+    // Active factory — used when creating new drops
     lsp7Factory:
       process.env.NEXT_PUBLIC_TESTNET_LSP7_FACTORY ??
-      "0x58877A19286c054acBcE221c7E92ab9039Bf2909",
+      "0x26AeD9C6f0BAA907f9ec9a5Fd1135C21F4B1aBB0",
     lsp8Factory:
       process.env.NEXT_PUBLIC_TESTNET_LSP8_FACTORY ??
-      "0x6625eDFaca73475dD44b4dAFC8666d92e4d3CAFf",
+      "0xee28A2464178F4814EA356735e27B5A0e219F47D",
     allLsp7Factories: [
-      process.env.NEXT_PUBLIC_TESTNET_LSP7_FACTORY ?? "0x58877A19286c054acBcE221c7E92ab9039Bf2909",
+      "0x58877A19286c054acBcE221c7E92ab9039Bf2909", // previous testnet
+      process.env.NEXT_PUBLIC_TESTNET_LSP7_FACTORY ?? "0x26AeD9C6f0BAA907f9ec9a5Fd1135C21F4B1aBB0", // v5 (active)
     ],
     allLsp8Factories: [
-      process.env.NEXT_PUBLIC_TESTNET_LSP8_FACTORY ?? "0x6625eDFaca73475dD44b4dAFC8666d92e4d3CAFf",
+      "0x6625eDFaca73475dD44b4dAFC8666d92e4d3CAFf", // previous testnet
+      process.env.NEXT_PUBLIC_TESTNET_LSP8_FACTORY ?? "0xee28A2464178F4814EA356735e27B5A0e219F47D", // v5 (active)
     ],
     explorerBase: "https://explorer.execution.testnet.lukso.network",
     faucet: "https://faucet.testnet.lukso.network",
