@@ -358,7 +358,7 @@ export default function SecretDropManagePage({ params }: { params: Promise<{ id:
           <input
             ref={imageRef}
             type="file"
-            accept="image/*"
+            accept="image/jpeg,image/png,image/svg+xml,image/webp"
             onChange={handleImageChange}
             className="hidden"
           />

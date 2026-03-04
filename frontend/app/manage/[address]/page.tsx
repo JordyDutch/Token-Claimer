@@ -682,7 +682,7 @@ export default function ManagePage() {
                   <input
                     ref={metaIconRef}
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/svg+xml,image/webp"
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0] ?? null;

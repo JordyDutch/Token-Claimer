@@ -511,7 +511,7 @@ export default function CreatePage() {
                     <input
                       ref={fileRef}
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/svg+xml,image/webp"
                       onChange={handleIconChange}
                       className="hidden"
                     />
@@ -767,7 +767,7 @@ export default function CreatePage() {
                     <input
                       ref={secretImageRef}
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/svg+xml,image/webp"
                       onChange={(e) => {
                         const file = e.target.files?.[0] ?? null;
                         setSecretImageFile(file);
