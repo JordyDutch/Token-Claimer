@@ -37,7 +37,11 @@ export async function fetchAssetByAddress(
       lsp4TokenName: a.lsp4TokenName ?? "",
       lsp4TokenSymbol: a.lsp4TokenSymbol ?? "",
       isLSP7: a.isLSP7 ?? true,
-      icon: a.icons?.[0]?.url ? `${IPFS_GATEWAY}/${a.icons[0].url.replace("ipfs://", "")}` : null,
+      icon: a.icons?.[0]?.url
+        ? (a.icons[0].url.startsWith("https://") || a.icons[0].url.startsWith("http://")
+          ? a.icons[0].url
+          : `${IPFS_GATEWAY}/${a.icons[0].url.replace("ipfs://", "")}`)
+        : null,
       description: a.description ?? null,
     };
   } catch {
@@ -64,7 +68,11 @@ export async function searchAssetsByName(
       lsp4TokenName: a.lsp4TokenName ?? "",
       lsp4TokenSymbol: a.lsp4TokenSymbol ?? "",
       isLSP7: a.isLSP7 ?? true,
-      icon: a.icons?.[0]?.url ? `${IPFS_GATEWAY}/${a.icons[0].url.replace("ipfs://", "")}` : null,
+      icon: a.icons?.[0]?.url
+        ? (a.icons[0].url.startsWith("https://") || a.icons[0].url.startsWith("http://")
+          ? a.icons[0].url
+          : `${IPFS_GATEWAY}/${a.icons[0].url.replace("ipfs://", "")}`)
+        : null,
       description: null,
     }));
   } catch {

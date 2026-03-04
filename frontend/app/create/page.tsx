@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { BrowserProvider, Contract } from "ethers";
 import {
-  LSP7_FACTORY_ABI, LSP8_FACTORY_ABI,
+  LSP7_FACTORY_ABI,
   getProvider,
 } from "../lib/contracts";
 import { uploadAndSetLSP4Metadata, addToLSP12IssuedAssets, type Lsp4Link } from "../lib/lsp4";
@@ -12,6 +12,7 @@ import CopyButton from "../components/CopyButton";
 import Footer from "../components/Footer";
 import { useWallet } from "../components/WalletProvider";
 import { useNetwork } from "../components/NetworkProvider";
+import { useUPProvider } from "../components/UPProviderInit";
 import TokenSearchInput from "../components/TokenSearchInput";
 import UPSearchInput from "../components/UPSearchInput";
 
@@ -20,6 +21,7 @@ type Status = { message: string; type: "success" | "error" | "loading" } | null;
 export default function CreatePage() {
   const { address, profile, connect: walletConnect, disconnect } = useWallet();
   const { config: networkConfig } = useNetwork();
+  const { inIframe } = useUPProvider();
   const [status, setStatus] = useState<Status>(null);
   const [dropType, setDropType] = useState<"token" | "nft" | "secret">("nft");
 
@@ -32,12 +34,14 @@ export default function CreatePage() {
   const [secretTokenReqs, setSecretTokenReqs] = useState<Array<{ address: string; minBalance: string }>>([]);
   const [secretMinFollowers, setSecretMinFollowers] = useState("0");
   const [secretFollowAddress, setSecretFollowAddress] = useState("");
+  const [secretIsPublic, setSecretIsPublic] = useState(false);
+  const [secretImageFile, setSecretImageFile] = useState<File | null>(null);
+  const [secretImagePreview, setSecretImagePreview] = useState<string | null>(null);
   const [secretDropId, setSecretDropId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
   const [maxSupply, setMaxSupply] = useState("100");
   const [amountPerClaim, setAmountPerClaim] = useState("1");
-  const [isNonDivisible, setIsNonDivisible] = useState(true);
   const [deployedAddress, setDeployedAddress] = useState<string | null>(null);
   const [deploying, setDeploying] = useState(false);
 
@@ -49,6 +53,7 @@ export default function CreatePage() {
   const [assetFiles, setAssetFiles] = useState<File[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const assetRef = useRef<HTMLInputElement>(null);
+  const secretImageRef = useRef<HTMLInputElement>(null);
 
   function handleIconChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
@@ -109,23 +114,15 @@ export default function CreatePage() {
       const signer = await provider.getSigner();
       let deployedAddr: string;
 
-      if (dropType === "token") {
+      {
         const factory = new Contract(networkConfig.lsp7Factory, LSP7_FACTORY_ABI, signer);
-        const tx = await factory.createTokenDrop(name, symbol, amountPerClaim, maxSupply, isNonDivisible);
+        const nonDivisible = dropType === "nft";
+        const tx = await factory.createTokenDrop(name, symbol, amountPerClaim, maxSupply, nonDivisible);
         setStatus({ message: "Waiting for confirmation...", type: "loading" });
         await tx.wait();
         const fr = new Contract(networkConfig.lsp7Factory, LSP7_FACTORY_ABI, provider);
-        const t = await fr.totalTokenCampaigns();
-        const items = await fr.getTokenCampaigns(t - BigInt(1), 1);
-        deployedAddr = items[0].contractAddr;
-      } else {
-        const factory = new Contract(networkConfig.lsp8Factory, LSP8_FACTORY_ABI, signer);
-        const tx = await factory.createNFTDrop(name, symbol, maxSupply, amountPerClaim);
-        setStatus({ message: "Waiting for confirmation...", type: "loading" });
-        await tx.wait();
-        const fr = new Contract(networkConfig.lsp8Factory, LSP8_FACTORY_ABI, provider);
-        const t = await fr.totalNFTCampaigns();
-        const items = await fr.getNFTCampaigns(t - BigInt(1), 1);
+        const t = await fr.totalCampaigns();
+        const items = await fr.getCampaigns(t - BigInt(1), 1);
         deployedAddr = items[0].contractAddr;
       }
 
@@ -183,6 +180,18 @@ export default function CreatePage() {
       const ts = Math.floor(Date.now() / 1000);
       const message = `Create secret drop as ${address} at ${ts}`;
       const signature = await signer.signMessage(message);
+      // Upload image to IPFS if provided
+      let imageCid: string | null = null;
+      if (secretImageFile) {
+        setStatus({ message: "Uploading image…", type: "loading" });
+        const form = new FormData();
+        form.append("file", secretImageFile, secretImageFile.name);
+        const uploadRes = await fetch("/api/ipfs", { method: "POST", body: form });
+        if (!uploadRes.ok) { setStatus({ message: "Image upload failed", type: "error" }); setDeploying(false); return; }
+        const { IpfsHash } = await uploadRes.json();
+        imageCid = IpfsHash;
+      }
+
       setStatus({ message: "Creating drop…", type: "loading" });
       const tokenRequirements = secretTokenReqs
         .filter((r) => r.address.startsWith("0x") && r.address.length === 42)
@@ -211,6 +220,8 @@ export default function CreatePage() {
           tokenRequirements,
           followerRequirement,
           minFollowers: Number(secretMinFollowers) || 0,
+          isPublic: secretIsPublic,
+          image: imageCid,
         }),
       });
       const data = await res.json();
@@ -237,8 +248,8 @@ export default function CreatePage() {
   if (secretDropId) {
     const shareUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/secret-drop/${secretDropId}`;
     return (
-      <div className="min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4">
-        <div className={card + " max-w-md w-full text-center"}>
+      <div className={inIframe ? "px-4 py-4" : "min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4"}>
+        <div className={card + (inIframe ? " max-w-xl w-full mx-auto text-center" : " max-w-lg w-full text-center")}>
           <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-violet-500/20 to-violet-400/10 border border-violet-500/20 flex items-center justify-center text-4xl mx-auto mb-4">
             🔐
           </div>
@@ -262,8 +273,8 @@ export default function CreatePage() {
   // Regular on-chain success screen
   if (deployedAddress) {
     return (
-      <div className="min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4">
-        <div className={card + " max-w-md w-full text-center"}>
+      <div className={inIframe ? "px-4 py-4" : "min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4"}>
+        <div className={card + (inIframe ? " max-w-xl w-full mx-auto text-center" : " max-w-lg w-full text-center")}>
           <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-green-500/20 to-green-400/10 border border-green-500/20 flex items-center justify-center text-4xl mx-auto mb-4">
             ✓
           </div>
@@ -331,8 +342,18 @@ export default function CreatePage() {
   const canDeploy = nameValid && symbolValid && supplyValid && amountValid && descriptionValid && iconValid && !deploying;
 
   return (
-    <div className="min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4">
-      <div className="max-w-md w-full space-y-4">
+    <div className={inIframe ? "px-4 py-4" : "min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4"}>
+      <div className={inIframe ? "w-full max-w-xl mx-auto space-y-4 relative" : "max-w-2xl w-full space-y-4"}>
+        {inIframe && (
+          <a
+            href="https://github.com/JordyDutch/issue-tracker/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute top-0 right-0 text-[9px] text-faint hover:text-label transition-colors z-10"
+          >
+            <span className="text-purple-500 font-bold">BETA</span> · Report issues
+          </a>
+        )}
         <div className={card}>
           <Link href="/" className="text-label text-xs hover:text-purple-400 transition-colors">
             ← Back
@@ -446,35 +467,6 @@ export default function CreatePage() {
                     min="1"
                   />
                 </div>
-                {dropType === "token" && (
-                  <div>
-                    <label className={lbl}>Token divisibility</label>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setIsNonDivisible(false)}
-                        className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                          !isNonDivisible
-                            ? "bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 border border-purple-300 dark:border-purple-500/30"
-                            : "bg-surface text-muted border border-border-default"
-                        }`}
-                      >
-                        Divisible (18 decimals)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setIsNonDivisible(true)}
-                        className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                          isNonDivisible
-                            ? "bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 border border-purple-300 dark:border-purple-500/30"
-                            : "bg-surface text-muted border border-border-default"
-                        }`}
-                      >
-                        Non-divisible (whole)
-                      </button>
-                    </div>
-                  </div>
-                )}
 
                 {/* LSP4 Metadata */}
                 <div className="border-t border-border-muted pt-4 mt-1">
@@ -519,7 +511,7 @@ export default function CreatePage() {
                     <input
                       ref={fileRef}
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/svg+xml,image/webp"
                       onChange={handleIconChange}
                       className="hidden"
                     />
@@ -736,6 +728,79 @@ export default function CreatePage() {
                     </div>
                   </div>
 
+                  {/* Image upload */}
+                  <div>
+                    <label className={lbl}>Drop Image <span className="text-faint">(optional — shown on Explore and claim page)</span></label>
+                    <div className="flex items-center gap-3">
+                      {secretImagePreview ? (
+                        <img
+                          src={secretImagePreview}
+                          alt="Preview"
+                          className="w-10 h-10 rounded-lg object-cover border border-border-default"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-surface border border-border-default flex items-center justify-center text-faint text-sm">
+                          🔒
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => secretImageRef.current?.click()}
+                        className="text-xs text-purple-400 hover:text-purple-300 border border-purple-500/30 rounded-lg px-3 py-1.5 transition-colors cursor-pointer"
+                      >
+                        {secretImageFile ? "Change image" : "Upload image"}
+                      </button>
+                      {secretImageFile && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSecretImageFile(null);
+                            setSecretImagePreview(null);
+                            if (secretImageRef.current) secretImageRef.current.value = "";
+                          }}
+                          className="text-xs text-label hover:text-red-400 transition-colors cursor-pointer"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      ref={secretImageRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/svg+xml,image/webp"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] ?? null;
+                        setSecretImageFile(file);
+                        setSecretImagePreview(file ? URL.createObjectURL(file) : null);
+                      }}
+                      className="hidden"
+                    />
+                    {secretImageFile && (
+                      <p className="text-[10px] text-faint mt-1">{secretImageFile.name}</p>
+                    )}
+                  </div>
+
+                  {/* Show on Explore toggle */}
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setSecretIsPublic(!secretIsPublic)}
+                      className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${
+                        secretIsPublic ? "bg-violet-500" : "bg-surface-hover"
+                      }`}
+                    >
+                      <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                        secretIsPublic ? "translate-x-5" : "translate-x-0.5"
+                      }`} />
+                    </button>
+                    <div>
+                      <span className="text-xs text-secondary">Show on Explore page</span>
+                      <p className="text-[10px] text-faint">
+                        {secretIsPublic ? "Anyone can discover this drop" : "Only accessible via direct link"}
+                      </p>
+                    </div>
+                  </div>
+
                   {status && (
                     <div className={`px-3 py-2 rounded-lg text-xs ${
                       status.type === "error" ? "bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-500/20" :
@@ -772,7 +837,7 @@ export default function CreatePage() {
           </div>
         )}
 
-        <Footer />
+        {!inIframe && <Footer />}
       </div>
     </div>
   );

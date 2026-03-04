@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { BrowserProvider, Contract, JsonRpcProvider } from "ethers";
-import { uploadAndSetLSP4Metadata, setLSP4Creators, addToLSP12IssuedAssets, type Lsp4Link } from "../../lib/lsp4";
+import { uploadAndSetLSP4Metadata, setLSP4Creators, addToLSP12IssuedAssets, LSP4_METADATA_KEY, type Lsp4Link, type Lsp4Icon } from "../../lib/lsp4";
 import {
   CLAIM_ABI, LSP7_EXTRA_ABI, LSP8_EXTRA_ABI, ZERO,
   LSP4_TOKEN_NAME_KEY,
@@ -14,6 +14,7 @@ import CopyButton from "../../components/CopyButton";
 import Footer from "../../components/Footer";
 import { useWallet } from "../../components/WalletProvider";
 import { useNetwork } from "../../components/NetworkProvider";
+import { useUPProvider } from "../../components/UPProviderInit";
 import TokenSearchInput from "../../components/TokenSearchInput";
 
 type Status = { message: string; type: "success" | "error" | "loading"; link?: string } | null;
@@ -23,10 +24,12 @@ export default function ManagePage() {
   const contractAddress = params.address as string;
   const { address, profile, connect: walletConnect, disconnect } = useWallet();
   const { config: networkConfig } = useNetwork();
+  const { inIframe } = useUPProvider();
 
   const [isOwner, setIsOwner] = useState(false);
   const [status, setStatus] = useState<Status>(null);
   const [tokenType, setTokenType] = useState<"LSP7" | "LSP8" | null>(null);
+  const [isNftStyle, setIsNftStyle] = useState(false);
   const [dropName, setDropName] = useState("");
   const [claimEnabled, setClaimEnabled] = useState(false);
   const [startTime, setStartTime] = useState("");
@@ -37,11 +40,14 @@ export default function ManagePage() {
   const [tokenReqs, setTokenReqs] = useState<{ addr: string; amount: string }[]>([]);
   const [reqFollowers, setReqFollowers] = useState("");
   const [linkCopied, setLinkCopied] = useState(false);
+  const [exploreVisible, setExploreVisible] = useState(true);
+  const [visibilitySaving, setVisibilitySaving] = useState(false);
 
   // LSP4 metadata state
   const [metaDescription, setMetaDescription] = useState("");
   const [metaIconFile, setMetaIconFile] = useState<File | null>(null);
   const [metaIconPreview, setMetaIconPreview] = useState<string | null>(null);
+  const [existingIcon, setExistingIcon] = useState<Lsp4Icon | null>(null);
   const [metaLinks, setMetaLinks] = useState<Lsp4Link[]>([{ title: "", url: "" }]);
   const [metaAssetFiles, setMetaAssetFiles] = useState<File[]>([]);
   const [metaSaving, setMetaSaving] = useState(false);
@@ -115,13 +121,58 @@ export default function ManagePage() {
         if (type === "LSP7") {
           const cl = await c.totalClaimers();
           setTotalClaimed(cl.toString());
+          const dec = await c.decimals();
+          setIsNftStyle(Number(dec) === 0);
         } else {
           const cl = await c.totalClaimed();
           setTotalClaimed(cl.toString());
+          setIsNftStyle(true);
         }
       } catch { setTotalClaimed("?"); }
+
+      // Load existing LSP4 metadata to pre-fill the form
+      safe(c.getData(LSP4_METADATA_KEY), null).then(async (metaRaw: string | null) => {
+        if (!metaRaw || metaRaw === "0x" || metaRaw.length < 10) return;
+        try {
+          const bytes = Buffer.from(metaRaw.replace(/^0x/, ""), "hex");
+          const text = bytes.toString("utf8");
+          const idx = text.indexOf("ipfs://");
+          if (idx === -1) return;
+          const cid = text.slice(idx).replace("ipfs://", "");
+          const res = await fetch(`https://api.universalprofile.cloud/ipfs/${cid}`);
+          if (!res.ok) return;
+          const json = await res.json();
+          const meta = json?.LSP4Metadata;
+          if (!meta) return;
+          if (meta.description) setMetaDescription(meta.description);
+          const iconObj = meta.images?.[0]?.[0] ?? meta.icon?.[0];
+          if (iconObj?.url) {
+            if (iconObj.url.startsWith("https://") || iconObj.url.startsWith("http://")) {
+              setMetaIconPreview(iconObj.url);
+            } else {
+              setMetaIconPreview(`https://api.universalprofile.cloud/ipfs/${iconObj.url.replace("ipfs://", "")}`);
+            }
+            setExistingIcon({ url: iconObj.url, verification: iconObj.verification });
+          }
+          const links = meta.links;
+          if (Array.isArray(links) && links.length > 0) {
+            setMetaLinks(links.map((l: any) => ({ title: l.title ?? "", url: l.url ?? "" })));
+          }
+        } catch { /* no existing metadata */ }
+      });
     } catch (e) { console.error(e); }
   }, [contractAddress, networkConfig]);
+
+  // Load visibility state from KV
+  useEffect(() => {
+    fetch(`/api/drop-visibility?network=${networkConfig.id}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const hidden: string[] = data.hidden ?? [];
+        setExploreVisible(!hidden.includes(contractAddress.toLowerCase()));
+      })
+      .catch(() => {});
+  }, [contractAddress, networkConfig.id]);
 
   // Auto-load when wallet is already connected
   useEffect(() => {
@@ -166,6 +217,38 @@ export default function ManagePage() {
     setTimeout(() => setLinkCopied(false), 2000);
   }
 
+  async function toggleExploreVisibility() {
+    const p = getProvider();
+    if (!p || !address) return;
+    try {
+      setVisibilitySaving(true);
+      const newVisible = !exploreVisible;
+      const ts = Math.floor(Date.now() / 1000);
+      const message = `Toggle visibility for ${contractAddress} as ${address} at ${ts}`;
+      const provider = new BrowserProvider(p);
+      const signer = await provider.getSigner();
+      const signature = await signer.signMessage(message);
+      const res = await fetch("/api/drop-visibility", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message,
+          signature,
+          visible: newVisible,
+          network: networkConfig.id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update visibility");
+      setExploreVisible(newVisible);
+      setStatus({ message: newVisible ? "Drop is now visible on Explore" : "Drop hidden from Explore", type: "success" });
+    } catch (e: any) {
+      setStatus({ message: e.message?.slice(0, 100) || "Failed to toggle visibility", type: "error" });
+    } finally {
+      setVisibilitySaving(false);
+    }
+  }
+
   async function updateMetadata() {
     const p = getProvider();
     if (!p || !address) return;
@@ -182,6 +265,7 @@ export default function ManagePage() {
           name: dropName,
           description: metaDescription.trim(),
           iconFile: metaIconFile,
+          existingIcon: metaIconFile ? null : existingIcon,
           links: validLinks,
           assetFiles: metaAssetFiles.length > 0 ? metaAssetFiles : undefined,
         },
@@ -231,8 +315,18 @@ export default function ManagePage() {
   const explorerUrl = `${networkConfig.explorerBase}/address/${contractAddress}`;
 
   return (
-    <div className="min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4">
-      <div className="max-w-lg w-full space-y-3 sm:space-y-4">
+    <div className={inIframe ? "px-4 py-4" : "min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4"}>
+      <div className={inIframe ? "w-full max-w-xl mx-auto space-y-3 sm:space-y-4 relative" : "max-w-2xl w-full space-y-3 sm:space-y-4"}>
+        {inIframe && (
+          <a
+            href="https://github.com/JordyDutch/issue-tracker/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute top-0 right-0 text-[9px] text-faint hover:text-label transition-colors z-10"
+          >
+            <span className="text-purple-500 font-bold">BETA</span> · Report issues
+          </a>
+        )}
         {/* Header card */}
         <div className={card}>
           <div className="flex items-center justify-between mb-1">
@@ -240,7 +334,7 @@ export default function ManagePage() {
               ← Claim page
             </Link>
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface text-muted">
-              {tokenType || "..."}
+              {tokenType ? (isNftStyle ? "NFT" : "Token") : "..."}
             </span>
           </div>
 
@@ -339,6 +433,30 @@ export default function ManagePage() {
               </button>
             </div>
 
+            {/* Explore visibility */}
+            <div className={card}>
+              <h2 className="text-xs font-semibold text-tertiary mb-1">Explore Visibility</h2>
+              <p className="text-[10px] text-faint mb-3">
+                Control whether this drop appears on the Explore page. Hidden drops can still be accessed via direct link.
+              </p>
+              <div className="flex items-center justify-between mb-3">
+                <span className={`text-xs font-semibold ${exploreVisible ? "text-green-600 dark:text-green-400" : "text-label"}`}>
+                  {exploreVisible ? "Visible on Explore" : "Hidden from Explore"}
+                </span>
+              </div>
+              <button
+                onClick={toggleExploreVisibility}
+                disabled={visibilitySaving}
+                className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed ${
+                  exploreVisible
+                    ? "bg-red-50 dark:bg-red-500/20 text-red-700 dark:text-red-400 border border-red-300 dark:border-red-500/30 hover:bg-red-100 dark:hover:bg-red-500/30"
+                    : "bg-green-50 dark:bg-green-500/20 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-500/30 hover:bg-green-100 dark:hover:bg-green-500/30"
+                }`}
+              >
+                {visibilitySaving ? "Saving..." : exploreVisible ? "Hide from Explore" : "Show on Explore"}
+              </button>
+            </div>
+
             {/* Claim window */}
             <div className={card}>
               <h2 className="text-xs font-semibold text-tertiary mb-3">Claim Window</h2>
@@ -380,10 +498,10 @@ export default function ManagePage() {
             {/* Amount per claim */}
             <div className={card}>
               <h2 className="text-xs font-semibold text-tertiary mb-1">
-                {tokenType === "LSP7" ? "Tokens" : "NFTs"} Per Claim
+                {isNftStyle ? "NFTs" : "Tokens"} Per Claim
               </h2>
               <p className="text-[10px] text-faint mb-3">
-                How many {tokenType === "LSP7" ? "tokens" : "NFTs"} each user receives when they claim.
+                How many {isNftStyle ? "NFTs" : "tokens"} each user receives when they claim.
               </p>
               <input
                 type="number"
@@ -540,7 +658,13 @@ export default function ManagePage() {
                   <label className={lbl}>Icon</label>
                   <div className="flex items-center gap-3 mt-1">
                     {metaIconPreview ? (
-                      <img src={metaIconPreview} alt="" className="w-10 h-10 rounded-lg object-cover border border-border-default" />
+                      <img
+                        src={metaIconPreview}
+                        alt=""
+                        className="w-10 h-10 rounded-lg object-cover border border-border-default cursor-pointer hover:opacity-50 transition-opacity"
+                        title="Click to remove"
+                        onClick={() => { setMetaIconFile(null); setMetaIconPreview(null); setExistingIcon(null); if (metaIconRef.current) metaIconRef.current.value = ""; }}
+                      />
                     ) : (
                       <div className="w-10 h-10 rounded-lg bg-surface border border-border-default flex items-center justify-center text-faint text-xs">IMG</div>
                     )}
@@ -564,7 +688,7 @@ export default function ManagePage() {
                   <input
                     ref={metaIconRef}
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/svg+xml,image/webp"
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0] ?? null;
@@ -674,7 +798,7 @@ export default function ManagePage() {
 
                 <button
                   onClick={updateMetadata}
-                  disabled={metaSaving || !metaDescription.trim()}
+                  disabled={metaSaving || !metaDescription.trim() || (!metaIconFile && !existingIcon)}
                   className={btn + " disabled:opacity-50 disabled:cursor-not-allowed"}
                 >
                   {metaSaving ? "Saving..." : "Save Metadata"}
@@ -723,7 +847,7 @@ export default function ManagePage() {
           <Link href="/" className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors">
             ← All drops
           </Link>
-          <Footer />
+          {!inIframe && <Footer />}
         </div>
       </div>
     </div>

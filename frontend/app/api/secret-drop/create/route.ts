@@ -23,15 +23,19 @@ export async function POST(req: NextRequest) {
       tokenRequirements,
       followerRequirement,
       minFollowers,
+      isPublic,
+      image,
     } = body;
 
-    // 1. Verify signature & freshness
-    if (!verifySig(message, signature, message.match(/0x[a-fA-F0-9]{40}/)?.[0] ?? "")) {
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-    }
+    // 1. Parse & verify freshness first, then verify signature
     const parsed = parseCreateMessage(message);
     if (!parsed) return NextResponse.json({ error: "Invalid message format" }, { status: 400 });
     if (!isFresh(parsed.ts)) return NextResponse.json({ error: "Message expired" }, { status: 400 });
+
+    const net = network === "testnet" ? "testnet" as const : "mainnet" as const;
+    if (!await verifySig(message, signature, parsed.address, net)) {
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    }
 
     const creator = normaliseAddress(parsed.address);
 
@@ -59,6 +63,8 @@ export async function POST(req: NextRequest) {
       mode: cleanCodes.length === 1 && limit > 1 ? "shared" : "pool",
       codeUsageLimit: limit,
       active: true,
+      isPublic: !!isPublic,
+      image: typeof image === "string" && image.trim() ? image.trim() : null,
       network: network === "testnet" ? "testnet" : "mainnet",
       tokenRequirements: tokenRequirements ?? [],
       followerRequirement: followerRequirement ?? null,
@@ -69,6 +75,10 @@ export async function POST(req: NextRequest) {
 
     // 4. Store in KV
     await kv.set(`sdrop:${id}`, config);
+    await kv.rpush(`sdrop:creator:${creator}`, id);
+    if (config.isPublic) {
+      await kv.rpush(`sdrop:public:${config.network}`, id);
+    }
 
     if (config.mode === "pool") {
       // Push all codes into a LIST (RPUSH so LPOP gives first-in first-out)

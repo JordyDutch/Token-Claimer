@@ -5,6 +5,7 @@ import { JsonRpcProvider, Contract } from "ethers";
 import { LSP7_FACTORY_ABI, LSP8_FACTORY_ABI } from "./lib/contracts";
 import { fetchProfile, ProfileInfo } from "./lib/profile";
 import { LSP4_METADATA_KEY } from "./lib/lsp4";
+import { SecretDropSummary } from "./lib/secret-drop";
 
 const IPFS_GATEWAY = "https://api.universalprofile.cloud/ipfs";
 const GET_DATA_ABI = ["function getData(bytes32 key) view returns (bytes memory)"];
@@ -14,18 +15,19 @@ async function fetchCampaignIcon(contractAddr: string, provider: JsonRpcProvider
     const c = new Contract(contractAddr, GET_DATA_ABI, provider);
     const raw: string = await c.getData(LSP4_METADATA_KEY);
     if (!raw || raw === "0x" || raw.length < 10) return null;
-    // VerifiableURI: 0x + 4-byte methodId (8 hex) + 32-byte hash (64 hex) + ipfs:// url bytes
-    const urlHex = raw.slice(2 + 8 + 64); // skip 0x + methodId + hash
-    if (!urlHex || urlHex.length < 8) return null;
-    const ipfsUrl = Buffer.from(urlHex, "hex").toString("utf8");
-    const cid = ipfsUrl.replace("ipfs://", "");
+    const bytes = Buffer.from(raw.replace(/^0x/, ""), "hex");
+    const text = bytes.toString("utf8");
+    const idx = text.indexOf("ipfs://");
+    if (idx === -1) return null;
+    const cid = text.slice(idx).replace("ipfs://", "");
     const res = await fetch(`${IPFS_GATEWAY}/${cid}`);
     if (!res.ok) return null;
     const json = await res.json();
-    const icon = json?.LSP4Metadata?.icon?.[0]?.url;
+    const icon = json?.LSP4Metadata?.images?.[0]?.[0]?.url
+      ?? json?.LSP4Metadata?.icon?.[0]?.url;
     if (!icon) return null;
-    const iconCid = icon.replace("ipfs://", "");
-    return `${IPFS_GATEWAY}/${iconCid}`;
+    if (icon.startsWith("https://") || icon.startsWith("http://")) return icon;
+    return `${IPFS_GATEWAY}/${icon.replace("ipfs://", "")}`;
   } catch {
     return null;
   }
@@ -34,6 +36,7 @@ import Link from "next/link";
 import Footer from "./components/Footer";
 import { useWallet } from "./components/WalletProvider";
 import { useNetwork } from "./components/NetworkProvider";
+import { useUPProvider } from "./components/UPProviderInit";
 
 interface Campaign {
   contractAddr: string;
@@ -46,18 +49,33 @@ interface Campaign {
   icon?: string | null;
 }
 
-type FilterTab = "all" | "tokens" | "nfts" | "mine";
+type FilterTab = "all" | "tokens" | "nfts" | "secret" | "mine";
+
+type FeedItem =
+  | { kind: "onchain"; data: Campaign }
+  | { kind: "secret"; data: SecretDropSummary };
 
 export default function HomePage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [secretDrops, setSecretDrops] = useState<SecretDropSummary[]>([]);
+  const [hiddenDrops, setHiddenDrops] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterTab>("all");
   const [search, setSearch] = useState("");
   const { address: walletAddress, connect: walletConnect } = useWallet();
   const { config: networkConfig, networkId } = useNetwork();
+  const { inIframe } = useUPProvider();
 
   useEffect(() => {
-    loadCampaigns(networkConfig);
+    let stale = false;
+    setCampaigns([]);
+    setSecretDrops([]);
+    setHiddenDrops(new Set());
+    setLoading(true);
+    loadCampaigns(networkConfig, () => stale);
+    loadSecretDrops(networkConfig.id, () => stale);
+    loadHiddenDrops(networkConfig.id, () => stale);
+    return () => { stale = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [networkId]);
 
@@ -66,7 +84,7 @@ export default function HomePage() {
     if (addr) setFilter("mine");
   }
 
-  async function loadCampaigns(cfg: typeof networkConfig) {
+  async function loadCampaigns(cfg: typeof networkConfig, isStale: () => boolean) {
     const rpc = new JsonRpcProvider(cfg.rpc);
 
     try {
@@ -83,7 +101,7 @@ export default function HomePage() {
               lsp7.totalTokenCampaigns().catch(() => BigInt(0))
             );
             if (total <= BigInt(0)) return;
-            const items = await lsp7.getTokenCampaigns(0, total);
+            const items = await lsp7.getCampaigns(0, total).catch(() => lsp7.getTokenCampaigns(0, total));
             for (const c of items) {
               const addr = c.contractAddr.toLowerCase();
               if (seen.has(addr)) continue;
@@ -126,6 +144,8 @@ export default function HomePage() {
         })
       );
 
+      if (isStale()) return; // network changed — discard results
+
       all.sort((a, b) => b.createdAt - a.createdAt);
 
       // Show campaigns immediately, then fetch profiles
@@ -146,6 +166,7 @@ export default function HomePage() {
           }
         }),
       ]);
+      if (isStale()) return;
       setCampaigns((prev) =>
         prev.map((c) => ({ ...c, creatorProfile: profiles.get(c.creator) }))
       );
@@ -153,8 +174,9 @@ export default function HomePage() {
       // Fetch icons separately so they stream in as they resolve
       await Promise.all(
         all.map(async (c) => {
+          if (isStale()) return;
           const icon = await fetchCampaignIcon(c.contractAddr, rpc);
-          if (icon) {
+          if (icon && !isStale()) {
             setCampaigns((prev) =>
               prev.map((p) => p.contractAddr === c.contractAddr ? { ...p, icon } : p)
             );
@@ -163,22 +185,86 @@ export default function HomePage() {
       );
     } catch (e) {
       console.error("Failed to load campaigns:", e);
-      setLoading(false);
+      if (!isStale()) setLoading(false);
     }
   }
 
-  const filtered = campaigns.filter((c) => {
-    if (filter === "tokens" && c.isNFT) return false;
-    if (filter === "nfts" && !c.isNFT) return false;
-    if (filter === "mine" && walletAddress && c.creator.toLowerCase() !== walletAddress.toLowerCase()) return false;
+  async function loadSecretDrops(networkId: string, isStale: () => boolean) {
+    try {
+      const res = await fetch(`/api/secret-drop/explore?network=${networkId}`);
+      if (!res.ok || isStale()) return;
+      const data = await res.json();
+      if (isStale()) return;
+      const drops: SecretDropSummary[] = data.drops ?? [];
+      setSecretDrops(drops);
+
+      // Fetch creator profiles for secret drops
+      const uniqueCreators = [...new Set(drops.map((d) => d.creator))];
+      const profiles = new Map<string, ProfileInfo | null>();
+      await Promise.all(
+        uniqueCreators.map(async (addr) => {
+          try { profiles.set(addr, await fetchProfile(addr)); }
+          catch { profiles.set(addr, null); }
+        })
+      );
+      if (isStale()) return;
+      setSecretDrops((prev) =>
+        prev.map((d) => ({ ...d, _creatorProfile: profiles.get(d.creator) }))
+      );
+    } catch {
+      // Secret drops are non-critical — don't block the page
+    }
+  }
+
+  async function loadHiddenDrops(networkId: string, isStale: () => boolean) {
+    try {
+      const res = await fetch(`/api/drop-visibility?network=${networkId}`);
+      if (!res.ok || isStale()) return;
+      const data = await res.json();
+      if (isStale()) return;
+      const hidden: string[] = data.hidden ?? [];
+      setHiddenDrops(new Set(hidden.map((a: string) => a.toLowerCase())));
+    } catch {
+      // Non-critical — show all drops if fetch fails
+    }
+  }
+
+  // Build unified feed — exclude hidden on-chain drops
+  const visibleCampaigns = campaigns.filter(
+    (c) => !hiddenDrops.has(c.contractAddr.toLowerCase())
+  );
+  const feedItems: FeedItem[] = [
+    ...visibleCampaigns.map((c): FeedItem => ({ kind: "onchain", data: c })),
+    ...secretDrops.map((s): FeedItem => ({ kind: "secret", data: s })),
+  ];
+  feedItems.sort((a, b) => {
+    const aTime = a.kind === "onchain" ? a.data.createdAt : a.data.createdAt;
+    const bTime = b.kind === "onchain" ? b.data.createdAt : b.data.createdAt;
+    return bTime - aTime;
+  });
+
+  const filtered = feedItems.filter((item) => {
+    // Tab filter
+    if (filter === "tokens") { if (item.kind !== "onchain" || item.data.isNFT) return false; }
+    else if (filter === "nfts") { if (item.kind !== "onchain" || !item.data.isNFT) return false; }
+    else if (filter === "secret") { if (item.kind !== "secret") return false; }
+    else if (filter === "mine" && walletAddress) {
+      const creator = item.kind === "onchain" ? item.data.creator : item.data.creator;
+      if (creator.toLowerCase() !== walletAddress.toLowerCase()) return false;
+    }
+    // Search filter
     if (search) {
       const q = search.toLowerCase();
-      return (
-        c.name.toLowerCase().includes(q) ||
-        c.symbol.toLowerCase().includes(q) ||
-        c.contractAddr.toLowerCase().includes(q) ||
-        (c.creatorProfile?.name || "").toLowerCase().includes(q)
-      );
+      if (item.kind === "onchain") {
+        const c = item.data;
+        return (
+          c.name.toLowerCase().includes(q) ||
+          c.symbol.toLowerCase().includes(q) ||
+          c.contractAddr.toLowerCase().includes(q) ||
+          (c.creatorProfile?.name || "").toLowerCase().includes(q)
+        );
+      }
+      return item.data.title.toLowerCase().includes(q);
     }
     return true;
   });
@@ -200,8 +286,18 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-dvh px-3 py-6 sm:p-8">
-      <div className="max-w-2xl mx-auto">
+    <div className={inIframe ? "px-4 py-4" : "min-h-dvh px-3 py-6 sm:p-8"}>
+      <div className={inIframe ? "w-full relative" : "max-w-6xl mx-auto"}>
+        {inIframe && (
+          <a
+            href="https://github.com/JordyDutch/issue-tracker/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute top-0 right-0 text-[9px] text-faint hover:text-label transition-colors z-10"
+          >
+            <span className="text-purple-500 font-bold">BETA</span> · Report issues
+          </a>
+        )}
         {/* Hero */}
         <div className="text-center mb-8 sm:mb-10">
           <h1 className="text-3xl sm:text-4xl font-bold mb-2">
@@ -236,6 +332,9 @@ export default function HomePage() {
             </button>
             <button onClick={() => setFilter("nfts")} className={tabClass("nfts")}>
               NFTs
+            </button>
+            <button onClick={() => setFilter("secret")} className={tabClass("secret")}>
+              Secret
             </button>
             <button
               onClick={() => {
@@ -297,57 +396,104 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Campaign list */}
+        {/* Feed list */}
         <div className="space-y-3">
-          {filtered.map((c) => (
-            <Link
-              key={c.contractAddr}
-              href={`/claim/${c.contractAddr}`}
-              className="block bg-card rounded-xl p-4 sm:p-5 border border-border-muted hover:border-purple-500/30 card-elevated transition-all group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden">
-                  {c.icon ? (
-                    <img src={c.icon} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    c.isNFT ? "🖼" : "🪙"
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-sm sm:text-base truncate group-hover:text-purple-400 transition-colors">
-                      {c.name}
-                    </h3>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface text-muted flex-shrink-0">
-                      {c.isNFT ? "NFT" : "Token"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    {c.creatorProfile?.image && (
-                      <img
-                        src={c.creatorProfile.image}
-                        alt=""
-                        className="w-4 h-4 rounded-full object-cover"
-                      />
+          {filtered.map((item) =>
+            item.kind === "onchain" ? (
+              <Link
+                key={item.data.contractAddr}
+                href={`/claim/${item.data.contractAddr}`}
+                className="block bg-card rounded-xl p-4 sm:p-5 border border-border-muted hover:border-purple-500/30 card-elevated transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden">
+                    {item.data.icon ? (
+                      <img src={item.data.icon} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      item.data.isNFT ? "🖼" : "🪙"
                     )}
-                    <span className="text-label text-xs truncate">
-                      {c.creatorProfile?.name ||
-                        `${c.creator.slice(0, 6)}...${c.creator.slice(-4)}`}
-                    </span>
-                    <span className="text-ghost text-xs flex-shrink-0">
-                      {timeSince(c.createdAt)}
-                    </span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-sm sm:text-base truncate group-hover:text-purple-400 transition-colors">
+                        {item.data.name}
+                      </h3>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface text-muted flex-shrink-0">
+                        {item.data.isNFT ? "NFT" : "Token"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      {item.data.creatorProfile?.image && (
+                        <img
+                          src={item.data.creatorProfile.image}
+                          alt=""
+                          className="w-4 h-4 rounded-full object-cover"
+                        />
+                      )}
+                      <span className="text-label text-xs truncate">
+                        {item.data.creatorProfile?.name ||
+                          `${item.data.creator.slice(0, 6)}...${item.data.creator.slice(-4)}`}
+                      </span>
+                      <span className="text-ghost text-xs flex-shrink-0">
+                        {timeSince(item.data.createdAt)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-faint group-hover:text-purple-400 transition-colors flex-shrink-0 text-lg">
+                    →
                   </div>
                 </div>
-                <div className="text-faint group-hover:text-purple-400 transition-colors flex-shrink-0 text-lg">
-                  →
+              </Link>
+            ) : (
+              <Link
+                key={item.data.id}
+                href={`/secret-drop/${item.data.id}`}
+                className="block bg-card rounded-xl p-4 sm:p-5 border border-border-muted hover:border-violet-500/30 card-elevated transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden">
+                    {item.data.image ? (
+                      <img src={`${IPFS_GATEWAY}/${item.data.image}`} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      "🔒"
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-sm sm:text-base truncate group-hover:text-violet-400 transition-colors">
+                        {item.data.title}
+                      </h3>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-400 border border-violet-500/30 flex-shrink-0">
+                        Secret
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      {(item.data as any)._creatorProfile?.image && (
+                        <img
+                          src={(item.data as any)._creatorProfile.image}
+                          alt=""
+                          className="w-4 h-4 rounded-full object-cover"
+                        />
+                      )}
+                      <span className="text-label text-xs truncate">
+                        {(item.data as any)._creatorProfile?.name ||
+                          `${item.data.creator.slice(0, 6)}...${item.data.creator.slice(-4)}`}
+                      </span>
+                      <span className="text-ghost text-xs flex-shrink-0">
+                        {timeSince(item.data.createdAt)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-faint group-hover:text-violet-400 transition-colors flex-shrink-0 text-lg">
+                    →
+                  </div>
                 </div>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            )
+          )}
         </div>
 
-        <Footer />
+        {!inIframe && <Footer />}
       </div>
     </div>
   );

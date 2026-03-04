@@ -3,12 +3,17 @@
  * Never imported by client code.
  */
 
-import { verifyMessage, JsonRpcProvider, Contract, getAddress } from "ethers";
+import { verifyMessage, hashMessage, JsonRpcProvider, Contract, getAddress } from "ethers";
 import { TokenReq, FollowerReq } from "../secret-drop";
 
 const MAINNET_RPC = "https://rpc.mainnet.lukso.network";
 const TESTNET_RPC = "https://rpc.testnet.lukso.network";
 const LSP26_REGISTRY = "0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA";
+
+const EIP1271_MAGIC = "0x1626ba7e";
+const EIP1271_ABI = [
+  "function isValidSignature(bytes32 hash, bytes signature) view returns (bytes4)",
+];
 
 const LSP26_ABI = [
   "function followerCount(address addr) view returns (uint256)",
@@ -20,14 +25,32 @@ const TOKEN_ABI = [
 ];
 
 /**
- * Verify an EIP-191 personal_sign signature.
- * Returns true if the recovered address matches `expectedAddress`.
+ * Verify a signature against an expected address.
+ * First tries EIP-191 recovery (works for EOAs).
+ * Falls back to EIP-1271 on-chain verification (works for Universal Profiles / smart contract wallets).
  */
-export function verifySig(message: string, signature: string, expectedAddress: string): boolean {
+export async function verifySig(
+  message: string,
+  signature: string,
+  expectedAddress: string,
+  network: "mainnet" | "testnet" = "mainnet"
+): Promise<boolean> {
   try {
+    // 1. Try standard EOA recovery
     const recovered = verifyMessage(message, signature);
-    return recovered.toLowerCase() === expectedAddress.toLowerCase();
-  } catch {
+    if (recovered.toLowerCase() === expectedAddress.toLowerCase()) return true;
+
+    console.log("[verifySig] EOA mismatch:", { recovered, expectedAddress, network });
+
+    // 2. Fallback: EIP-1271 smart-contract signature (Universal Profile)
+    const rpc = new JsonRpcProvider(network === "testnet" ? TESTNET_RPC : MAINNET_RPC);
+    const hash = hashMessage(message);
+    const contract = new Contract(expectedAddress, EIP1271_ABI, rpc);
+    const result: string = await contract.isValidSignature(hash, signature);
+    console.log("[verifySig] EIP-1271 result:", result);
+    return result.toLowerCase() === EIP1271_MAGIC;
+  } catch (err) {
+    console.error("[verifySig] EIP-1271 failed:", err);
     return false;
   }
 }
@@ -50,6 +73,26 @@ export function parseCreateMessage(message: string): { address: string; ts: numb
   const m = message.match(/^Create secret drop as (0x[a-fA-F0-9]{40}) at (\d+)$/);
   if (!m) return null;
   return { address: m[1], ts: parseInt(m[2], 10) };
+}
+
+/**
+ * Parse the manage-drop challenge message.
+ * Expected format: "Manage secret drop {id} as {address} at {timestamp}"
+ */
+export function parseManageMessage(message: string): { dropId: string; address: string; ts: number } | null {
+  const m = message.match(/^Manage secret drop ([a-z0-9-]+) as (0x[a-fA-F0-9]{40}) at (\d+)$/);
+  if (!m) return null;
+  return { dropId: m[1], address: m[2], ts: parseInt(m[3], 10) };
+}
+
+/**
+ * Parse the visibility toggle message for on-chain drops.
+ * Expected format: "Toggle visibility for {contractAddress} as {address} at {timestamp}"
+ */
+export function parseVisibilityMessage(message: string): { contractAddress: string; address: string; ts: number } | null {
+  const m = message.match(/^Toggle visibility for (0x[a-fA-F0-9]{40}) as (0x[a-fA-F0-9]{40}) at (\d+)$/);
+  if (!m) return null;
+  return { contractAddress: m[1], address: m[2], ts: parseInt(m[3], 10) };
 }
 
 /** Returns true if timestamp is within the last 5 minutes. */

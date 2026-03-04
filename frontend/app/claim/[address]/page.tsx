@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
-import { BrowserProvider, Contract, JsonRpcProvider, formatUnits } from "ethers";
+import { BrowserProvider, Contract, JsonRpcProvider, formatUnits, Interface, id } from "ethers";
 import {
   CLAIM_ABI, LSP7_EXTRA_ABI, LSP8_EXTRA_ABI, ZERO,
   LSP4_TOKEN_NAME_KEY, LSP4_TOKEN_SYMBOL_KEY,
@@ -16,6 +16,32 @@ import CopyButton from "../../components/CopyButton";
 import Footer from "../../components/Footer";
 import { useWallet } from "../../components/WalletProvider";
 import { useNetwork } from "../../components/NetworkProvider";
+import { useUPProvider } from "../../components/UPProviderInit";
+
+/* ---------- Event topics for claimers list ---------- */
+const TOPIC_TOKEN_CLAIMED = id("TokensClaimed(address,uint256)");
+const TOPIC_NFT_CLAIMED = id("NFTsClaimed(address,uint256,uint256)");
+const claimIface = new Interface([
+  "event TokensClaimed(address indexed claimer, uint256 amount)",
+  "event NFTsClaimed(address indexed claimer, uint256 firstTokenId, uint256 amount)",
+]);
+
+interface ClaimerInfo {
+  address: string;
+  blockNumber: number;
+  timestamp: number;
+  profile?: ProfileInfo | null;
+}
+
+function timeSince(timestamp: number): string {
+  if (!timestamp) return "";
+  const seconds = Math.floor(Date.now() / 1000 - timestamp);
+  if (seconds < 60) return "just now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 2592000) return `${Math.floor(seconds / 86400)}d ago`;
+  return new Date(timestamp * 1000).toLocaleDateString();
+}
 
 type Status = { message: string; type: "success" | "error" | "loading"; link?: string } | null;
 
@@ -24,12 +50,14 @@ export default function ClaimPage() {
   const contractAddress = params.address as string;
   const { address, profile, connect: walletConnect, disconnect } = useWallet();
   const { config: networkConfig, networkId } = useNetwork();
+  const { inIframe } = useUPProvider();
 
   const [creatorProfile, setCreatorProfile] = useState<ProfileInfo | null>(null);
   const [dropName, setDropName] = useState("Loading...");
   const [dropSymbol, setDropSymbol] = useState("");
   const [dropIcon, setDropIcon] = useState<string | null>(null);
   const [tokenType, setTokenType] = useState<"LSP7" | "LSP8" | null>(null);
+  const [isNftStyle, setIsNftStyle] = useState(false);
   const [claimedDisplay, setClaimedDisplay] = useState("-");
   const [supplyDisplay, setSupplyDisplay] = useState("-");
   const [amountDisplay, setAmountDisplay] = useState("");
@@ -43,6 +71,7 @@ export default function ClaimPage() {
     followers: bigint;
   } | null>(null);
   const [eligibility, setEligibility] = useState<{ tokenOk: boolean; followersOk: boolean } | null>(null);
+  const [tokenMet, setTokenMet] = useState<boolean[]>([]);
   const [owner, setOwner] = useState<string | null>(null);
   const [startTime, setStartTime] = useState<number>(0);
   const [endTime, setEndTime] = useState<number>(0);
@@ -50,6 +79,10 @@ export default function ClaimPage() {
   const [copied, setCopied] = useState(false);
   const [codewordRequired, setCodewordRequired] = useState(false);
   const [codewordInput, setCodewordInput] = useState("");
+  const [claimers, setClaimers] = useState<ClaimerInfo[]>([]);
+  const [claimersLoading, setClaimersLoading] = useState(true);
+  const [showAllClaimers, setShowAllClaimers] = useState(false);
+  const claimersVersion = useRef(0);
 
   const loadState = useCallback(async (userAddr?: string) => {
     if (!contractAddress) return;
@@ -95,19 +128,22 @@ export default function ClaimPage() {
       safe(c.getData(LSP4_METADATA_KEY), null).then(async (metaRaw: string | null) => {
         if (!metaRaw || metaRaw === "0x" || metaRaw.length < 10) return;
         try {
-          // VerifiableURI: 0x6f357c6a (4 bytes) + keccak256 (32 bytes) + ipfs://CID
-          const hex = metaRaw.slice(2); // strip 0x
-          const urlHex = hex.slice((4 + 32) * 2);  // skip magic + hash
-          const ipfsUrl = Buffer.from(urlHex, "hex").toString("utf8");
-          const cid = ipfsUrl.replace("ipfs://", "");
-          const gateway = `https://api.universalprofile.cloud/ipfs/${cid}`;
-          const res = await fetch(gateway);
+          const bytes = Buffer.from(metaRaw.replace(/^0x/, ""), "hex");
+          const text = bytes.toString("utf8");
+          const idx = text.indexOf("ipfs://");
+          if (idx === -1) return;
+          const cid = text.slice(idx).replace("ipfs://", "");
+          const res = await fetch(`https://api.universalprofile.cloud/ipfs/${cid}`);
           if (!res.ok) return;
           const json = await res.json();
-          const icon = json?.LSP4Metadata?.icon?.[0]?.url;
+          const icon = json?.LSP4Metadata?.images?.[0]?.[0]?.url
+            ?? json?.LSP4Metadata?.icon?.[0]?.url;
           if (icon) {
-            const iconCid = icon.replace("ipfs://", "");
-            setDropIcon(`https://api.universalprofile.cloud/ipfs/${iconCid}`);
+            if (icon.startsWith("https://") || icon.startsWith("http://")) {
+              setDropIcon(icon);
+            } else {
+              setDropIcon(`https://api.universalprofile.cloud/ipfs/${icon.replace("ipfs://", "")}`);
+            }
           }
         } catch { /* no icon, keep fallback */ }
       });
@@ -141,23 +177,31 @@ export default function ClaimPage() {
       const hasReqs = enrichedTokens.length > 0 || rFollowers > BigInt(0);
       setReqInfo(hasReqs ? { tokens: enrichedTokens, followers: rFollowers } : null);
 
+      const MAX_UINT256 = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
       if (type === "LSP7") {
         // v5 proxy: totalSupply() replaces totalClaimedAmount() (removed in proxy refactor)
-        const [claimedAmt, claimers, decimals] = await Promise.all([
+        const [, claimers, decimals] = await Promise.all([
           c.totalClaimedAmount().catch(() => c.totalSupply().catch(() => BigInt(0))),
-          c.totalClaimers(),
+          c.totalClaimers().catch(() => BigInt(0)),
           c.decimals(),
         ]);
         const dec = Number(decimals);
+        const nft = dec === 0;
+        setIsNftStyle(nft);
         setClaimedDisplay(claimers.toString());
-        // type(uint256).max means unlimited supply in v5
-        const isUnlimited = supply === BigInt(0) || supply === BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-        setSupplyDisplay(isUnlimited ? "Unlimited" : formatUnits(supply, dec));
-        setAmountDisplay(formatUnits(amount, dec) + " tokens");
+        const isUnlimited = supply === BigInt(0) || supply === MAX_UINT256;
+        if (nft) {
+          setSupplyDisplay(isUnlimited ? "Unlimited" : supply.toString());
+          setAmountDisplay(amount.toString() + (amount === BigInt(1) ? " NFT" : " NFTs"));
+        } else {
+          setSupplyDisplay(isUnlimited ? "Unlimited" : formatUnits(supply, dec));
+          setAmountDisplay(formatUnits(amount, dec) + " tokens");
+        }
       } else {
+        setIsNftStyle(true);
         const totalClaimed = await c.totalClaimed().catch(() => BigInt(0));
         setClaimedDisplay(totalClaimed.toString());
-        const isLSP8Unlimited = supply === BigInt(0) || supply === BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        const isLSP8Unlimited = supply === BigInt(0) || supply === MAX_UINT256;
         setSupplyDisplay(isLSP8Unlimited ? "Unlimited" : supply.toString());
         setAmountDisplay(amount.toString() + (amount === BigInt(1) ? " NFT" : " NFTs"));
       }
@@ -169,6 +213,25 @@ export default function ClaimPage() {
         ]);
         setAlreadyClaimed(claimed);
         setEligibility({ tokenOk: meets.tokenOk, followersOk: meets.followersOk });
+
+        // Check each token requirement individually
+        if (enrichedTokens.length > 0) {
+          const balanceAbi = ["function balanceOf(address) view returns (uint256)"];
+          const perToken = await Promise.all(
+            enrichedTokens.map(async (t) => {
+              try {
+                const tokenContract = new Contract(t.addr, balanceAbi, rpc);
+                const balance: bigint = await tokenContract.balanceOf(userAddr);
+                return t.amount > BigInt(0) ? balance >= t.amount : balance > BigInt(0);
+              } catch {
+                return false;
+              }
+            })
+          );
+          setTokenMet(perToken);
+        } else {
+          setTokenMet([]);
+        }
       }
     } catch (e) {
       console.error("Load error:", e);
@@ -180,6 +243,80 @@ export default function ClaimPage() {
 
   // Load contract state on mount, reload when wallet connects or network changes
   useEffect(() => { loadState(address ?? undefined); }, [loadState, address]);
+
+  // Fetch claimers list from on-chain events
+  const loadClaimers = useCallback(async () => {
+    if (!contractAddress) return;
+    const version = ++claimersVersion.current;
+    setClaimersLoading(true);
+    const rpc = new JsonRpcProvider(networkConfig.rpc);
+    try {
+      const currentBlock = await rpc.getBlockNumber();
+      // Fetch all claim events for this contract (scan last ~600k blocks ≈ 35 days)
+      const fromBlock = Math.max(0, currentBlock - 600_000);
+      const logs: any[] = await rpc.send("eth_getLogs", [{
+        address: [contractAddress],
+        topics: [[TOPIC_TOKEN_CLAIMED, TOPIC_NFT_CLAIMED]],
+        fromBlock: `0x${fromBlock.toString(16)}`,
+        toBlock: "latest",
+      }]);
+      if (version !== claimersVersion.current) return;
+
+      // Parse logs → claimer entries
+      const parsed: ClaimerInfo[] = [];
+      for (const log of logs) {
+        try {
+          const p = claimIface.parseLog({ topics: log.topics, data: log.data });
+          if (!p) continue;
+          parsed.push({
+            address: p.args[0],
+            blockNumber: parseInt(log.blockNumber, 16),
+            timestamp: 0,
+          });
+        } catch { /* skip */ }
+      }
+
+      // Deduplicate by address, keep most recent
+      const byAddr = new Map<string, ClaimerInfo>();
+      for (const c of parsed) {
+        const key = c.address.toLowerCase();
+        const existing = byAddr.get(key);
+        if (!existing || c.blockNumber > existing.blockNumber) byAddr.set(key, c);
+      }
+      const unique = [...byAddr.values()].sort((a, b) => b.blockNumber - a.blockNumber);
+
+      // Fetch block timestamps
+      const uniqueBlocks = [...new Set(unique.map((c) => c.blockNumber))];
+      const tsMap = new Map<number, number>();
+      await Promise.all(
+        uniqueBlocks.map(async (bn) => {
+          try {
+            const block = await rpc.getBlock(bn);
+            if (block) tsMap.set(bn, block.timestamp);
+          } catch { /* skip */ }
+        }),
+      );
+      for (const c of unique) c.timestamp = tsMap.get(c.blockNumber) ?? 0;
+
+      if (version !== claimersVersion.current) return;
+      setClaimers(unique);
+      setClaimersLoading(false);
+
+      // Enrich with profiles (fire-and-forget)
+      const profiles = await Promise.all(
+        unique.map(async (c) => {
+          try { return await fetchProfile(c.address); }
+          catch { return null; }
+        }),
+      );
+      if (version !== claimersVersion.current) return;
+      setClaimers(unique.map((c, i) => ({ ...c, profile: profiles[i] })));
+    } catch {
+      if (version === claimersVersion.current) setClaimersLoading(false);
+    }
+  }, [contractAddress, networkConfig]);
+
+  useEffect(() => { loadClaimers(); }, [loadClaimers]);
 
   async function connect() {
     setStatus({ message: "Connecting...", type: "loading" });
@@ -214,9 +351,10 @@ export default function ClaimPage() {
         : await c.claim();
       setStatus({ message: "Waiting for confirmation...", type: "loading" });
       await tx.wait();
-      setStatus({ message: tokenType === "LSP7" ? "Tokens claimed successfully!" : "NFT claimed successfully!", type: "success" });
+      setStatus({ message: isNftStyle ? "NFT claimed successfully!" : "Tokens claimed successfully!", type: "success" });
       setAlreadyClaimed(true);
       await loadState(address);
+      loadClaimers();
     } catch (e: any) {
       setStatus({ message: friendlyRevert(e, "Claim failed"), type: "error" });
     } finally {
@@ -270,10 +408,10 @@ export default function ClaimPage() {
 
   if (pageLoading) {
     return (
-      <div className="min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4">
-        <div className="max-w-md w-full">
-          <div className="bg-card rounded-xl p-5 sm:p-8 border border-border-muted card-elevated animate-pulse">
-            <div className="w-32 h-32 sm:w-48 sm:h-48 rounded-xl mx-auto mb-4 sm:mb-6 bg-surface" />
+      <div className={inIframe ? "min-h-dvh flex items-center justify-center px-4 py-3" : "min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4"}>
+        <div className={inIframe ? "w-full" : "max-w-2xl w-full"}>
+          <div className={`bg-card rounded-xl border border-border-muted card-elevated animate-pulse ${inIframe ? "p-4" : "p-5 sm:p-8"}`}>
+            <div className={`rounded-xl mx-auto bg-surface ${inIframe ? "w-14 h-14 mb-2" : "w-32 h-32 sm:w-48 sm:h-48 mb-4 sm:mb-6"}`} />
             <div className="h-6 bg-surface rounded w-1/2 mx-auto mb-3" />
             <div className="h-4 bg-surface-subtle rounded w-1/3 mx-auto mb-6" />
             <div className="flex justify-center gap-8 mb-6">
@@ -288,55 +426,102 @@ export default function ClaimPage() {
   }
 
   return (
-    <div className="min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4">
-      <div className="max-w-md w-full">
-        <div className="bg-card rounded-xl p-5 sm:p-8 text-center border border-border-muted card-elevated">
-          {/* Drop icon */}
-          <div className="w-32 h-32 sm:w-48 sm:h-48 rounded-xl mx-auto mb-4 sm:mb-6 bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-4xl sm:text-6xl overflow-hidden">
-            {dropIcon
-              ? <img src={dropIcon} alt={dropName} className="w-full h-full object-cover" />
-              : (tokenType === "LSP7" ? "🪙" : "🖼")}
-          </div>
-
-          {/* Status badge */}
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${statusColor}`}>
-              {statusLabel}
-            </span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface text-label">
-              {tokenType === "LSP7" ? "Token" : "NFT"}
-            </span>
-          </div>
-
-          <h1 className="text-xl sm:text-2xl font-bold mb-0.5">{dropName}</h1>
-          {dropSymbol && <p className="text-faint text-xs mb-1">${dropSymbol}</p>}
-
-          {/* Creator */}
-          {creatorProfile && (
-            <div className="flex items-center justify-center gap-1.5 mb-3">
-              <span className="text-label text-xs">by</span>
-              {creatorProfile.image && (
-                <img src={creatorProfile.image} alt="" className="w-4 h-4 rounded-full object-cover" />
-              )}
-              <span className="text-muted text-xs">
-                {creatorProfile.name || (owner ? `${owner.slice(0, 6)}...${owner.slice(-4)}` : "")}
-              </span>
+    <div className={inIframe ? "min-h-dvh flex items-center justify-center px-4 py-3" : "min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4"}>
+      <div className={inIframe ? "w-full relative" : "max-w-2xl w-full"}>
+        {inIframe && (
+          <a
+            href="https://github.com/JordyDutch/issue-tracker/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute top-2 right-3 text-[9px] text-faint hover:text-label transition-colors z-10"
+          >
+            <span className="text-purple-500 font-bold">BETA</span> · Report issues
+          </a>
+        )}
+        <div className={`bg-card rounded-xl text-center border border-border-muted card-elevated ${inIframe ? "p-6" : "p-5 sm:p-8"}`}>
+          {/* Drop header — horizontal in iframe, stacked standalone */}
+          {inIframe ? (
+            <div className="flex items-center gap-4 mb-5">
+              <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-3xl overflow-hidden flex-shrink-0">
+                {dropIcon
+                  ? <img src={dropIcon} alt={dropName} className="w-full h-full object-cover" />
+                  : (isNftStyle ? "🖼" : "🪙")}
+              </div>
+              <div className="text-left min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <h1 className="text-xl font-bold truncate">{dropName}</h1>
+                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border flex-shrink-0 ${statusColor}`}>
+                    {statusLabel}
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface text-label flex-shrink-0">
+                    {isNftStyle ? "NFT" : "Token"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-label flex-wrap">
+                  {creatorProfile && (
+                    <span className="flex items-center gap-1">
+                      by
+                      {creatorProfile.image && <img src={creatorProfile.image} alt="" className="w-4 h-4 rounded-full object-cover" />}
+                      <span className="text-muted">{creatorProfile.name || (owner ? `${owner.slice(0, 6)}…${owner.slice(-4)}` : "")}</span>
+                    </span>
+                  )}
+                  {amountDisplay && (
+                    <span className="text-purple-600 dark:text-purple-400 font-medium">{amountDisplay}/claim</span>
+                  )}
+                  <span className="text-purple-600 dark:text-purple-400 font-semibold">{claimedDisplay}</span>
+                  <span className="text-faint">/ {supplyDisplay}</span>
+                </div>
+              </div>
             </div>
+          ) : (
+            <>
+              <div className="w-32 h-32 sm:w-48 sm:h-48 rounded-xl mx-auto mb-4 sm:mb-6 bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-4xl sm:text-6xl overflow-hidden">
+                {dropIcon
+                  ? <img src={dropIcon} alt={dropName} className="w-full h-full object-cover" />
+                  : (isNftStyle ? "🖼" : "🪙")}
+              </div>
+
+              {/* Status badge */}
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${statusColor}`}>
+                  {statusLabel}
+                </span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface text-label">
+                  {isNftStyle ? "NFT" : "Token"}
+                </span>
+              </div>
+
+              <h1 className="text-xl sm:text-2xl font-bold mb-0.5">{dropName}</h1>
+              {dropSymbol && <p className="text-faint text-xs mb-1">${dropSymbol}</p>}
+
+              {/* Creator */}
+              {creatorProfile && (
+                <div className="flex items-center justify-center gap-1.5 mb-3">
+                  <span className="text-label text-xs">by</span>
+                  {creatorProfile.image && (
+                    <img src={creatorProfile.image} alt="" className="w-4 h-4 rounded-full object-cover" />
+                  )}
+                  <span className="text-muted text-xs">
+                    {creatorProfile.name || (owner ? `${owner.slice(0, 6)}...${owner.slice(-4)}` : "")}
+                  </span>
+                </div>
+              )}
+            </>
           )}
 
           {/* Connected user */}
           {address && (
-            <div className="flex items-center justify-center gap-2 mb-3">
+            <div className={`flex items-center justify-center gap-2 ${inIframe ? "mb-4" : "mb-3"}`}>
               {profile?.image && (
                 <img src={profile.image} alt="" className="w-5 h-5 rounded-full object-cover" />
               )}
-              <span className="text-tertiary text-xs sm:text-sm font-medium">
+              <span className="text-tertiary text-xs font-medium">
                 {profile?.name || `${address.slice(0, 6)}...${address.slice(-4)}`}
               </span>
               <button
                 onClick={() => {
                   disconnect();
-                  setAlreadyClaimed(false); setEligibility(null);
+                  setAlreadyClaimed(false); setEligibility(null); setTokenMet([]);
                 }}
                 className="text-faint hover:text-muted text-[10px] ml-1 cursor-pointer"
               >
@@ -346,13 +531,13 @@ export default function ClaimPage() {
           )}
 
           {!address && !alreadyClaimed && (
-            <p className="text-label mb-3 text-xs sm:text-sm">
+            <p className={`text-label text-xs ${inIframe ? "mb-4" : "mb-3 sm:text-sm"}`}>
               Connect your Universal Profile to claim
             </p>
           )}
 
-          {/* Amount per claim */}
-          {amountDisplay && (
+          {/* Amount per claim — hidden in iframe (shown inline in header) */}
+          {!inIframe && amountDisplay && (
             <div className="inline-block bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-400 px-3 py-1 rounded-full text-xs font-medium mb-4">
               {amountDisplay} per claim
             </div>
@@ -360,8 +545,8 @@ export default function ClaimPage() {
 
           {/* Claim window */}
           {hasTimeWindow && (
-            <div className="bg-surface-muted rounded-xl p-3 mb-4 text-xs">
-              <div className="text-label text-[10px] uppercase tracking-wider mb-1.5 font-medium">
+            <div className={`bg-surface-muted rounded-xl text-xs ${inIframe ? "p-3 mb-4" : "p-3 mb-4"}`}>
+              <div className={`text-label text-[10px] uppercase tracking-wider font-medium ${inIframe ? "mb-1" : "mb-1.5"}`}>
                 Claim Window
               </div>
               <div className="flex items-center justify-center gap-3 text-tertiary">
@@ -374,12 +559,12 @@ export default function ClaimPage() {
 
           {/* Requirements */}
           {reqInfo && (
-            <div className="bg-surface-subtle rounded-xl p-3 sm:p-4 mb-4 text-left text-xs sm:text-sm">
-              <div className="text-muted text-[10px] uppercase tracking-wider mb-2 text-center font-medium">
+            <div className={`bg-surface-subtle rounded-xl text-left text-xs ${inIframe ? "p-3 mb-4" : "p-3 sm:p-4 mb-4 sm:text-sm"}`}>
+              <div className={`text-muted text-[10px] uppercase tracking-wider text-center font-medium ${inIframe ? "mb-1" : "mb-2"}`}>
                 Requirements
               </div>
               {reqInfo.tokens.map((t, i) => (
-                <div key={i} className="flex items-center justify-between py-1.5 gap-2">
+                <div key={i} className={`flex items-center justify-between gap-2 ${inIframe ? "py-1" : "py-1.5"}`}>
                   <div className="flex items-center gap-2 min-w-0">
                     {t.icon ? (
                       <img src={t.icon} alt="" className="w-5 h-5 rounded-md object-cover flex-shrink-0" />
@@ -395,16 +580,16 @@ export default function ClaimPage() {
                       )}
                     </span>
                   </div>
-                  {eligibility && (
-                    <span className={eligibility.tokenOk ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
-                      {eligibility.tokenOk ? "✓" : "✗"}
+                  {tokenMet.length > 0 && (
+                    <span className={tokenMet[i] ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                      {tokenMet[i] ? "✓" : "✗"}
                     </span>
                   )}
                 </div>
               ))}
               {reqInfo.followers > BigInt(0) && (
-                <div className="flex items-center justify-between py-1.5">
-                  <span className="text-tertiary">
+                <div className={`flex items-center justify-between ${inIframe ? "py-1" : "py-1.5"}`}>
+                  <span className="text-tertiary text-xs">
                     {reqInfo.followers.toString()}+ followers
                   </span>
                   {eligibility && (
@@ -419,53 +604,55 @@ export default function ClaimPage() {
 
           {/* Inactive warning */}
           {!isActive && tokenType && (
-            <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400 px-3 py-2.5 rounded-xl mb-4 text-xs sm:text-sm">
+            <div className={`bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400 rounded-xl text-xs ${inIframe ? "px-3 py-2 mb-4" : "px-3 py-2.5 mb-4 sm:text-sm"}`}>
               {!claimEnabled
                 ? "This drop is currently paused by the creator"
                 : "Claim window has not started yet"}
             </div>
           )}
 
-          {/* Stats */}
-          <div className="flex justify-center gap-8 sm:gap-12 mb-6 sm:mb-8">
-            <div>
-              <div className="text-[10px] sm:text-xs text-label uppercase tracking-wider">
-                Claimers
+          {/* Stats — hidden in iframe (shown inline in header) */}
+          {!inIframe && (
+            <div className="flex justify-center gap-8 sm:gap-12 mb-6 sm:mb-8">
+              <div>
+                <div className="text-[10px] sm:text-xs text-label uppercase tracking-wider">
+                  Claimers
+                </div>
+                <div className="text-lg sm:text-xl font-semibold text-purple-600 dark:text-purple-400">
+                  {claimedDisplay}
+                </div>
               </div>
-              <div className="text-lg sm:text-xl font-semibold text-purple-600 dark:text-purple-400">
-                {claimedDisplay}
+              <div>
+                <div className="text-[10px] sm:text-xs text-label uppercase tracking-wider">
+                  Max Supply
+                </div>
+                <div className="text-lg sm:text-xl font-semibold text-purple-600 dark:text-purple-400">
+                  {supplyDisplay}
+                </div>
               </div>
             </div>
-            <div>
-              <div className="text-[10px] sm:text-xs text-label uppercase tracking-wider">
-                Max Supply
-              </div>
-              <div className="text-lg sm:text-xl font-semibold text-purple-600 dark:text-purple-400">
-                {supplyDisplay}
-              </div>
-            </div>
-          </div>
+          )}
 
           {/* Action button */}
           {!address ? (
             <button
               onClick={connect}
-              className="w-full py-3.5 sm:py-4 rounded-xl text-base sm:text-lg font-semibold border-2 border-purple-400 text-purple-400 hover:bg-purple-400/10 transition-all cursor-pointer active:scale-[0.97]"
+              className={`w-full rounded-xl font-semibold border-2 border-purple-400 text-purple-400 hover:bg-purple-400/10 transition-all cursor-pointer active:scale-[0.97] ${inIframe ? "py-3 text-sm" : "py-3.5 sm:py-4 text-base sm:text-lg"}`}
             >
               Connect Universal Profile
             </button>
           ) : alreadyClaimed ? (
             <button
               disabled
-              className="w-full py-3.5 sm:py-4 rounded-xl text-base sm:text-lg font-semibold bg-green-50 dark:bg-green-500/20 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-500/30 cursor-not-allowed"
+              className={`w-full rounded-xl font-semibold bg-green-50 dark:bg-green-500/20 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-500/30 cursor-not-allowed ${inIframe ? "py-3 text-sm" : "py-3.5 sm:py-4 text-base sm:text-lg"}`}
             >
               Already Claimed ✓
             </button>
           ) : (
             <>
               {codewordRequired && (
-                <div className="mb-3">
-                  <label className="text-[10px] text-label uppercase tracking-wider block mb-1.5 text-center">
+                <div className={inIframe ? "mb-4" : "mb-3"}>
+                  <label className={`text-[10px] text-label uppercase tracking-wider block text-center ${inIframe ? "mb-1" : "mb-1.5"}`}>
                     🔑 Codeword required
                   </label>
                   <input
@@ -474,7 +661,7 @@ export default function ClaimPage() {
                     onChange={(e) => setCodewordInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && canClaim && claim()}
                     placeholder="Enter codeword..."
-                    className="w-full bg-surface border border-border-default rounded-xl px-4 py-3 text-sm text-secondary focus:outline-none focus:border-purple-400 transition-colors text-center tracking-widest placeholder:tracking-normal"
+                    className={`w-full bg-surface border border-border-default rounded-xl text-sm text-secondary focus:outline-none focus:border-purple-400 transition-colors text-center tracking-widest placeholder:tracking-normal ${inIframe ? "px-4 py-2.5" : "px-4 py-3"}`}
                     autoComplete="off"
                     spellCheck={false}
                   />
@@ -483,12 +670,12 @@ export default function ClaimPage() {
             <button
               onClick={claim}
               disabled={!canClaim}
-              className="w-full py-3.5 sm:py-4 rounded-xl text-base sm:text-lg font-semibold bg-purple-400 text-white hover:bg-purple-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.97]"
+              className={`w-full rounded-xl font-semibold bg-purple-400 text-white hover:bg-purple-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.97] ${inIframe ? "py-3 text-sm" : "py-3.5 sm:py-4 text-base sm:text-lg"}`}
             >
               {claiming
                 ? "Claiming..."
                 : !eligibility || (eligibility.tokenOk && eligibility.followersOk)
-                ? tokenType === "LSP7" ? "Claim Tokens" : "Claim NFT"
+                ? isNftStyle ? "Claim NFT" : "Claim Tokens"
                 : "Requirements not met"}
             </button>
             </>
@@ -497,7 +684,7 @@ export default function ClaimPage() {
           {/* Status message */}
           {status && (
             <div
-              className={`mt-3 px-3 py-2.5 rounded-xl text-xs sm:text-sm text-center ${
+              className={`mt-2 px-3 py-2 rounded-xl text-xs ${
                 status.type === "success"
                   ? "bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 text-green-700 dark:text-green-400"
                   : status.type === "error"
@@ -512,49 +699,134 @@ export default function ClaimPage() {
               ) : status.message}
             </div>
           )}
+
+          {/* Share buttons — visible after claiming */}
+          {alreadyClaimed && (() => {
+            const claimUrl = `https://agent-token-claimer.vercel.app/claim/${contractAddress}`;
+            const shareText = `I just claimed ${dropName} on LUKSO!\n\nA project by @JordyDutch & @LUKSOAgent`;
+            const tweetUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(claimUrl)}`;
+            const telegramUrl = `https://t.me/share/url?url=${encodeURIComponent(claimUrl)}&text=${encodeURIComponent(shareText)}`;
+            return (
+              <div className="mt-4">
+                <p className="text-[10px] text-label uppercase tracking-wider text-center mb-2">Share your claim</p>
+                <div className="flex items-center justify-center gap-2">
+                  <a
+                    href={tweetUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border-default text-muted hover:text-primary hover:border-purple-500/30 transition-all"
+                  >
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                    Post
+                  </a>
+                  <a
+                    href={telegramUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border-default text-muted hover:text-primary hover:border-purple-500/30 transition-all"
+                  >
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+                    Share
+                  </a>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(claimUrl).then(() => {
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      });
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border-default text-muted hover:text-primary hover:border-purple-500/30 transition-all cursor-pointer"
+                  >
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    {copied ? "Copied!" : "Copy link"}
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Recent claimers */}
+          {!inIframe && claimers.length > 0 && (
+            <div className="mt-6 pt-5 border-t border-border-muted">
+              <div className="text-[10px] text-label uppercase tracking-wider text-center font-medium mb-3">
+                Recent Claimers
+              </div>
+              <div className="space-y-2">
+                {(showAllClaimers ? claimers : claimers.slice(0, 10)).map((c) => (
+                  <div key={c.address} className="flex items-center gap-2.5 px-2 py-1.5">
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                      {c.profile?.image ? (
+                        <img src={c.profile.image} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-white font-medium text-[8px]">
+                          {c.address.slice(2, 4).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-secondary truncate flex-1 text-left">
+                      {c.profile?.name || `${c.address.slice(0, 6)}...${c.address.slice(-4)}`}
+                    </span>
+                    <span className="text-[10px] text-faint flex-shrink-0">
+                      {timeSince(c.timestamp)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {claimers.length > 10 && (
+                <button
+                  onClick={() => setShowAllClaimers(!showAllClaimers)}
+                  className="text-[10px] text-purple-500 hover:text-purple-400 text-center mt-2 w-full cursor-pointer transition-colors"
+                >
+                  {showAllClaimers ? "Show less" : `Show all ${claimers.length} claimers`}
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Bottom bar */}
-        <div className="flex items-center justify-between mt-4 sm:mt-6 px-2 gap-2">
-          <Link
-            href="/"
-            className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors"
-          >
-            ← All drops
-          </Link>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={shareLink}
-              className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors cursor-pointer"
-            >
-              {copied ? "Link copied!" : "Share"}
-            </button>
-            <a
-              href={explorerUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+        {/* Bottom bar — hidden in iframe */}
+        {!inIframe && (
+          <div className="flex items-center justify-between mt-4 sm:mt-6 px-2 gap-2">
+            <Link
+              href="/"
               className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors"
             >
-              Explorer
-            </a>
-            <CopyButton
-              text={contractAddress}
-              label="Copy address"
-              className="text-[10px] sm:text-xs"
-            />
-            {address && owner && address.toLowerCase() === owner.toLowerCase() && (
-              <Link
-                href={`/manage/${contractAddress}`}
+              ← All drops
+            </Link>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={shareLink}
+                className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors cursor-pointer"
+              >
+                {copied ? "Link copied!" : "Share"}
+              </button>
+              <a
+                href={explorerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors"
               >
-                Manage →
-              </Link>
-            )}
+                Explorer
+              </a>
+              <CopyButton
+                text={contractAddress}
+                label="Copy address"
+                className="text-[10px] sm:text-xs"
+              />
+              {address && owner && address.toLowerCase() === owner.toLowerCase() && (
+                <Link
+                  href={`/manage/${contractAddress}`}
+                  className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors"
+                >
+                  Manage →
+                </Link>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
-        <Footer />
+        {!inIframe && <Footer />}
       </div>
     </div>
   );
