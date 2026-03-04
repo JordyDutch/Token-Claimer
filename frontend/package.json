@@ -12,6 +12,7 @@
     "@vercel/analytics": "^1.6.1",
     "@vercel/kv": "^3.0.0",
     "ethers": "^6.16.0",
+    "lightningcss-darwin-arm64": "^1.31.1",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3"

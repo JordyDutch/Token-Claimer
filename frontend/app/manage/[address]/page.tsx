@@ -7,7 +7,7 @@ import { uploadAndSetLSP4Metadata, setLSP4Creators, addToLSP12IssuedAssets, type
 import {
   CLAIM_ABI, LSP7_EXTRA_ABI, LSP8_EXTRA_ABI, ZERO,
   LSP4_TOKEN_NAME_KEY,
-  getProvider, detectTokenType,
+  getProvider, detectTokenType, friendlyRevert,
 } from "../../lib/contracts";
 import Link from "next/link";
 import CopyButton from "../../components/CopyButton";
@@ -155,7 +155,7 @@ export default function ManagePage() {
       setStatus({ message: "Updated successfully!", type: "success" });
       await loadState(address);
     } catch (e: any) {
-      setStatus({ message: e.reason || e.message?.slice(0, 100) || "Failed", type: "error" });
+      setStatus({ message: friendlyRevert(e), type: "error" });
     }
   }
 
@@ -189,7 +189,7 @@ export default function ManagePage() {
       );
       setStatus({ message: "Metadata updated!", type: "success" });
     } catch (e: any) {
-      setStatus({ message: e.reason || e.message?.slice(0, 100) || "Metadata update failed", type: "error" });
+      setStatus({ message: friendlyRevert(e, "Metadata update failed"), type: "error" });
     } finally {
       setMetaSaving(false);
     }
@@ -218,7 +218,7 @@ export default function ManagePage() {
       );
       setStatus({ message: "Creator verified! Badge should appear on marketplaces.", type: "success" });
     } catch (e: any) {
-      setStatus({ message: e.reason || e.message?.slice(0, 100) || "Verification failed", type: "error" });
+      setStatus({ message: friendlyRevert(e, "Verification failed"), type: "error" });
     } finally {
       setVerifying(false);
     }

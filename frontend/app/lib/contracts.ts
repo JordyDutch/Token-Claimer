@@ -123,3 +123,20 @@ export async function detectTokenType(contract: any): Promise<"LSP7" | "LSP8"> {
     return "LSP8";
   }
 }
+
+const REVERT_ERRORS: Record<string, string> = {
+  "0x24fbaa90": "Claim is not active",
+  "0x646cf558": "You have already claimed",
+  "0xcd3b2d03": "Claim is outside the allowed time window",
+  "0xd05cb609": "Max supply has been reached",
+  "0xe4455cae": "You don't hold enough required tokens",
+  "0x94303d52": "You don't have enough followers",
+  "0x4aa20f9c": "Incorrect codeword",
+  "0x8beb9d16": "Transaction failed, please try again",
+  "0xb8eaf7a1": "Rescue failed",
+};
+
+export function friendlyRevert(e: any, fallback = "Transaction failed"): string {
+  const selector = (e.data ?? e.error?.data ?? "").slice(0, 10);
+  return REVERT_ERRORS[selector] ?? e.reason ?? e.message?.slice(0, 100) ?? fallback;
+}

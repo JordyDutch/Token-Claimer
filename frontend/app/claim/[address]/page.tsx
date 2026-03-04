@@ -6,7 +6,7 @@ import { BrowserProvider, Contract, JsonRpcProvider, formatUnits } from "ethers"
 import {
   CLAIM_ABI, LSP7_EXTRA_ABI, LSP8_EXTRA_ABI, ZERO,
   LSP4_TOKEN_NAME_KEY, LSP4_TOKEN_SYMBOL_KEY,
-  getProvider, detectTokenType,
+  getProvider, detectTokenType, friendlyRevert,
 } from "../../lib/contracts";
 import { fetchProfile, ProfileInfo } from "../../lib/profile";
 import { LSP4_METADATA_KEY } from "../../lib/lsp4";
@@ -155,7 +155,7 @@ export default function ClaimPage() {
         setSupplyDisplay(isUnlimited ? "Unlimited" : formatUnits(supply, dec));
         setAmountDisplay(formatUnits(amount, dec) + " tokens");
       } else {
-        const totalClaimed = await c.totalClaimed();
+        const totalClaimed = await c.totalClaimed().catch(() => BigInt(0));
         setClaimedDisplay(totalClaimed.toString());
         const isLSP8Unlimited = supply === BigInt(0) || supply === BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         setSupplyDisplay(isLSP8Unlimited ? "Unlimited" : supply.toString());
@@ -218,9 +218,7 @@ export default function ClaimPage() {
       setAlreadyClaimed(true);
       await loadState(address);
     } catch (e: any) {
-      const msg = e.reason || e.message?.slice(0, 100) || "Failed";
-      const friendly = msg.includes("WrongCodeword") ? "Incorrect codeword" : msg;
-      setStatus({ message: friendly, type: "error" });
+      setStatus({ message: friendlyRevert(e, "Claim failed"), type: "error" });
     } finally {
       setClaiming(false);
     }
