@@ -45,6 +45,8 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
     error TooManyTokenRequirements();
     error ClaimEnabledNoChange();
     error AlreadyInitialized();
+    /// @notice Reverts when a token requirement address has no contract code (EOA or zero address).
+    error InvalidTokenRequirement();
 
     // ──────────────────── Storage ────────────────────
 
@@ -76,6 +78,9 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
     address public constant LSP26_REGISTRY = 0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA;
 
     /// @notice Tracks whether an address has already claimed.
+    /// @dev Keyed by `msg.sender`. One claim per address — not per identity.
+    ///      On LUKSO, Universal Profiles are cheap to deploy, so this does not
+    ///      prevent Sybil attacks without additional off-chain gating.
     mapping(address => bool) public hasClaimed;
 
     /// @dev keccak256 hash of the codeword (0x0 = no codeword required).
@@ -109,6 +114,12 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
     // ──────────────────── Constructor (disabled for proxy) ────────────────────
 
     /// @custom:oz-upgrades-unsafe-allow constructor
+    /// @dev Disables initializers on the implementation contract itself so it can never
+    ///      be used directly. LYX sent to the implementation is unrecoverable — the
+    ///      `receive()` below is inherited but `rescueLYX` is only callable post-initialize,
+    ///      which is blocked by `_disableInitializers()`. Clones deploy their own storage
+    ///      and call `initialize()` exactly once, so they are unaffected.
+    ///      ⚠️ Do not send LYX to the implementation contract address directly.
     constructor() {
         _disableInitializers();
     }
@@ -179,7 +190,10 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
     }
 
     /// @notice Update the number of tokens minted per claim.
-    /// @param amount_ New amount per claim. Must be > 0 and <= 1e24.
+    /// @param amount_ New amount per claim. Must be > 0 and ≤ 1e24.
+    ///        The upper bound of 1e24 (1,000,000 tokens with 18 decimals) is a sanity cap
+    ///        to prevent accidental misconfiguration (e.g. passing raw ether amounts).
+    ///        It is not a protocol-level supply constraint — `maxSupply` governs total supply.
     function setAmountPerClaim(uint256 amount_) external onlyOwner {
         if (amount_ == 0 || amount_ > 1e24) revert AmountOutOfRange();
         if (tokenSupplyCap() != type(uint256).max && tokenSupplyCap() < amount_) {
@@ -191,8 +205,16 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
 
     /// @notice Configures the optional token-holding and follower requirements.
     /// @param tokens_      Array of LSP7/LSP8 contract addresses claimers must hold.
+    ///                     Each address MUST be a deployed contract. Passing an EOA or zero
+    ///                     address will cause `balanceOf` to revert during `_checkRequirements`,
+    ///                     permanently blocking all claims (DoS).
     /// @param minBalances_ Corresponding minimum balances (must equal tokens_.length).
     /// @param followers_   Minimum LSP26 follower count (0 = none).
+    /// @dev ⚠️ SYBIL NOTE: Requirements are checked against `msg.sender` (the claimer address).
+    ///      On LUKSO, deploying additional Universal Profiles is cheap, so a determined actor
+    ///      can bypass claim-once limits via multiple addresses. Token/follower requirements
+    ///      raise the cost of Sybil attacks but do not eliminate them. This is a known
+    ///      limitation of address-based gating without an off-chain identity layer (e.g. KYC).
     function setRequirements(
         address[] calldata tokens_,
         uint256[] calldata minBalances_,
@@ -203,7 +225,13 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
         delete _reqTokens;
         delete _reqMinBalances;
         for (uint256 i = 0; i < tokens_.length;) {
-            _reqTokens.push(tokens_[i]);
+            address token = tokens_[i];
+            // Validate that the address has contract code. A zero address or EOA would
+            // cause `balanceOf` to revert during claim, permanently blocking all claims.
+            uint256 codeSize;
+            assembly { codeSize := extcodesize(token) }
+            if (codeSize == 0) revert InvalidTokenRequirement();
+            _reqTokens.push(token);
             _reqMinBalances.push(minBalances_[i]);
             unchecked { ++i; }
         }
