@@ -88,7 +88,8 @@ export default function ManagePage() {
         safe(c.startTime(), BigInt(0)),
         safe(c.endTime(), BigInt(0)),
         safe(c.amountPerClaim(), BigInt(0)),
-        safe(c.maxSupply(), BigInt(0)),
+        // v5 proxy tokens use tokenSupplyCap(), v3/v4 use maxSupply()
+        c.tokenSupplyCap().catch(() => c.maxSupply()).catch(() => BigInt(0)),
         safe(c.getTokenRequirements(), { tokens: [], minBalances: [] }),
         safe(c.requiredFollowers(), BigInt(0)),
         safe(c.codewordEnabled(), false),
@@ -97,7 +98,9 @@ export default function ManagePage() {
       setDropName(nameRaw && nameRaw !== "0x" ? Buffer.from(nameRaw.replace(/^0x/, ""), "hex").toString("utf8") : "");
       setClaimEnabled(enabled);
       setAmountPerClaim(amount ? amount.toString() : "0");
-      setMaxSupply(supply ? supply.toString() : "0");
+      // type(uint256).max from v5 proxy = unlimited; treat as "0" for display
+      const isUnlimited = supply === BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+      setMaxSupply(isUnlimited ? "0" : (supply ? supply.toString() : "0"));
       // Load multi-token requirements
       const tokensArr: string[] = reqResult?.tokens ?? [];
       const balancesArr: bigint[] = reqResult?.minBalances ?? [];

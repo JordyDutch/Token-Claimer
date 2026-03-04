@@ -5,16 +5,20 @@ export const LUKSO_CHAIN_ID = "0x2a";
 export const ZERO = "0x0000000000000000000000000000000000000000";
 
 export const LSP7_FACTORY =
-  process.env.NEXT_PUBLIC_LSP7_FACTORY ?? "0x9b132E764f92c6E6F5E91E276E310758C33dB08F";
+  process.env.NEXT_PUBLIC_LSP7_FACTORY ?? "0xE2932677195f46341c9d13dD0BBa016ac19B4E05";
 export const LSP8_FACTORY =
-  process.env.NEXT_PUBLIC_LSP8_FACTORY ?? "0xBd545E98F133282bD79dc4a6ac422437478A58b6";
+  process.env.NEXT_PUBLIC_LSP8_FACTORY ?? "0x649Ccee0D46283102De6fEef3456c2e0a6c37461";
 
 // LSP7DropFactory ABI
+// Includes both old (`totalTokenCampaigns`) and new (`totalCampaigns`) names —
+// the frontend uses .catch() fallbacks to handle both factory versions gracefully.
 export const LSP7_FACTORY_ABI = [
   "function createTokenDrop(string,string,uint256,uint256,bool) returns (address)",
-  "function totalTokenCampaigns() view returns (uint256)",
+  "function totalCampaigns() view returns (uint256)",          // v5 (EIP-1167 proxy factories)
+  "function totalTokenCampaigns() view returns (uint256)",     // v3/v4 (legacy)
   "function getTokenCampaigns(uint256,uint256) view returns (tuple(address contractAddr, address creator, string name, string symbol, uint256 createdAt)[])",
   "function getTokenCampaignsByCreator(address) view returns (uint256[])",
+  "function implementation() view returns (address)",          // v5 only
 ];
 
 // LSP8DropFactory ABI
@@ -42,7 +46,8 @@ export const CLAIM_ABI = [
   "function claimEnabled() view returns (bool)",
   "function startTime() view returns (uint256)",
   "function endTime() view returns (uint256)",
-  "function maxSupply() view returns (uint256)",
+  "function maxSupply() view returns (uint256)",         // v3/v4 legacy
+  "function tokenSupplyCap() view returns (uint256)",   // v5 proxy tokens
   "function isClaimActive() view returns (bool)",
   "function hasClaimed(address) view returns (bool)",
   "function getData(bytes32) view returns (bytes)",
@@ -61,7 +66,13 @@ export const CLAIM_ABI = [
 ];
 
 export const LSP7_EXTRA_ABI = [
+  // v5 (proxy): uses totalSupply() from CappedSupply base + tokenSupplyCap()
+  "function totalSupply() view returns (uint256)",
+  "function tokenSupplyCap() view returns (uint256)",
+  // v3/v4 (legacy constructor): kept for backward compat
   "function totalClaimedAmount() view returns (uint256)",
+  "function maxSupply() view returns (uint256)",
+  // shared
   "function totalClaimers() view returns (uint256)",
   "function decimals() view returns (uint8)",
 ];

@@ -78,7 +78,10 @@ export default function HomePage() {
         cfg.allLsp7Factories.map(async (factoryAddr) => {
           try {
             const lsp7 = new Contract(factoryAddr, LSP7_FACTORY_ABI, rpc);
-            const total = await lsp7.totalTokenCampaigns().catch(() => BigInt(0));
+            // v5 factories use totalCampaigns(), v3/v4 use totalTokenCampaigns()
+            const total = await lsp7.totalCampaigns().catch(() =>
+              lsp7.totalTokenCampaigns().catch(() => BigInt(0))
+            );
             if (total <= BigInt(0)) return;
             const items = await lsp7.getTokenCampaigns(0, total);
             for (const c of items) {

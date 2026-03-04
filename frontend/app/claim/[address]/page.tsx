@@ -75,7 +75,8 @@ export default function ClaimPage() {
       const [nameRaw, symbolRaw, supply, active, enabled, amount, reqResult, rFollowers, ownerAddr, start, end, codeEnabled] = await Promise.all([
         safe(c.getData(LSP4_TOKEN_NAME_KEY), null),
         safe(c.getData(LSP4_TOKEN_SYMBOL_KEY), null),
-        safe(c.maxSupply(), BigInt(0)),
+        // v5 proxy tokens use tokenSupplyCap(), v3/v4 use maxSupply()
+        c.tokenSupplyCap().catch(() => c.maxSupply()).catch(() => BigInt(0)),
         safe(c.isClaimActive(), false),
         safe(c.claimEnabled(), false),
         safe(c.amountPerClaim(), BigInt(0)),
@@ -141,15 +142,23 @@ export default function ClaimPage() {
       setReqInfo(hasReqs ? { tokens: enrichedTokens, followers: rFollowers } : null);
 
       if (type === "LSP7") {
-        const [, claimers, decimals] = await Promise.all([c.totalClaimedAmount(), c.totalClaimers(), c.decimals()]);
+        // v5 proxy: totalSupply() replaces totalClaimedAmount() (removed in proxy refactor)
+        const [claimedAmt, claimers, decimals] = await Promise.all([
+          c.totalClaimedAmount().catch(() => c.totalSupply().catch(() => BigInt(0))),
+          c.totalClaimers(),
+          c.decimals(),
+        ]);
         const dec = Number(decimals);
         setClaimedDisplay(claimers.toString());
-        setSupplyDisplay(supply === BigInt(0) ? "Unlimited" : formatUnits(supply, dec));
+        // type(uint256).max means unlimited supply in v5
+        const isUnlimited = supply === BigInt(0) || supply === BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        setSupplyDisplay(isUnlimited ? "Unlimited" : formatUnits(supply, dec));
         setAmountDisplay(formatUnits(amount, dec) + " tokens");
       } else {
         const totalClaimed = await c.totalClaimed();
         setClaimedDisplay(totalClaimed.toString());
-        setSupplyDisplay(supply === BigInt(0) ? "Unlimited" : supply.toString());
+        const isLSP8Unlimited = supply === BigInt(0) || supply === BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        setSupplyDisplay(isLSP8Unlimited ? "Unlimited" : supply.toString());
         setAmountDisplay(amount.toString() + (amount === BigInt(1) ? " NFT" : " NFTs"));
       }
 
