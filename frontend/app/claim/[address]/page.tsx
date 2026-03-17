@@ -324,7 +324,7 @@ export default function ClaimPage() {
     if (!addr) {
       const mobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
       setStatus(mobile
-        ? { message: "Open in Mobile UP App", type: "error", link: "https://universalprofile.cloud/" }
+        ? { message: "Open via the Universal Profiles mobile app", type: "error", link: "https://universalprofile.cloud/" }
         : { message: "Install the UP Browser Extension", type: "error", link: "https://chromewebstore.google.com/detail/universal-profiles/abchhpf8hn4lfpcnhbmgfkbiimhmbpkh" });
       return;
     }

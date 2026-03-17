@@ -224,7 +224,7 @@ export default function MyDropsPage() {
     const addr = await walletConnect();
     if (!addr) {
       const mobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-      setError(mobile ? "Open universalprofile.cloud on mobile to connect" : "Install the UP Browser Extension: chromewebstore.google.com/detail/universal-profiles/abchhpf8hn4lfpcnhbmgfkbiimhmbpkh");
+      setError(mobile ? "Open via the Universal Profiles mobile app" : "Install the UP Browser Extension: chromewebstore.google.com/detail/universal-profiles/abchhpf8hn4lfpcnhbmgfkbiimhmbpkh");
       return;
     }
   }

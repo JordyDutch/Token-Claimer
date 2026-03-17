@@ -97,7 +97,7 @@ export default function CreatePage() {
     if (!addr) {
       const mobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
       setStatus(mobile
-        ? { message: "Open universalprofile.cloud on mobile to connect", type: "error" }
+        ? { message: "Open via the Universal Profiles mobile app", type: "error" }
         : { message: "Install the UP Browser Extension to connect", type: "error" });
       return;
     }
