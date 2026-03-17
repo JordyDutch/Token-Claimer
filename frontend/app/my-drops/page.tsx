@@ -245,7 +245,7 @@ export default function MyDropsPage() {
             rel="noopener noreferrer"
             className="absolute top-0 right-0 text-[9px] text-faint hover:text-label transition-colors z-10"
           >
-            <span className="text-purple-500 font-bold">BETA</span> · Report issues
+            <span className="text-pink-500 font-bold">BETA</span> · Report issues
           </a>
         )}
         {/* Header */}
@@ -258,7 +258,7 @@ export default function MyDropsPage() {
           </div>
           <Link
             href="/create"
-            className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-purple-500 text-white hover:bg-purple-600 transition-all active:scale-[0.97] flex-shrink-0"
+            className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-pink-500 text-white hover:bg-pink-500 transition-all active:scale-[0.97] flex-shrink-0"
           >
             + New Drop
           </Link>
@@ -273,7 +273,7 @@ export default function MyDropsPage() {
             </p>
             <button
               onClick={connect}
-              className="px-6 py-3 rounded-xl text-sm font-semibold border-2 border-purple-400 text-purple-400 hover:bg-purple-400/10 transition-all cursor-pointer active:scale-[0.97]"
+              className="px-6 py-3 rounded-xl text-sm font-semibold border-2 border-pink-500 text-pink-500 hover:bg-pink-500/10 transition-all cursor-pointer active:scale-[0.97]"
             >
               Connect Universal Profile
             </button>
@@ -329,7 +329,7 @@ export default function MyDropsPage() {
             <p className="text-muted text-sm mb-2">You haven't created any drops yet</p>
             <Link
               href="/create"
-              className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+              className="text-xs text-pink-500 hover:text-pink-500 transition-colors"
             >
               Create your first drop →
             </Link>
@@ -349,7 +349,7 @@ export default function MyDropsPage() {
                   <div key={item.data.contractAddr} className={card}>
                     <div className="flex items-start gap-4">
                       {/* Icon */}
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden">
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-600 to-pink-600 flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden">
                         {item.data.icon ? (
                           <img src={item.data.icon} alt="" className="w-full h-full object-cover" />
                         ) : (
@@ -395,7 +395,7 @@ export default function MyDropsPage() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <Link
                             href={`/manage/${item.data.contractAddr}`}
-                            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition-all"
+                            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-pink-500/20 text-pink-500 border border-pink-500/30 hover:bg-pink-500/30 transition-all"
                           >
                             Manage
                           </Link>
@@ -468,7 +468,7 @@ export default function MyDropsPage() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <Link
                             href={`/secret-drop/${item.data.id}/manage`}
-                            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition-all"
+                            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-pink-500/20 text-pink-500 border border-pink-500/30 hover:bg-pink-500/30 transition-all"
                           >
                             Manage
                           </Link>

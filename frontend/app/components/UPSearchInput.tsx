@@ -148,7 +148,7 @@ export default function UPSearchInput({ value, onChange, placeholder, className 
     setResults([]);
   }
 
-  const inp = "w-full bg-surface border border-border-default rounded-lg px-3 py-2.5 text-sm text-secondary focus:outline-none focus:border-purple-400 transition-colors";
+  const inp = "w-full bg-surface border border-border-default rounded-lg px-3 py-2.5 text-sm text-secondary focus:outline-none focus:border-pink-500 transition-colors";
 
   if (selected) {
     return (
@@ -156,7 +156,7 @@ export default function UPSearchInput({ value, onChange, placeholder, className 
         {selected.avatar ? (
           <img src={selected.avatar} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" />
         ) : (
-          <div className="w-5 h-5 rounded-full bg-purple-500/20 shrink-0 flex items-center justify-center text-[10px] text-purple-400">UP</div>
+          <div className="w-5 h-5 rounded-full bg-pink-500/20 shrink-0 flex items-center justify-center text-[10px] text-pink-500">UP</div>
         )}
         <span className="text-xs text-secondary flex-1 truncate">{selected.name || selected.id.slice(0, 10) + "…"}</span>
         <span className="text-[10px] text-label font-mono hidden sm:inline">{selected.id.slice(0, 6)}…{selected.id.slice(-4)}</span>
@@ -187,7 +187,7 @@ export default function UPSearchInput({ value, onChange, placeholder, className 
               {p.avatar ? (
                 <img src={p.avatar} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
               ) : (
-                <div className="w-6 h-6 rounded-full bg-purple-500/20 shrink-0 flex items-center justify-center text-[10px] text-purple-400">UP</div>
+                <div className="w-6 h-6 rounded-full bg-pink-500/20 shrink-0 flex items-center justify-center text-[10px] text-pink-500">UP</div>
               )}
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-secondary truncate">{p.name}</p>

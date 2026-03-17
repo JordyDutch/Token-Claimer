@@ -25,7 +25,7 @@ function highlight(code: string): React.ReactNode[] {
     [/\/\/[^\n]*/g, "text-faint italic"],
     [/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`/g, "text-green-600 dark:text-green-400"],
     [/\b(?:address|uint256|uint8|bytes32|bytes|bool|string|memory|calldata|mapping|tuple)\b/g, "text-amber-600 dark:text-amber-400"],
-    [/\b(?:function|returns?|view|external|public|struct|import|from|const|let|var|await|async|new|try|catch|if|else|for)\b/g, "text-purple-600 dark:text-purple-400 font-semibold"],
+    [/\b(?:function|returns?|view|external|public|struct|import|from|const|let|var|await|async|new|try|catch|if|else|for)\b/g, "text-pink-500 dark:text-pink-400 font-semibold"],
     [/\b\d[\d_]*\b/g, "text-blue-600 dark:text-blue-400"],
   ];
 
@@ -70,7 +70,7 @@ function Addr({ address, explorer }: { address: string; explorer: string }) {
       href={`${explorer}/address/${address}#code`}
       target="_blank"
       rel="noopener noreferrer"
-      className="font-mono text-[11px] sm:text-xs text-purple-600 dark:text-purple-400 hover:underline break-all"
+      className="font-mono text-[11px] sm:text-xs text-pink-500 dark:text-pink-400 hover:underline break-all"
     >
       {address}
     </a>
@@ -94,13 +94,13 @@ export default function DevelopersPage() {
             rel="noopener noreferrer"
             className="absolute top-0 right-0 text-[9px] text-faint hover:text-label transition-colors z-10"
           >
-            <span className="text-purple-500 font-bold">BETA</span> · Report issues
+            <span className="text-pink-500 font-bold">BETA</span> · Report issues
           </a>
         )}
 
         {/* Hero */}
         <div className="mb-8 sm:mb-10">
-          <Link href="/" className="text-label text-xs hover:text-purple-400 transition-colors">
+          <Link href="/" className="text-label text-xs hover:text-pink-500 transition-colors">
             ← Back
           </Link>
           <h1 className="text-2xl sm:text-3xl font-bold mt-3 mb-2">Developers</h1>
@@ -122,11 +122,11 @@ export default function DevelopersPage() {
             </p>
             <div className="bg-surface-subtle rounded-xl p-4 sm:p-6 border border-border-muted text-xs sm:text-sm font-mono text-center space-y-3">
               <div className="flex items-center justify-center gap-2 sm:gap-4 flex-wrap">
-                <span className="bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-400 px-3 py-1.5 rounded-lg font-semibold">
+                <span className="bg-pink-500 dark:bg-pink-500/10 border border-pink-500 dark:border-pink-500/20 text-pink-500 dark:text-pink-400 px-3 py-1.5 rounded-lg font-semibold">
                   LSP7DropFactory
                 </span>
                 <span className="text-faint hidden sm:inline">/</span>
-                <span className="bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-400 px-3 py-1.5 rounded-lg font-semibold">
+                <span className="bg-pink-500 dark:bg-pink-500/10 border border-pink-500 dark:border-pink-500/20 text-pink-500 dark:text-pink-400 px-3 py-1.5 rounded-lg font-semibold">
                   LSP8DropFactory
                 </span>
               </div>
@@ -221,17 +221,17 @@ export default function DevelopersPage() {
             <h2 className={sectionTitle}>How It Works</h2>
             <div className="space-y-4">
               <div className="flex gap-3">
-                <span className="w-6 h-6 rounded-full bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-400 text-xs font-bold flex items-center justify-center flex-shrink-0">1</span>
+                <span className="w-6 h-6 rounded-full bg-pink-500 dark:bg-pink-500/10 border border-pink-500 dark:border-pink-500/20 text-pink-500 dark:text-pink-400 text-xs font-bold flex items-center justify-center flex-shrink-0">1</span>
                 <div>
                   <p className="text-sm font-medium mb-1">Creator deploys a drop</p>
                   <p className="text-xs text-label">
-                    Calls <code className="text-purple-600 dark:text-purple-400">createTokenDrop()</code> or <code className="text-purple-600 dark:text-purple-400">createNFTDrop()</code> on
+                    Calls <code className="text-pink-500 dark:text-pink-400">createTokenDrop()</code> or <code className="text-pink-500 dark:text-pink-400">createNFTDrop()</code> on
                     the factory. This deploys a fresh contract and transfers ownership to the creator.
                   </p>
                 </div>
               </div>
               <div className="flex gap-3">
-                <span className="w-6 h-6 rounded-full bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-400 text-xs font-bold flex items-center justify-center flex-shrink-0">2</span>
+                <span className="w-6 h-6 rounded-full bg-pink-500 dark:bg-pink-500/10 border border-pink-500 dark:border-pink-500/20 text-pink-500 dark:text-pink-400 text-xs font-bold flex items-center justify-center flex-shrink-0">2</span>
                 <div>
                   <p className="text-sm font-medium mb-1">Creator configures the drop</p>
                   <p className="text-xs text-label">
@@ -241,11 +241,11 @@ export default function DevelopersPage() {
                 </div>
               </div>
               <div className="flex gap-3">
-                <span className="w-6 h-6 rounded-full bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-400 text-xs font-bold flex items-center justify-center flex-shrink-0">3</span>
+                <span className="w-6 h-6 rounded-full bg-pink-500 dark:bg-pink-500/10 border border-pink-500 dark:border-pink-500/20 text-pink-500 dark:text-pink-400 text-xs font-bold flex items-center justify-center flex-shrink-0">3</span>
                 <div>
                   <p className="text-sm font-medium mb-1">Users claim tokens or NFTs</p>
                   <p className="text-xs text-label">
-                    Eligible users call <code className="text-purple-600 dark:text-purple-400">claim()</code> or <code className="text-purple-600 dark:text-purple-400">claimWithCode()</code>.
+                    Eligible users call <code className="text-pink-500 dark:text-pink-400">claim()</code> or <code className="text-pink-500 dark:text-pink-400">claimWithCode()</code>.
                     The contract validates all requirements, then mints tokens/NFTs directly to the claimer.
                     Each address can only claim once.
                   </p>
@@ -370,37 +370,37 @@ ReentrancyGuard()`}</CodeBlock>
             <h2 className={sectionTitle}>LSP Standards Used</h2>
             <div className="space-y-3">
               <div className="flex gap-3">
-                <span className="bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-400 text-[10px] font-bold px-2 py-1 rounded flex-shrink-0 h-fit">LSP7</span>
+                <span className="bg-pink-500 dark:bg-pink-500/10 border border-pink-500 dark:border-pink-500/20 text-pink-500 dark:text-pink-400 text-[10px] font-bold px-2 py-1 rounded flex-shrink-0 h-fit">LSP7</span>
                 <div>
                   <p className="text-sm font-medium">Digital Asset (Fungible Token)</p>
                   <p className="text-xs text-label">
-                    LUKSO&apos;s standard for fungible tokens. Similar to ERC-20 but with <code className="text-purple-600 dark:text-purple-400">force</code> parameter
-                    on transfers and metadata stored in ERC725Y (no <code className="text-purple-600 dark:text-purple-400">name()</code>/<code className="text-purple-600 dark:text-purple-400">symbol()</code> view functions).
+                    LUKSO&apos;s standard for fungible tokens. Similar to ERC-20 but with <code className="text-pink-500 dark:text-pink-400">force</code> parameter
+                    on transfers and metadata stored in ERC725Y (no <code className="text-pink-500 dark:text-pink-400">name()</code>/<code className="text-pink-500 dark:text-pink-400">symbol()</code> view functions).
                   </p>
                 </div>
               </div>
               <div className="flex gap-3">
-                <span className="bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-400 text-[10px] font-bold px-2 py-1 rounded flex-shrink-0 h-fit">LSP8</span>
+                <span className="bg-pink-500 dark:bg-pink-500/10 border border-pink-500 dark:border-pink-500/20 text-pink-500 dark:text-pink-400 text-[10px] font-bold px-2 py-1 rounded flex-shrink-0 h-fit">LSP8</span>
                 <div>
                   <p className="text-sm font-medium">Identifiable Digital Asset (NFT)</p>
                   <p className="text-xs text-label">
-                    LUKSO&apos;s NFT standard. Token IDs are <code className="text-purple-600 dark:text-purple-400">bytes32</code> (not uint256).
+                    LUKSO&apos;s NFT standard. Token IDs are <code className="text-pink-500 dark:text-pink-400">bytes32</code> (not uint256).
                     Drop contracts auto-increment IDs starting at 1.
                   </p>
                 </div>
               </div>
               <div className="flex gap-3">
-                <span className="bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-400 text-[10px] font-bold px-2 py-1 rounded flex-shrink-0 h-fit">LSP26</span>
+                <span className="bg-pink-500 dark:bg-pink-500/10 border border-pink-500 dark:border-pink-500/20 text-pink-500 dark:text-pink-400 text-[10px] font-bold px-2 py-1 rounded flex-shrink-0 h-fit">LSP26</span>
                 <div>
                   <p className="text-sm font-medium">Follower System</p>
                   <p className="text-xs text-label">
                     On-chain social graph. Drops can require claimers to have a minimum number of followers.
-                    Registry is at <code className="text-purple-600 dark:text-purple-400 break-all">{contracts.lsp26}</code>.
+                    Registry is at <code className="text-pink-500 dark:text-pink-400 break-all">{contracts.lsp26}</code>.
                   </p>
                 </div>
               </div>
               <div className="flex gap-3">
-                <span className="bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-400 text-[10px] font-bold px-2 py-1 rounded flex-shrink-0 h-fit">LSP4</span>
+                <span className="bg-pink-500 dark:bg-pink-500/10 border border-pink-500 dark:border-pink-500/20 text-pink-500 dark:text-pink-400 text-[10px] font-bold px-2 py-1 rounded flex-shrink-0 h-fit">LSP4</span>
                 <div>
                   <p className="text-sm font-medium">Digital Asset Metadata</p>
                   <p className="text-xs text-label">
@@ -505,7 +505,7 @@ async function detectTokenType(contract) {
                 href="https://github.com/JordyDutch/Token-Claimer"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-4 py-2 rounded-lg text-xs font-medium bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-500/20 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-all"
+                className="px-4 py-2 rounded-lg text-xs font-medium bg-pink-500/15 dark:bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-500 dark:border-pink-500/20 hover:bg-pink-500 dark:hover:bg-pink-500/20 transition-all"
               >
                 GitHub Repository
               </a>
@@ -513,7 +513,7 @@ async function detectTokenType(contract) {
                 href="https://github.com/JordyDutch/issue-tracker/issues"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-4 py-2 rounded-lg text-xs font-medium bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-500/20 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-all"
+                className="px-4 py-2 rounded-lg text-xs font-medium bg-pink-500/15 dark:bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-500 dark:border-pink-500/20 hover:bg-pink-500 dark:hover:bg-pink-500/20 transition-all"
               >
                 Report Issues
               </a>

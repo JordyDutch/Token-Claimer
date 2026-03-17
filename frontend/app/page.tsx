@@ -112,7 +112,8 @@ export default function HomePage() {
                 name: c.name,
                 symbol: c.symbol,
                 createdAt: Number(c.createdAt),
-                isNFT: false,
+                // v5 Campaign struct has isNonDivisible; legacy factories don't
+                isNFT: Boolean(c.isNonDivisible),
               });
             }
           } catch { /* skip unresponsive factory */ }
@@ -272,7 +273,7 @@ export default function HomePage() {
   const tabClass = (tab: FilterTab) =>
     `px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
       filter === tab
-        ? "bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 border border-purple-300 dark:border-purple-500/30"
+        ? "bg-pink-500/15 dark:bg-pink-500/20 text-pink-600 dark:text-pink-400 border border-pink-500 dark:border-pink-500/30"
         : "text-label hover:text-secondary border border-transparent"
     }`;
 
@@ -295,7 +296,7 @@ export default function HomePage() {
             rel="noopener noreferrer"
             className="absolute top-0 right-0 text-[9px] text-faint hover:text-label transition-colors z-10"
           >
-            <span className="text-purple-500 font-bold">BETA</span> · Report issues
+            <span className="text-pink-500 font-bold">BETA</span> · Report issues
           </a>
         )}
         {/* Hero */}
@@ -308,7 +309,7 @@ export default function HomePage() {
           </p>
           <Link
             href="/create"
-            className="inline-block px-6 py-3 rounded-xl text-sm sm:text-base font-semibold bg-purple-500 text-white hover:bg-purple-600 transition-all active:scale-[0.97]"
+            className="inline-block px-6 py-3 rounded-xl text-sm sm:text-base font-semibold bg-pink-500 text-white hover:bg-pink-500 transition-all active:scale-[0.97]"
           >
             + Create a Drop
           </Link>
@@ -321,7 +322,7 @@ export default function HomePage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name, symbol, or address..."
-            className="w-full bg-card border border-border-muted rounded-xl px-4 py-2.5 text-sm text-tertiary placeholder:text-faint focus:outline-none focus:border-purple-500/40 transition-colors"
+            className="w-full bg-card border border-border-muted rounded-xl px-4 py-2.5 text-sm text-tertiary placeholder:text-faint focus:outline-none focus:border-pink-500/40 transition-colors"
           />
           <div className="flex items-center gap-2 flex-wrap">
             <button onClick={() => setFilter("all")} className={tabClass("all")}>
@@ -388,7 +389,7 @@ export default function HomePage() {
             {filter === "mine" && (
               <Link
                 href="/create"
-                className="inline-block mt-3 text-xs text-purple-400 hover:text-purple-300"
+                className="inline-block mt-3 text-xs text-pink-500 hover:text-pink-500"
               >
                 Create your first drop →
               </Link>
@@ -403,10 +404,10 @@ export default function HomePage() {
               <Link
                 key={item.data.contractAddr}
                 href={`/claim/${item.data.contractAddr}`}
-                className="block bg-card rounded-xl p-4 sm:p-5 border border-border-muted hover:border-purple-500/30 card-elevated transition-all group"
+                className="block bg-card rounded-xl p-4 sm:p-5 border border-border-muted hover:border-pink-500/30 card-elevated transition-all group"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br from-violet-600 to-pink-600 flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden">
                     {item.data.icon ? (
                       <img src={item.data.icon} alt="" className="w-full h-full object-cover" />
                     ) : (
@@ -415,7 +416,7 @@ export default function HomePage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-sm sm:text-base truncate group-hover:text-purple-400 transition-colors">
+                      <h3 className="font-semibold text-sm sm:text-base truncate group-hover:text-pink-500 transition-colors">
                         {item.data.name}
                       </h3>
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface text-muted flex-shrink-0">
@@ -439,7 +440,7 @@ export default function HomePage() {
                       </span>
                     </div>
                   </div>
-                  <div className="text-faint group-hover:text-purple-400 transition-colors flex-shrink-0 text-lg">
+                  <div className="text-faint group-hover:text-pink-500 transition-colors flex-shrink-0 text-lg">
                     →
                   </div>
                 </div>

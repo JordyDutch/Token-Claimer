@@ -171,7 +171,7 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
     return (
       <div className={inIframe ? "min-h-dvh flex flex-col items-center justify-center gap-4 px-4 py-3" : "min-h-dvh flex flex-col items-center justify-center gap-4 px-3 py-6 sm:p-4"}>
         <p className="text-muted">Drop not found</p>
-        <Link href="/" className="text-purple-400 text-sm hover:underline">Back home</Link>
+        <Link href="/" className="text-pink-500 text-sm hover:underline">Back home</Link>
       </div>
     );
   }
@@ -186,7 +186,7 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
             rel="noopener noreferrer"
             className="absolute top-2 right-3 text-[9px] text-faint hover:text-label transition-colors z-10"
           >
-            <span className="text-purple-500 font-bold">BETA</span> · Report issues
+            <span className="text-pink-500 font-bold">BETA</span> · Report issues
           </a>
         )}
         <div className={`bg-card rounded-xl text-center border border-border-muted card-elevated ${inIframe ? "p-6" : "p-5 sm:p-8"}`}>
@@ -218,7 +218,7 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
                   )}
                   {drop.mode === "pool" && drop.remaining !== null && (
                     <>
-                      <span className="text-purple-600 dark:text-purple-400 font-semibold">{drop.remaining}</span>
+                      <span className="text-pink-500 dark:text-pink-400 font-semibold">{drop.remaining}</span>
                       <span className="text-faint">/ {drop.totalCodes} remaining</span>
                     </>
                   )}
@@ -297,7 +297,7 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
                 <div className="text-[10px] sm:text-xs text-label uppercase tracking-wider">
                   Remaining
                 </div>
-                <div className="text-lg sm:text-xl font-semibold text-purple-600 dark:text-purple-400">
+                <div className="text-lg sm:text-xl font-semibold text-pink-500 dark:text-pink-400">
                   {drop.remaining}
                 </div>
               </div>
@@ -305,7 +305,7 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
                 <div className="text-[10px] sm:text-xs text-label uppercase tracking-wider">
                   Total
                 </div>
-                <div className="text-lg sm:text-xl font-semibold text-purple-600 dark:text-purple-400">
+                <div className="text-lg sm:text-xl font-semibold text-pink-500 dark:text-pink-400">
                   {drop.totalCodes}
                 </div>
               </div>
@@ -346,7 +346,7 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
                 <div className={`flex items-center gap-2 ${inIframe ? "py-1" : "py-1.5"}`}>
                   <span className="text-tertiary text-xs">
                     Follow{" "}
-                    <span className="font-mono text-xs text-purple-400">
+                    <span className="font-mono text-xs text-pink-500">
                       {drop.followerRequirement.followAddress.slice(0, 8)}…
                     </span>
                   </span>
@@ -396,7 +396,7 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
               {!address ? (
                 <button
                   onClick={() => walletConnect()}
-                  className={`w-full rounded-xl font-semibold border-2 border-purple-400 text-purple-400 hover:bg-purple-400/10 transition-all cursor-pointer active:scale-[0.97] ${inIframe ? "py-3 text-sm" : "py-3.5 sm:py-4 text-base sm:text-lg"}`}
+                  className={`w-full rounded-xl font-semibold border-2 border-pink-500 text-pink-500 hover:bg-pink-500/10 transition-all cursor-pointer active:scale-[0.97] ${inIframe ? "py-3 text-sm" : "py-3.5 sm:py-4 text-base sm:text-lg"}`}
                 >
                   Connect Universal Profile
                 </button>
@@ -418,7 +418,7 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
           <div className="flex items-center justify-between mt-4 sm:mt-6 px-2 gap-2">
             <Link
               href="/"
-              className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors"
+              className="text-faint text-[10px] sm:text-xs hover:text-pink-500 transition-colors"
             >
               ← All drops
             </Link>
@@ -431,7 +431,7 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
                     setTimeout(() => setCopied(false), 2000);
                   });
                 }}
-                className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors cursor-pointer"
+                className="text-faint text-[10px] sm:text-xs hover:text-pink-500 transition-colors cursor-pointer"
               >
                 {copied && !claimed ? "Link copied!" : "Share"}
               </button>

@@ -92,7 +92,7 @@ export default function TokenSearchInput({ value, onChange, label, className }: 
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const inp = "w-full bg-surface border border-border-default rounded-lg px-3 py-2.5 text-sm text-secondary focus:outline-none focus:border-purple-400 transition-colors";
+  const inp = "w-full bg-surface border border-border-default rounded-lg px-3 py-2.5 text-sm text-secondary focus:outline-none focus:border-pink-500 transition-colors";
 
   return (
     <div ref={containerRef} className={className}>
@@ -142,7 +142,7 @@ export default function TokenSearchInput({ value, onChange, label, className }: 
         />
         {searching && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <div className="w-3.5 h-3.5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+            <div className="w-3.5 h-3.5 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
           </div>
         )}
 

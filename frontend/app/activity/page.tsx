@@ -356,11 +356,11 @@ export default function ActivityPage() {
               <Link
                 key={item.id}
                 href={`/claim/${item.dropAddress}`}
-                className="block bg-card rounded-xl px-4 py-3 border border-border-muted hover:border-purple-500/30 card-elevated transition-all group"
+                className="block bg-card rounded-xl px-4 py-3 border border-border-muted hover:border-pink-500/30 card-elevated transition-all group"
               >
                 <div className="flex items-center gap-3">
                   {/* Avatar */}
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-600 to-pink-600 flex items-center justify-center flex-shrink-0 overflow-hidden">
                     {item.profile?.image ? (
                       <img
                         src={item.profile.image}
@@ -390,7 +390,7 @@ export default function ActivityPage() {
                       >
                         {item.type === "create" ? "created" : "claimed"}
                       </span>
-                      <span className="font-medium truncate max-w-[160px] group-hover:text-purple-400 transition-colors">
+                      <span className="font-medium truncate max-w-[160px] group-hover:text-pink-500 transition-colors">
                         {item.dropName}
                       </span>
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface text-muted flex-shrink-0">

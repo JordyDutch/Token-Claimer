@@ -5,19 +5,22 @@ export const LUKSO_CHAIN_ID = "0x2a";
 export const ZERO = "0x0000000000000000000000000000000000000000";
 
 export const LSP7_FACTORY =
-  process.env.NEXT_PUBLIC_LSP7_FACTORY ?? "0xE2932677195f46341c9d13dD0BBa016ac19B4E05";
+  process.env.NEXT_PUBLIC_LSP7_FACTORY ?? "0xF1b5FfA5A82Cee28eaC551165102a1e62fBef7Ab";
 export const LSP8_FACTORY =
-  process.env.NEXT_PUBLIC_LSP8_FACTORY ?? "0x649Ccee0D46283102De6fEef3456c2e0a6c37461";
+  process.env.NEXT_PUBLIC_LSP8_FACTORY ?? "0xA373f07E94496A4509c30DcB27b431c541b87FbF";
 
 // LSP7DropFactory ABI
 // Includes both old (`totalTokenCampaigns`) and new (`totalCampaigns`) names —
 // the frontend uses .catch() fallbacks to handle both factory versions gracefully.
 export const LSP7_FACTORY_ABI = [
   "function createTokenDrop(string,string,uint256,uint256,bool) returns (address)",
+  "function createNFTDrop(string,string,uint256,uint256) returns (address)",
   "function totalCampaigns() view returns (uint256)",          // v5 (EIP-1167 proxy factories)
   "function totalTokenCampaigns() view returns (uint256)",     // v3/v4 (legacy)
-  "function getCampaigns(uint256,uint256) view returns (tuple(address contractAddr, address creator, string name, string symbol, uint256 createdAt)[])",
+  "function totalNFTCampaigns() view returns (uint256)",
+  "function getCampaigns(uint256,uint256) view returns (tuple(address contractAddr, address creator, string name, string symbol, uint256 createdAt, bool isNonDivisible)[])",
   "function getTokenCampaigns(uint256,uint256) view returns (tuple(address contractAddr, address creator, string name, string symbol, uint256 createdAt)[])",
+  "function getNFTCampaigns(uint256,uint256) view returns (tuple(address contractAddr, address creator, string name, string symbol, uint256 createdAt, bool isNonDivisible)[])",
   "function getCampaignsByCreator(address) view returns (uint256[])",
   "function getTokenCampaignsByCreator(address) view returns (uint256[])",
   "function implementation() view returns (address)",          // v5 only
@@ -146,11 +149,12 @@ export async function ensureLuksoNetwork(
   }
 }
 
-// Detect if a claim contract is LSP7 or LSP8 by checking for decimals()
-export async function detectTokenType(contract: any): Promise<"LSP7" | "LSP8"> {
+// Detect if a claim contract is LSP7, LSP7-NFT, or LSP8 by checking for decimals()
+// LSP7 with decimals=0 is an NFT-style (non-divisible) drop
+export async function detectTokenType(contract: any): Promise<"LSP7" | "LSP7-NFT" | "LSP8"> {
   try {
-    await contract.decimals();
-    return "LSP7";
+    const decimals = await contract.decimals();
+    return Number(decimals) === 0 ? "LSP7-NFT" : "LSP7";
   } catch {
     return "LSP8";
   }

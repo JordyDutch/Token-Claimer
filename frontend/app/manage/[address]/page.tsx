@@ -28,7 +28,7 @@ export default function ManagePage() {
 
   const [isOwner, setIsOwner] = useState(false);
   const [status, setStatus] = useState<Status>(null);
-  const [tokenType, setTokenType] = useState<"LSP7" | "LSP8" | null>(null);
+  const [tokenType, setTokenType] = useState<"LSP7" | "LSP7-NFT" | "LSP8" | null>(null);
   const [isNftStyle, setIsNftStyle] = useState(false);
   const [dropName, setDropName] = useState("");
   const [claimEnabled, setClaimEnabled] = useState(false);
@@ -118,11 +118,11 @@ export default function ManagePage() {
       if (start > BigInt(0)) setStartTime(new Date(Number(start) * 1000).toISOString().slice(0, 16));
       if (end > BigInt(0)) setEndTime(new Date(Number(end) * 1000).toISOString().slice(0, 16));
       try {
-        if (type === "LSP7") {
+        if (type === "LSP7" || type === "LSP7-NFT") {
           const cl = await c.totalClaimers();
           setTotalClaimed(cl.toString());
           const dec = await c.decimals();
-          setIsNftStyle(Number(dec) === 0);
+          setIsNftStyle(type === "LSP7-NFT" || Number(dec) === 0);
         } else {
           const cl = await c.totalClaimed();
           setTotalClaimed(cl.toString());
@@ -308,9 +308,9 @@ export default function ManagePage() {
     }
   }
 
-  const inp = "w-full bg-surface border border-border-default rounded-lg px-3 py-2.5 text-sm text-secondary focus:outline-none focus:border-purple-400 transition-colors";
+  const inp = "w-full bg-surface border border-border-default rounded-lg px-3 py-2.5 text-sm text-secondary focus:outline-none focus:border-pink-500 transition-colors";
   const lbl = "text-[11px] sm:text-xs text-label";
-  const btn = "w-full py-2.5 sm:py-3 rounded-xl text-sm font-medium bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 border border-purple-300 dark:border-purple-500/30 hover:bg-purple-100 dark:hover:bg-purple-500/30 transition-all cursor-pointer active:scale-[0.97]";
+  const btn = "w-full py-2.5 sm:py-3 rounded-xl text-sm font-medium bg-pink-500/15 dark:bg-pink-500/20 text-pink-600 dark:text-pink-400 border border-pink-500 dark:border-pink-500/30 hover:bg-pink-500 dark:hover:bg-pink-500/30 transition-all cursor-pointer active:scale-[0.97]";
   const card = "bg-card rounded-xl p-4 sm:p-6 border border-border-muted card-elevated";
   const explorerUrl = `${networkConfig.explorerBase}/address/${contractAddress}`;
 
@@ -324,13 +324,13 @@ export default function ManagePage() {
             rel="noopener noreferrer"
             className="absolute top-0 right-0 text-[9px] text-faint hover:text-label transition-colors z-10"
           >
-            <span className="text-purple-500 font-bold">BETA</span> · Report issues
+            <span className="text-pink-500 font-bold">BETA</span> · Report issues
           </a>
         )}
         {/* Header card */}
         <div className={card}>
           <div className="flex items-center justify-between mb-1">
-            <Link href={`/claim/${contractAddress}`} className="text-label text-xs hover:text-purple-400 transition-colors">
+            <Link href={`/claim/${contractAddress}`} className="text-label text-xs hover:text-pink-500 transition-colors">
               ← Claim page
             </Link>
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface text-muted">
@@ -351,7 +351,7 @@ export default function ManagePage() {
               href={explorerUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[10px] text-label hover:text-purple-400 transition-colors"
+              className="text-[10px] text-label hover:text-pink-500 transition-colors"
             >
               Explorer
             </a>
@@ -360,7 +360,7 @@ export default function ManagePage() {
           {/* Share claim link */}
           <button
             onClick={copyClaimLink}
-            className="w-full py-2 rounded-lg text-xs font-medium border border-border-default text-muted hover:text-purple-400 hover:border-purple-500/30 transition-all cursor-pointer mb-3"
+            className="w-full py-2 rounded-lg text-xs font-medium border border-border-default text-muted hover:text-pink-500 hover:border-pink-500/30 transition-all cursor-pointer mb-3"
           >
             {linkCopied ? "Claim link copied!" : "Copy claim link for sharing"}
           </button>
@@ -368,7 +368,7 @@ export default function ManagePage() {
           {!address ? (
             <button
               onClick={connect}
-              className="w-full py-3 rounded-xl text-sm font-semibold border-2 border-purple-400 text-purple-400 hover:bg-purple-400/10 transition-all cursor-pointer active:scale-[0.97]"
+              className="w-full py-3 rounded-xl text-sm font-semibold border-2 border-pink-500 text-pink-500 hover:bg-pink-500/10 transition-all cursor-pointer active:scale-[0.97]"
             >
               Connect Universal Profile
             </button>
@@ -407,11 +407,11 @@ export default function ManagePage() {
                 </div>
                 <div>
                   <div className={lbl + " uppercase tracking-wider"}>Claimed</div>
-                  <div className="text-lg font-semibold text-purple-600 dark:text-purple-400">{totalClaimed}</div>
+                  <div className="text-lg font-semibold text-pink-500 dark:text-pink-400">{totalClaimed}</div>
                 </div>
                 <div>
                   <div className={lbl + " uppercase tracking-wider"}>Supply</div>
-                  <div className="text-lg font-semibold text-purple-600 dark:text-purple-400">
+                  <div className="text-lg font-semibold text-pink-500 dark:text-pink-400">
                     {maxSupply === "0" ? "Unlimited" : maxSupply}
                   </div>
                 </div>
@@ -562,7 +562,7 @@ export default function ManagePage() {
                   <button
                     type="button"
                     onClick={() => setTokenReqs((prev) => [...prev, { addr: "", amount: "" }])}
-                    className="text-xs text-purple-400 hover:text-purple-300 border border-purple-500/30 rounded-lg px-3 py-1.5 transition-colors cursor-pointer w-full"
+                    className="text-xs text-pink-500 hover:text-pink-500 border border-pink-500/30 rounded-lg px-3 py-1.5 transition-colors cursor-pointer w-full"
                   >
                     + Add token requirement
                   </button>
@@ -671,7 +671,7 @@ export default function ManagePage() {
                     <button
                       type="button"
                       onClick={() => metaIconRef.current?.click()}
-                      className="text-xs text-purple-400 hover:text-purple-300 border border-purple-500/30 rounded-lg px-3 py-1.5 transition-colors cursor-pointer"
+                      className="text-xs text-pink-500 hover:text-pink-500 border border-pink-500/30 rounded-lg px-3 py-1.5 transition-colors cursor-pointer"
                     >
                       {metaIconFile ? "Change" : "Upload"}
                     </button>
@@ -688,7 +688,7 @@ export default function ManagePage() {
                   <input
                     ref={metaIconRef}
                     type="file"
-                    accept="image/jpeg,image/png,image/svg+xml,image/webp"
+                    accept="image/jpeg,image/png,image/svg+xml,image/webp,image/gif"
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0] ?? null;
@@ -744,7 +744,7 @@ export default function ManagePage() {
                   <button
                     type="button"
                     onClick={() => setMetaLinks((prev) => [...prev, { title: "", url: "" }])}
-                    className="text-xs text-purple-400 hover:text-purple-300 mt-2 cursor-pointer"
+                    className="text-xs text-pink-500 hover:text-pink-500 mt-2 cursor-pointer"
                   >
                     + Add link
                   </button>
@@ -783,7 +783,7 @@ export default function ManagePage() {
                   <button
                     type="button"
                     onClick={() => metaAssetRef.current?.click()}
-                    className="text-xs text-purple-400 hover:text-purple-300 border border-purple-500/30 rounded-lg px-3 py-1.5 transition-colors cursor-pointer"
+                    className="text-xs text-pink-500 hover:text-pink-500 border border-pink-500/30 rounded-lg px-3 py-1.5 transition-colors cursor-pointer"
                   >
                     + Add asset file
                   </button>
@@ -831,7 +831,7 @@ export default function ManagePage() {
                 ? "bg-toast-success border border-green-300 dark:border-green-500/30 text-green-700 dark:text-green-400"
                 : status.type === "error"
                 ? "bg-toast-error border border-red-300 dark:border-red-500/30 text-red-700 dark:text-red-400"
-                : "bg-dropdown border border-purple-300 dark:border-purple-500/30 text-purple-700 dark:text-purple-400"
+                : "bg-dropdown border border-pink-500 dark:border-pink-500/30 text-pink-500 dark:text-pink-400"
             }`}
           >
             {status.link ? (
@@ -844,7 +844,7 @@ export default function ManagePage() {
 
         {/* Footer nav */}
         <div className="flex justify-between px-2 pb-4">
-          <Link href="/" className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors">
+          <Link href="/" className="text-faint text-[10px] sm:text-xs hover:text-pink-500 transition-colors">
             ← All drops
           </Link>
           {!inIframe && <Footer />}
