@@ -181,14 +181,14 @@ export default function SecretDropManagePage({ params }: { params: Promise<{ id:
     });
   }
 
-  const inp = "w-full bg-surface border border-border-default rounded-lg px-3 py-2.5 text-sm text-secondary focus:outline-none focus:border-purple-400 transition-colors";
+  const inp = "w-full bg-surface border border-border-default rounded-lg px-3 py-2.5 text-sm text-secondary focus:outline-none focus:border-pink-500 transition-colors";
   const lbl = "text-[11px] sm:text-xs text-label mb-1 block";
   const card = "bg-card rounded-xl p-5 sm:p-8 border border-border-muted card-elevated";
 
   if (loading) {
     return (
       <div className={inIframe ? "flex items-center justify-center py-12" : "min-h-screen bg-bg flex items-center justify-center"}>
-        <div className="w-6 h-6 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-pink-500/30 border-t-pink-500 rounded-full animate-spin" />
       </div>
     );
   }
@@ -197,7 +197,7 @@ export default function SecretDropManagePage({ params }: { params: Promise<{ id:
     return (
       <div className={inIframe ? "flex flex-col items-center justify-center gap-4 py-12" : "min-h-screen bg-bg flex flex-col items-center justify-center gap-4"}>
         <p className="text-muted">Drop not found</p>
-        <Link href="/" className="text-purple-400 text-sm hover:underline">Back home</Link>
+        <Link href="/" className="text-pink-500 text-sm hover:underline">Back home</Link>
       </div>
     );
   }
@@ -210,7 +210,7 @@ export default function SecretDropManagePage({ params }: { params: Promise<{ id:
           <p className="text-muted text-sm mb-4">Connect your Universal Profile to manage this drop</p>
           <button
             onClick={() => walletConnect()}
-            className="px-6 py-3 rounded-xl text-sm font-semibold border-2 border-purple-400 text-purple-400 hover:bg-purple-400/10 transition-all cursor-pointer active:scale-[0.97]"
+            className="px-6 py-3 rounded-xl text-sm font-semibold border-2 border-pink-500 text-pink-500 hover:bg-pink-500/10 transition-all cursor-pointer active:scale-[0.97]"
           >
             Connect Universal Profile
           </button>
@@ -225,7 +225,7 @@ export default function SecretDropManagePage({ params }: { params: Promise<{ id:
         <div className={card + " max-w-lg w-full text-center"}>
           <div className="text-4xl mb-3">🚫</div>
           <p className="text-muted text-sm mb-2">You are not the creator of this drop</p>
-          <Link href="/" className="text-purple-400 text-xs hover:underline">Back home</Link>
+          <Link href="/" className="text-pink-500 text-xs hover:underline">Back home</Link>
         </div>
       </div>
     );
@@ -238,7 +238,7 @@ export default function SecretDropManagePage({ params }: { params: Promise<{ id:
       <div className={inIframe ? "w-full max-w-2xl mx-auto space-y-4" : "max-w-2xl mx-auto space-y-4"}>
         {/* Header */}
         <div className={card}>
-          <Link href="/my-drops" className="text-label text-xs hover:text-purple-400 transition-colors">
+          <Link href="/my-drops" className="text-label text-xs hover:text-pink-500 transition-colors">
             ← Back to My Drops
           </Link>
 
@@ -339,7 +339,7 @@ export default function SecretDropManagePage({ params }: { params: Promise<{ id:
               <button
                 type="button"
                 onClick={() => imageRef.current?.click()}
-                className="text-xs text-purple-400 hover:text-purple-300 border border-purple-500/30 rounded-lg px-3 py-1.5 transition-colors cursor-pointer"
+                className="text-xs text-pink-500 hover:text-pink-500 border border-pink-500/30 rounded-lg px-3 py-1.5 transition-colors cursor-pointer"
               >
                 {imageCid ? "Change image" : "Upload image"}
               </button>
@@ -404,7 +404,7 @@ export default function SecretDropManagePage({ params }: { params: Promise<{ id:
               <button
                 type="button"
                 onClick={() => setTokenReqs((prev) => [...prev, { address: "", minBalance: "1" }])}
-                className="text-[10px] text-purple-400 hover:text-purple-300 border border-purple-500/20 rounded-md px-2 py-1 cursor-pointer"
+                className="text-[10px] text-pink-500 hover:text-pink-500 border border-pink-500/20 rounded-md px-2 py-1 cursor-pointer"
               >
                 + Add token
               </button>
@@ -479,7 +479,7 @@ export default function SecretDropManagePage({ params }: { params: Promise<{ id:
               ? "bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 text-green-700 dark:text-green-400"
               : status.type === "error"
               ? "bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400"
-              : "bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-400"
+              : "bg-pink-500 dark:bg-pink-500/10 border border-pink-500 dark:border-pink-500/20 text-pink-500 dark:text-pink-500"
           }`}>
             {status.message}
           </div>

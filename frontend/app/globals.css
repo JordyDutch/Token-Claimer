@@ -28,8 +28,8 @@
 
 /* Light mode (default) — WCAG AA compliant, clean white */
 :root {
-  --accent: #c084fc;
-  --accent-hover: #a855f7;
+  --accent: #FF2975;
+  --accent-hover: #e01f62;
   --c-bg: #f7f8fa;
   --c-bg-transparent: rgba(247, 248, 250, 0.92);
   --c-card: #ffffff;
@@ -107,7 +107,7 @@ button:focus-visible, input:focus-visible, a:focus-visible {
 
 /* Selection */
 ::selection {
-  background: rgba(192, 132, 252, 0.3);
+  background: rgba(255, 41, 117, 0.3);
   color: var(--c-primary);
 }
 

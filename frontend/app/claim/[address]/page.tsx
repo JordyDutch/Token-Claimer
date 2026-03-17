@@ -435,14 +435,14 @@ export default function ClaimPage() {
             rel="noopener noreferrer"
             className="absolute top-2 right-3 text-[9px] text-faint hover:text-label transition-colors z-10"
           >
-            <span className="text-purple-500 font-bold">BETA</span> · Report issues
+            <span className="text-pink-500 font-bold">BETA</span> · Report issues
           </a>
         )}
         <div className={`bg-card rounded-xl text-center border border-border-muted card-elevated ${inIframe ? "p-6" : "p-5 sm:p-8"}`}>
           {/* Drop header — horizontal in iframe, stacked standalone */}
           {inIframe ? (
             <div className="flex items-center gap-4 mb-5">
-              <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-3xl overflow-hidden flex-shrink-0">
+              <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-violet-600 to-pink-600 flex items-center justify-center text-3xl overflow-hidden flex-shrink-0">
                 {dropIcon
                   ? <img src={dropIcon} alt={dropName} className="w-full h-full object-cover" />
                   : (isNftStyle ? "🖼" : "🪙")}
@@ -466,16 +466,16 @@ export default function ClaimPage() {
                     </span>
                   )}
                   {amountDisplay && (
-                    <span className="text-purple-600 dark:text-purple-400 font-medium">{amountDisplay}/claim</span>
+                    <span className="text-pink-500 dark:text-pink-500 font-medium">{amountDisplay}/claim</span>
                   )}
-                  <span className="text-purple-600 dark:text-purple-400 font-semibold">{claimedDisplay}</span>
+                  <span className="text-pink-500 dark:text-pink-500 font-semibold">{claimedDisplay}</span>
                   <span className="text-faint">/ {supplyDisplay}</span>
                 </div>
               </div>
             </div>
           ) : (
             <>
-              <div className="w-32 h-32 sm:w-48 sm:h-48 rounded-xl mx-auto mb-4 sm:mb-6 bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-4xl sm:text-6xl overflow-hidden">
+              <div className="w-32 h-32 sm:w-48 sm:h-48 rounded-xl mx-auto mb-4 sm:mb-6 bg-gradient-to-br from-violet-600 to-pink-600 flex items-center justify-center text-4xl sm:text-6xl overflow-hidden">
                 {dropIcon
                   ? <img src={dropIcon} alt={dropName} className="w-full h-full object-cover" />
                   : (isNftStyle ? "🖼" : "🪙")}
@@ -538,7 +538,7 @@ export default function ClaimPage() {
 
           {/* Amount per claim — hidden in iframe (shown inline in header) */}
           {!inIframe && amountDisplay && (
-            <div className="inline-block bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-400 px-3 py-1 rounded-full text-xs font-medium mb-4">
+            <div className="inline-block bg-pink-500 dark:bg-pink-500/10 border border-pink-500 dark:border-pink-500/20 text-pink-500 dark:text-pink-500 px-3 py-1 rounded-full text-xs font-medium mb-4">
               {amountDisplay} per claim
             </div>
           )}
@@ -618,7 +618,7 @@ export default function ClaimPage() {
                 <div className="text-[10px] sm:text-xs text-label uppercase tracking-wider">
                   Claimers
                 </div>
-                <div className="text-lg sm:text-xl font-semibold text-purple-600 dark:text-purple-400">
+                <div className="text-lg sm:text-xl font-semibold text-pink-500 dark:text-pink-500">
                   {claimedDisplay}
                 </div>
               </div>
@@ -626,7 +626,7 @@ export default function ClaimPage() {
                 <div className="text-[10px] sm:text-xs text-label uppercase tracking-wider">
                   Max Supply
                 </div>
-                <div className="text-lg sm:text-xl font-semibold text-purple-600 dark:text-purple-400">
+                <div className="text-lg sm:text-xl font-semibold text-pink-500 dark:text-pink-500">
                   {supplyDisplay}
                 </div>
               </div>
@@ -637,7 +637,7 @@ export default function ClaimPage() {
           {!address ? (
             <button
               onClick={connect}
-              className={`w-full rounded-xl font-semibold border-2 border-purple-400 text-purple-400 hover:bg-purple-400/10 transition-all cursor-pointer active:scale-[0.97] ${inIframe ? "py-3 text-sm" : "py-3.5 sm:py-4 text-base sm:text-lg"}`}
+              className={`w-full rounded-xl font-semibold border-2 border-pink-500 text-pink-500 hover:bg-pink-500/10 transition-all cursor-pointer active:scale-[0.97] ${inIframe ? "py-3 text-sm" : "py-3.5 sm:py-4 text-base sm:text-lg"}`}
             >
               Connect Universal Profile
             </button>
@@ -661,7 +661,7 @@ export default function ClaimPage() {
                     onChange={(e) => setCodewordInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && canClaim && claim()}
                     placeholder="Enter codeword..."
-                    className={`w-full bg-surface border border-border-default rounded-xl text-sm text-secondary focus:outline-none focus:border-purple-400 transition-colors text-center tracking-widest placeholder:tracking-normal ${inIframe ? "px-4 py-2.5" : "px-4 py-3"}`}
+                    className={`w-full bg-surface border border-border-default rounded-xl text-sm text-secondary focus:outline-none focus:border-pink-500 transition-colors text-center tracking-widest placeholder:tracking-normal ${inIframe ? "px-4 py-2.5" : "px-4 py-3"}`}
                     autoComplete="off"
                     spellCheck={false}
                   />
@@ -670,7 +670,7 @@ export default function ClaimPage() {
             <button
               onClick={claim}
               disabled={!canClaim}
-              className={`w-full rounded-xl font-semibold bg-purple-400 text-white hover:bg-purple-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.97] ${inIframe ? "py-3 text-sm" : "py-3.5 sm:py-4 text-base sm:text-lg"}`}
+              className={`w-full rounded-xl font-semibold bg-pink-500 text-white hover:bg-pink-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.97] ${inIframe ? "py-3 text-sm" : "py-3.5 sm:py-4 text-base sm:text-lg"}`}
             >
               {claiming
                 ? "Claiming..."
@@ -689,7 +689,7 @@ export default function ClaimPage() {
                   ? "bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 text-green-700 dark:text-green-400"
                   : status.type === "error"
                   ? "bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400"
-                  : "bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-400"
+                  : "bg-pink-500 dark:bg-pink-500/10 border border-pink-500 dark:border-pink-500/20 text-pink-500 dark:text-pink-500"
               }`}
             >
               {status.link ? (
@@ -714,7 +714,7 @@ export default function ClaimPage() {
                     href={tweetUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border-default text-muted hover:text-primary hover:border-purple-500/30 transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border-default text-muted hover:text-primary hover:border-pink-500/30 transition-all"
                   >
                     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
                     Post
@@ -723,7 +723,7 @@ export default function ClaimPage() {
                     href={telegramUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border-default text-muted hover:text-primary hover:border-purple-500/30 transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border-default text-muted hover:text-primary hover:border-pink-500/30 transition-all"
                   >
                     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
                     Share
@@ -735,7 +735,7 @@ export default function ClaimPage() {
                         setTimeout(() => setCopied(false), 2000);
                       });
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border-default text-muted hover:text-primary hover:border-purple-500/30 transition-all cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border-default text-muted hover:text-primary hover:border-pink-500/30 transition-all cursor-pointer"
                   >
                     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                     {copied ? "Copied!" : "Copy link"}
@@ -754,7 +754,7 @@ export default function ClaimPage() {
               <div className="space-y-2">
                 {(showAllClaimers ? claimers : claimers.slice(0, 10)).map((c) => (
                   <div key={c.address} className="flex items-center gap-2.5 px-2 py-1.5">
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-600 to-pink-600 flex items-center justify-center flex-shrink-0 overflow-hidden">
                       {c.profile?.image ? (
                         <img src={c.profile.image} alt="" className="w-full h-full object-cover" />
                       ) : (
@@ -775,7 +775,7 @@ export default function ClaimPage() {
               {claimers.length > 10 && (
                 <button
                   onClick={() => setShowAllClaimers(!showAllClaimers)}
-                  className="text-[10px] text-purple-500 hover:text-purple-400 text-center mt-2 w-full cursor-pointer transition-colors"
+                  className="text-[10px] text-pink-500 hover:text-pink-500 text-center mt-2 w-full cursor-pointer transition-colors"
                 >
                   {showAllClaimers ? "Show less" : `Show all ${claimers.length} claimers`}
                 </button>
@@ -789,7 +789,7 @@ export default function ClaimPage() {
           <div className="flex items-center justify-between mt-4 sm:mt-6 px-2 gap-2">
             <Link
               href="/"
-              className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors"
+              className="text-faint text-[10px] sm:text-xs hover:text-pink-500 transition-colors"
             >
               ← All drops
             </Link>
@@ -797,7 +797,7 @@ export default function ClaimPage() {
             <div className="flex items-center gap-3">
               <button
                 onClick={shareLink}
-                className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors cursor-pointer"
+                className="text-faint text-[10px] sm:text-xs hover:text-pink-500 transition-colors cursor-pointer"
               >
                 {copied ? "Link copied!" : "Share"}
               </button>
@@ -805,7 +805,7 @@ export default function ClaimPage() {
                 href={explorerUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors"
+                className="text-faint text-[10px] sm:text-xs hover:text-pink-500 transition-colors"
               >
                 Explorer
               </a>
@@ -817,7 +817,7 @@ export default function ClaimPage() {
               {address && owner && address.toLowerCase() === owner.toLowerCase() && (
                 <Link
                   href={`/manage/${contractAddress}`}
-                  className="text-faint text-[10px] sm:text-xs hover:text-purple-400 transition-colors"
+                  className="text-faint text-[10px] sm:text-xs hover:text-pink-500 transition-colors"
                 >
                   Manage →
                 </Link>

@@ -241,7 +241,7 @@ export default function CreatePage() {
   }
 
   const inp =
-    "w-full bg-surface border border-border-default rounded-lg px-3 py-2.5 text-sm text-secondary focus:outline-none focus:border-purple-400 transition-colors";
+    "w-full bg-surface border border-border-default rounded-lg px-3 py-2.5 text-sm text-secondary focus:outline-none focus:border-pink-500 transition-colors";
   const lbl = "text-[11px] sm:text-xs text-label mb-1 block";
   const card = "bg-card rounded-xl p-5 sm:p-8 border border-border-muted card-elevated";
 
@@ -263,7 +263,7 @@ export default function CreatePage() {
             <p className="text-xs font-mono text-violet-400 break-all mb-2">{shareUrl}</p>
             <CopyButton text={shareUrl} label="Copy link" />
           </div>
-          <Link href="/" className="block text-label text-xs hover:text-purple-400 transition-colors">
+          <Link href="/" className="block text-label text-xs hover:text-pink-500 transition-colors">
             ← All drops
           </Link>
         </div>
@@ -286,14 +286,14 @@ export default function CreatePage() {
 
           <div className="bg-surface-subtle rounded-xl p-3 mb-4">
             <p className="text-[10px] text-label mb-1">Contract Address</p>
-            <p className="text-xs font-mono text-purple-400 break-all mb-2">{deployedAddress}</p>
+            <p className="text-xs font-mono text-pink-500 break-all mb-2">{deployedAddress}</p>
             <div className="flex items-center justify-center gap-3">
               <CopyButton text={deployedAddress} label="Copy address" />
               <a
                 href={`${networkConfig.explorerBase}/address/${deployedAddress}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-label hover:text-purple-400 transition-colors"
+                className="text-xs text-label hover:text-pink-500 transition-colors"
               >
                 View on Explorer
               </a>
@@ -314,17 +314,17 @@ export default function CreatePage() {
           <div className="space-y-3">
             <Link
               href={`/manage/${deployedAddress}`}
-              className="block w-full py-3 rounded-xl text-sm font-semibold bg-purple-500 text-white hover:bg-purple-600 transition-all active:scale-[0.97]"
+              className="block w-full py-3 rounded-xl text-sm font-semibold bg-pink-500 text-white hover:bg-pink-500 transition-all active:scale-[0.97]"
             >
               Manage Drop →
             </Link>
             <Link
               href={`/claim/${deployedAddress}`}
-              className="block w-full py-3 rounded-xl text-sm font-semibold border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 transition-all active:scale-[0.97]"
+              className="block w-full py-3 rounded-xl text-sm font-semibold border border-pink-500/30 text-pink-500 hover:bg-pink-500/10 transition-all active:scale-[0.97]"
             >
               View Claim Page →
             </Link>
-            <Link href="/" className="block text-label text-xs hover:text-purple-400 mt-4 transition-colors">
+            <Link href="/" className="block text-label text-xs hover:text-pink-500 mt-4 transition-colors">
               ← All drops
             </Link>
           </div>
@@ -352,11 +352,11 @@ export default function CreatePage() {
             rel="noopener noreferrer"
             className="absolute top-0 right-0 text-[9px] text-faint hover:text-label transition-colors z-10"
           >
-            <span className="text-purple-500 font-bold">BETA</span> · Report issues
+            <span className="text-pink-500 font-bold">BETA</span> · Report issues
           </a>
         )}
         <div className={card}>
-          <Link href="/" className="text-label text-xs hover:text-purple-400 transition-colors">
+          <Link href="/" className="text-label text-xs hover:text-pink-500 transition-colors">
             ← Back
           </Link>
           <h1 className="text-xl sm:text-2xl font-bold mt-2 mb-1">Create a Drop</h1>
@@ -367,7 +367,7 @@ export default function CreatePage() {
           {!address ? (
             <button
               onClick={connect}
-              className="w-full py-3.5 rounded-xl text-sm font-semibold border-2 border-purple-400 text-purple-400 hover:bg-purple-400/10 transition-all cursor-pointer active:scale-[0.97]"
+              className="w-full py-3.5 rounded-xl text-sm font-semibold border-2 border-pink-500 text-pink-500 hover:bg-pink-500/10 transition-all cursor-pointer active:scale-[0.97]"
             >
               Connect Universal Profile
             </button>
@@ -394,7 +394,7 @@ export default function CreatePage() {
                   onClick={() => setDropType("nft")}
                   className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
                     dropType === "nft"
-                      ? "bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 border border-purple-300 dark:border-purple-500/30"
+                      ? "bg-pink-500 dark:bg-pink-500/20 text-pink-500 dark:text-pink-500 border border-pink-500 dark:border-pink-500/30"
                       : "bg-surface text-muted border border-border-default"
                   }`}
                 >
@@ -404,7 +404,7 @@ export default function CreatePage() {
                   onClick={() => setDropType("token")}
                   className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
                     dropType === "token"
-                      ? "bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 border border-purple-300 dark:border-purple-500/30"
+                      ? "bg-pink-500 dark:bg-pink-500/20 text-pink-500 dark:text-pink-500 border border-pink-500 dark:border-pink-500/30"
                       : "bg-surface text-muted border border-border-default"
                   }`}
                 >
@@ -492,7 +492,7 @@ export default function CreatePage() {
                       <button
                         type="button"
                         onClick={() => fileRef.current?.click()}
-                        className="text-xs text-purple-400 hover:text-purple-300 border border-purple-500/30 rounded-lg px-3 py-1.5 transition-colors cursor-pointer"
+                        className="text-xs text-pink-500 hover:text-pink-500 border border-pink-500/30 rounded-lg px-3 py-1.5 transition-colors cursor-pointer"
                       >
                         {iconFile ? "Change image" : "Upload image"}
                       </button>
@@ -568,7 +568,7 @@ export default function CreatePage() {
                     <button
                       type="button"
                       onClick={addLink}
-                      className="text-xs text-purple-400 hover:text-purple-300 mt-2 cursor-pointer"
+                      className="text-xs text-pink-500 hover:text-pink-500 mt-2 cursor-pointer"
                     >
                       + Add link
                     </button>
@@ -607,7 +607,7 @@ export default function CreatePage() {
                     <button
                       type="button"
                       onClick={() => assetRef.current?.click()}
-                      className="text-xs text-purple-400 hover:text-purple-300 border border-purple-500/30 rounded-lg px-3 py-1.5 transition-colors cursor-pointer"
+                      className="text-xs text-pink-500 hover:text-pink-500 border border-pink-500/30 rounded-lg px-3 py-1.5 transition-colors cursor-pointer"
                     >
                       + Add asset file
                     </button>
@@ -628,7 +628,7 @@ export default function CreatePage() {
                 <button
                   onClick={deploy}
                   disabled={!canDeploy}
-                  className="w-full py-3.5 rounded-xl text-sm font-semibold bg-purple-500 text-white hover:bg-purple-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.97] mt-2"
+                  className="w-full py-3.5 rounded-xl text-sm font-semibold bg-pink-500 text-white hover:bg-pink-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.97] mt-2"
                 >
                   {deploying ? "Deploying..." : `Create ${dropType === "nft" ? "NFT" : "Token"} Drop`}
                 </button>
@@ -679,7 +679,7 @@ export default function CreatePage() {
                       <label className={lbl + " mb-0"}>Token Requirements <span className="text-faint">(optional)</span></label>
                       <button type="button"
                         onClick={() => setSecretTokenReqs((prev) => [...prev, { address: "", minBalance: "1" }])}
-                        className="text-[10px] text-purple-400 hover:text-purple-300 border border-purple-500/20 rounded-md px-2 py-1"
+                        className="text-[10px] text-pink-500 hover:text-pink-500 border border-pink-500/20 rounded-md px-2 py-1"
                       >+ Add token</button>
                     </div>
                     {secretTokenReqs.length === 0 && (
@@ -748,7 +748,7 @@ export default function CreatePage() {
                       <button
                         type="button"
                         onClick={() => secretImageRef.current?.click()}
-                        className="text-xs text-purple-400 hover:text-purple-300 border border-purple-500/30 rounded-lg px-3 py-1.5 transition-colors cursor-pointer"
+                        className="text-xs text-pink-500 hover:text-pink-500 border border-pink-500/30 rounded-lg px-3 py-1.5 transition-colors cursor-pointer"
                       >
                         {secretImageFile ? "Change image" : "Upload image"}
                       </button>
@@ -807,7 +807,7 @@ export default function CreatePage() {
                     <div className={`px-3 py-2 rounded-lg text-xs ${
                       status.type === "error" ? "bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-500/20" :
                       status.type === "success" ? "bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-500/20" :
-                      "bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-500/20"}`}>
+                      "bg-pink-500 dark:bg-pink-500/10 text-pink-500 dark:text-pink-500 border border-pink-500 dark:border-pink-500/20"}`}>
                       {status.message}
                     </div>
                   )}
@@ -832,7 +832,7 @@ export default function CreatePage() {
                 ? "bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 text-green-700 dark:text-green-400"
                 : status.type === "error"
                 ? "bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400"
-                : "bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-400"
+                : "bg-pink-500 dark:bg-pink-500/10 border border-pink-500 dark:border-pink-500/20 text-pink-500 dark:text-pink-500"
             }`}
           >
             {status.message}

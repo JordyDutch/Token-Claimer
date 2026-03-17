@@ -9,18 +9,18 @@ export default function Footer() {
           href="https://lukso.network"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-purple-400 hover:underline"
+          className="text-pink-500 hover:underline"
         >
           LUKSO
         </a>
       </p>
       <p className="text-label text-[10px] sm:text-xs">
-        This app is in <span className="text-purple-500 font-bold">BETA</span>.{" "}
+        This app is in <span className="text-pink-500 font-bold">BETA</span>.{" "}
         <a
           href="https://github.com/JordyDutch/issue-tracker/issues"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-purple-400 hover:text-purple-300 underline underline-offset-2 transition-colors"
+          className="text-pink-500 hover:text-pink-500 underline underline-offset-2 transition-colors"
         >
           Report issues to our team
         </a>
