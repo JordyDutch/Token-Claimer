@@ -218,7 +218,7 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
                   )}
                   {drop.mode === "pool" && drop.remaining !== null && (
                     <>
-                      <span className="text-pink-500 dark:text-pink-500 font-semibold">{drop.remaining}</span>
+                      <span className="text-pink-500 dark:text-pink-400 font-semibold">{drop.remaining}</span>
                       <span className="text-faint">/ {drop.totalCodes} remaining</span>
                     </>
                   )}
@@ -297,7 +297,7 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
                 <div className="text-[10px] sm:text-xs text-label uppercase tracking-wider">
                   Remaining
                 </div>
-                <div className="text-lg sm:text-xl font-semibold text-pink-500 dark:text-pink-500">
+                <div className="text-lg sm:text-xl font-semibold text-pink-500 dark:text-pink-400">
                   {drop.remaining}
                 </div>
               </div>
@@ -305,7 +305,7 @@ export default function SecretDropPage({ params }: { params: Promise<{ id: strin
                 <div className="text-[10px] sm:text-xs text-label uppercase tracking-wider">
                   Total
                 </div>
-                <div className="text-lg sm:text-xl font-semibold text-pink-500 dark:text-pink-500">
+                <div className="text-lg sm:text-xl font-semibold text-pink-500 dark:text-pink-400">
                   {drop.totalCodes}
                 </div>
               </div>

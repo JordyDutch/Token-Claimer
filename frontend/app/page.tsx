@@ -273,7 +273,7 @@ export default function HomePage() {
   const tabClass = (tab: FilterTab) =>
     `px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
       filter === tab
-        ? "bg-pink-500 dark:bg-pink-500/20 text-pink-500 dark:text-pink-500 border border-pink-500 dark:border-pink-500/30"
+        ? "bg-pink-500/15 dark:bg-pink-500/20 text-pink-600 dark:text-pink-400 border border-pink-500 dark:border-pink-500/30"
         : "text-label hover:text-secondary border border-transparent"
     }`;
 

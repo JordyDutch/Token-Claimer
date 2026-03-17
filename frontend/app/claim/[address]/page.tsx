@@ -466,9 +466,9 @@ export default function ClaimPage() {
                     </span>
                   )}
                   {amountDisplay && (
-                    <span className="text-pink-500 dark:text-pink-500 font-medium">{amountDisplay}/claim</span>
+                    <span className="text-pink-500 dark:text-pink-400 font-medium">{amountDisplay}/claim</span>
                   )}
-                  <span className="text-pink-500 dark:text-pink-500 font-semibold">{claimedDisplay}</span>
+                  <span className="text-pink-500 dark:text-pink-400 font-semibold">{claimedDisplay}</span>
                   <span className="text-faint">/ {supplyDisplay}</span>
                 </div>
               </div>
@@ -538,7 +538,7 @@ export default function ClaimPage() {
 
           {/* Amount per claim — hidden in iframe (shown inline in header) */}
           {!inIframe && amountDisplay && (
-            <div className="inline-block bg-pink-500 dark:bg-pink-500/10 border border-pink-500 dark:border-pink-500/20 text-pink-500 dark:text-pink-500 px-3 py-1 rounded-full text-xs font-medium mb-4">
+            <div className="inline-block bg-pink-500 dark:bg-pink-500/10 border border-pink-500 dark:border-pink-500/20 text-pink-500 dark:text-pink-400 px-3 py-1 rounded-full text-xs font-medium mb-4">
               {amountDisplay} per claim
             </div>
           )}
@@ -618,7 +618,7 @@ export default function ClaimPage() {
                 <div className="text-[10px] sm:text-xs text-label uppercase tracking-wider">
                   Claimers
                 </div>
-                <div className="text-lg sm:text-xl font-semibold text-pink-500 dark:text-pink-500">
+                <div className="text-lg sm:text-xl font-semibold text-pink-500 dark:text-pink-400">
                   {claimedDisplay}
                 </div>
               </div>
@@ -626,7 +626,7 @@ export default function ClaimPage() {
                 <div className="text-[10px] sm:text-xs text-label uppercase tracking-wider">
                   Max Supply
                 </div>
-                <div className="text-lg sm:text-xl font-semibold text-pink-500 dark:text-pink-500">
+                <div className="text-lg sm:text-xl font-semibold text-pink-500 dark:text-pink-400">
                   {supplyDisplay}
                 </div>
               </div>
@@ -689,7 +689,7 @@ export default function ClaimPage() {
                   ? "bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 text-green-700 dark:text-green-400"
                   : status.type === "error"
                   ? "bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400"
-                  : "bg-pink-500 dark:bg-pink-500/10 border border-pink-500 dark:border-pink-500/20 text-pink-500 dark:text-pink-500"
+                  : "bg-pink-500 dark:bg-pink-500/10 border border-pink-500 dark:border-pink-500/20 text-pink-500 dark:text-pink-400"
               }`}
             >
               {status.link ? (

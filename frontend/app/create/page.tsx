@@ -394,7 +394,7 @@ export default function CreatePage() {
                   onClick={() => setDropType("nft")}
                   className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
                     dropType === "nft"
-                      ? "bg-pink-500 dark:bg-pink-500/20 text-pink-500 dark:text-pink-500 border border-pink-500 dark:border-pink-500/30"
+                      ? "bg-pink-500/15 dark:bg-pink-500/20 text-pink-600 dark:text-pink-400 border border-pink-500 dark:border-pink-500/40"
                       : "bg-surface text-muted border border-border-default"
                   }`}
                 >
@@ -404,7 +404,7 @@ export default function CreatePage() {
                   onClick={() => setDropType("token")}
                   className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
                     dropType === "token"
-                      ? "bg-pink-500 dark:bg-pink-500/20 text-pink-500 dark:text-pink-500 border border-pink-500 dark:border-pink-500/30"
+                      ? "bg-pink-500/15 dark:bg-pink-500/20 text-pink-600 dark:text-pink-400 border border-pink-500 dark:border-pink-500/40"
                       : "bg-surface text-muted border border-border-default"
                   }`}
                 >
@@ -807,7 +807,7 @@ export default function CreatePage() {
                     <div className={`px-3 py-2 rounded-lg text-xs ${
                       status.type === "error" ? "bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-500/20" :
                       status.type === "success" ? "bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-500/20" :
-                      "bg-pink-500 dark:bg-pink-500/10 text-pink-500 dark:text-pink-500 border border-pink-500 dark:border-pink-500/20"}`}>
+                      "bg-pink-500/15 dark:bg-pink-500/20 text-pink-600 dark:text-pink-400 border border-pink-500 dark:border-pink-500/30"}`}>
                       {status.message}
                     </div>
                   )}
@@ -832,7 +832,7 @@ export default function CreatePage() {
                 ? "bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 text-green-700 dark:text-green-400"
                 : status.type === "error"
                 ? "bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400"
-                : "bg-pink-500 dark:bg-pink-500/10 border border-pink-500 dark:border-pink-500/20 text-pink-500 dark:text-pink-500"
+                : "bg-pink-500/15 dark:bg-pink-500/20 border border-pink-500 dark:border-pink-500/30 text-pink-600 dark:text-pink-400"
             }`}
           >
             {status.message}

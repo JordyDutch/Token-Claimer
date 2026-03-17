@@ -310,7 +310,7 @@ export default function ManagePage() {
 
   const inp = "w-full bg-surface border border-border-default rounded-lg px-3 py-2.5 text-sm text-secondary focus:outline-none focus:border-pink-500 transition-colors";
   const lbl = "text-[11px] sm:text-xs text-label";
-  const btn = "w-full py-2.5 sm:py-3 rounded-xl text-sm font-medium bg-pink-500 dark:bg-pink-500/20 text-pink-500 dark:text-pink-500 border border-pink-500 dark:border-pink-500/30 hover:bg-pink-500 dark:hover:bg-pink-500/30 transition-all cursor-pointer active:scale-[0.97]";
+  const btn = "w-full py-2.5 sm:py-3 rounded-xl text-sm font-medium bg-pink-500/15 dark:bg-pink-500/20 text-pink-600 dark:text-pink-400 border border-pink-500 dark:border-pink-500/30 hover:bg-pink-500 dark:hover:bg-pink-500/30 transition-all cursor-pointer active:scale-[0.97]";
   const card = "bg-card rounded-xl p-4 sm:p-6 border border-border-muted card-elevated";
   const explorerUrl = `${networkConfig.explorerBase}/address/${contractAddress}`;
 
@@ -407,11 +407,11 @@ export default function ManagePage() {
                 </div>
                 <div>
                   <div className={lbl + " uppercase tracking-wider"}>Claimed</div>
-                  <div className="text-lg font-semibold text-pink-500 dark:text-pink-500">{totalClaimed}</div>
+                  <div className="text-lg font-semibold text-pink-500 dark:text-pink-400">{totalClaimed}</div>
                 </div>
                 <div>
                   <div className={lbl + " uppercase tracking-wider"}>Supply</div>
-                  <div className="text-lg font-semibold text-pink-500 dark:text-pink-500">
+                  <div className="text-lg font-semibold text-pink-500 dark:text-pink-400">
                     {maxSupply === "0" ? "Unlimited" : maxSupply}
                   </div>
                 </div>
@@ -831,7 +831,7 @@ export default function ManagePage() {
                 ? "bg-toast-success border border-green-300 dark:border-green-500/30 text-green-700 dark:text-green-400"
                 : status.type === "error"
                 ? "bg-toast-error border border-red-300 dark:border-red-500/30 text-red-700 dark:text-red-400"
-                : "bg-dropdown border border-pink-500 dark:border-pink-500/30 text-pink-500 dark:text-pink-500"
+                : "bg-dropdown border border-pink-500 dark:border-pink-500/30 text-pink-500 dark:text-pink-400"
             }`}
           >
             {status.link ? (

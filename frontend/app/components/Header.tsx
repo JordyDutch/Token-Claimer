@@ -14,7 +14,7 @@ export default function Header() {
   const linkClass = (href: string) => {
     const active = pathname === href;
     return `text-xs sm:text-sm font-medium transition-colors ${
-      active ? "text-pink-500 dark:text-pink-500" : "text-label hover:text-secondary"
+      active ? "text-pink-500 dark:text-pink-400" : "text-label hover:text-secondary"
     }`;
   };
 
