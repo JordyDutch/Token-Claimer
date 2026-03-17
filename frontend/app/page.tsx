@@ -112,7 +112,8 @@ export default function HomePage() {
                 name: c.name,
                 symbol: c.symbol,
                 createdAt: Number(c.createdAt),
-                isNFT: false,
+                // v5 Campaign struct has isNonDivisible; legacy factories don't
+                isNFT: Boolean(c.isNonDivisible),
               });
             }
           } catch { /* skip unresponsive factory */ }

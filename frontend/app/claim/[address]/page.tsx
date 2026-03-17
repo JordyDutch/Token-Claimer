@@ -56,7 +56,7 @@ export default function ClaimPage() {
   const [dropName, setDropName] = useState("Loading...");
   const [dropSymbol, setDropSymbol] = useState("");
   const [dropIcon, setDropIcon] = useState<string | null>(null);
-  const [tokenType, setTokenType] = useState<"LSP7" | "LSP8" | null>(null);
+  const [tokenType, setTokenType] = useState<"LSP7" | "LSP7-NFT" | "LSP8" | null>(null);
   const [isNftStyle, setIsNftStyle] = useState(false);
   const [claimedDisplay, setClaimedDisplay] = useState("-");
   const [supplyDisplay, setSupplyDisplay] = useState("-");
@@ -178,7 +178,7 @@ export default function ClaimPage() {
       setReqInfo(hasReqs ? { tokens: enrichedTokens, followers: rFollowers } : null);
 
       const MAX_UINT256 = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-      if (type === "LSP7") {
+      if (type === "LSP7" || type === "LSP7-NFT") {
         // v5 proxy: totalSupply() replaces totalClaimedAmount() (removed in proxy refactor)
         const [, claimers, decimals] = await Promise.all([
           c.totalClaimedAmount().catch(() => c.totalSupply().catch(() => BigInt(0))),
@@ -186,7 +186,7 @@ export default function ClaimPage() {
           c.decimals(),
         ]);
         const dec = Number(decimals);
-        const nft = dec === 0;
+        const nft = type === "LSP7-NFT" || dec === 0;
         setIsNftStyle(nft);
         setClaimedDisplay(claimers.toString());
         const isUnlimited = supply === BigInt(0) || supply === MAX_UINT256;

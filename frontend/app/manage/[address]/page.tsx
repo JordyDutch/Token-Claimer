@@ -28,7 +28,7 @@ export default function ManagePage() {
 
   const [isOwner, setIsOwner] = useState(false);
   const [status, setStatus] = useState<Status>(null);
-  const [tokenType, setTokenType] = useState<"LSP7" | "LSP8" | null>(null);
+  const [tokenType, setTokenType] = useState<"LSP7" | "LSP7-NFT" | "LSP8" | null>(null);
   const [isNftStyle, setIsNftStyle] = useState(false);
   const [dropName, setDropName] = useState("");
   const [claimEnabled, setClaimEnabled] = useState(false);
@@ -118,11 +118,11 @@ export default function ManagePage() {
       if (start > BigInt(0)) setStartTime(new Date(Number(start) * 1000).toISOString().slice(0, 16));
       if (end > BigInt(0)) setEndTime(new Date(Number(end) * 1000).toISOString().slice(0, 16));
       try {
-        if (type === "LSP7") {
+        if (type === "LSP7" || type === "LSP7-NFT") {
           const cl = await c.totalClaimers();
           setTotalClaimed(cl.toString());
           const dec = await c.decimals();
-          setIsNftStyle(Number(dec) === 0);
+          setIsNftStyle(type === "LSP7-NFT" || Number(dec) === 0);
         } else {
           const cl = await c.totalClaimed();
           setTotalClaimed(cl.toString());
@@ -688,7 +688,7 @@ export default function ManagePage() {
                   <input
                     ref={metaIconRef}
                     type="file"
-                    accept="image/jpeg,image/png,image/svg+xml,image/webp"
+                    accept="image/jpeg,image/png,image/svg+xml,image/webp,image/gif"
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0] ?? null;

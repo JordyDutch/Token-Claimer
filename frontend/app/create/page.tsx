@@ -116,8 +116,9 @@ export default function CreatePage() {
 
       {
         const factory = new Contract(networkConfig.lsp7Factory, LSP7_FACTORY_ABI, signer);
-        const nonDivisible = dropType === "nft";
-        const tx = await factory.createTokenDrop(name, symbol, amountPerClaim, maxSupply, nonDivisible);
+        const tx = dropType === "nft"
+          ? await factory.createNFTDrop(name, symbol, maxSupply, amountPerClaim)
+          : await factory.createTokenDrop(name, symbol, amountPerClaim, maxSupply, false);
         setStatus({ message: "Waiting for confirmation...", type: "loading" });
         await tx.wait();
         const fr = new Contract(networkConfig.lsp7Factory, LSP7_FACTORY_ABI, provider);
@@ -477,6 +478,7 @@ export default function CreatePage() {
                     <label className={lbl}>Icon *</label>
                     <div className="flex items-center gap-3">
                       {iconPreview ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
                         <img
                           src={iconPreview}
                           alt="Icon preview"
@@ -511,7 +513,7 @@ export default function CreatePage() {
                     <input
                       ref={fileRef}
                       type="file"
-                      accept="image/jpeg,image/png,image/svg+xml,image/webp"
+                      accept="image/jpeg,image/png,image/svg+xml,image/webp,image/gif"
                       onChange={handleIconChange}
                       className="hidden"
                     />
@@ -767,7 +769,7 @@ export default function CreatePage() {
                     <input
                       ref={secretImageRef}
                       type="file"
-                      accept="image/jpeg,image/png,image/svg+xml,image/webp"
+                      accept="image/jpeg,image/png,image/svg+xml,image/webp,image/gif"
                       onChange={(e) => {
                         const file = e.target.files?.[0] ?? null;
                         setSecretImageFile(file);

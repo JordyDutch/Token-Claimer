@@ -14,10 +14,13 @@ export const LSP8_FACTORY =
 // the frontend uses .catch() fallbacks to handle both factory versions gracefully.
 export const LSP7_FACTORY_ABI = [
   "function createTokenDrop(string,string,uint256,uint256,bool) returns (address)",
+  "function createNFTDrop(string,string,uint256,uint256) returns (address)",
   "function totalCampaigns() view returns (uint256)",          // v5 (EIP-1167 proxy factories)
   "function totalTokenCampaigns() view returns (uint256)",     // v3/v4 (legacy)
-  "function getCampaigns(uint256,uint256) view returns (tuple(address contractAddr, address creator, string name, string symbol, uint256 createdAt)[])",
+  "function totalNFTCampaigns() view returns (uint256)",
+  "function getCampaigns(uint256,uint256) view returns (tuple(address contractAddr, address creator, string name, string symbol, uint256 createdAt, bool isNonDivisible)[])",
   "function getTokenCampaigns(uint256,uint256) view returns (tuple(address contractAddr, address creator, string name, string symbol, uint256 createdAt)[])",
+  "function getNFTCampaigns(uint256,uint256) view returns (tuple(address contractAddr, address creator, string name, string symbol, uint256 createdAt, bool isNonDivisible)[])",
   "function getCampaignsByCreator(address) view returns (uint256[])",
   "function getTokenCampaignsByCreator(address) view returns (uint256[])",
   "function implementation() view returns (address)",          // v5 only
@@ -146,11 +149,12 @@ export async function ensureLuksoNetwork(
   }
 }
 
-// Detect if a claim contract is LSP7 or LSP8 by checking for decimals()
-export async function detectTokenType(contract: any): Promise<"LSP7" | "LSP8"> {
+// Detect if a claim contract is LSP7, LSP7-NFT, or LSP8 by checking for decimals()
+// LSP7 with decimals=0 is an NFT-style (non-divisible) drop
+export async function detectTokenType(contract: any): Promise<"LSP7" | "LSP7-NFT" | "LSP8"> {
   try {
-    await contract.decimals();
-    return "LSP7";
+    const decimals = await contract.decimals();
+    return Number(decimals) === 0 ? "LSP7-NFT" : "LSP7";
   } catch {
     return "LSP8";
   }

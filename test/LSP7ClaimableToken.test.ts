@@ -97,11 +97,12 @@ async function deployTokenProxy(
   const tx = await factory.createTokenDrop(name, symbol, amountPerClaim, adjustedMaxSupply, isNonDivisible);
   const receipt = await tx.wait();
 
-  // Get the deployed proxy address from the event
+  // Get the deployed proxy address from the event (TokenCampaignCreated or NFTCampaignCreated)
+  const expectedEvent = isNonDivisible ? "NFTCampaignCreated" : "TokenCampaignCreated";
   const event = receipt!.logs.find(
     (log: any) => {
       try {
-        return factory.interface.parseLog({ topics: log.topics as string[], data: log.data })?.name === "TokenCampaignCreated";
+        return factory.interface.parseLog({ topics: log.topics as string[], data: log.data })?.name === expectedEvent;
       } catch { return false; }
     }
   );
