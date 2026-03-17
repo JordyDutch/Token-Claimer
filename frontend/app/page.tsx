@@ -73,14 +73,34 @@ export default function HomePage() {
       const seen = new Set<string>();
       const all: Campaign[] = [];
 
-      // Query ALL historical LSP7 factories
+      // Query ALL historical LSP7 factories (includes both divisible tokens and non-divisible NFTs)
       await Promise.all(
         cfg.allLsp7Factories.map(async (factoryAddr) => {
           try {
             const lsp7 = new Contract(factoryAddr, LSP7_FACTORY_ABI, rpc);
-            const total = await lsp7.totalTokenCampaigns().catch(() => BigInt(0));
-            if (total <= BigInt(0)) return;
-            const items = await lsp7.getTokenCampaigns(0, total);
+            // Try new unified getCampaigns first, fall back to legacy totalTokenCampaigns
+            let total = await lsp7.totalCampaigns().catch(() => BigInt(0));
+            if (total <= BigInt(0)) {
+              // Legacy factory without totalCampaigns
+              total = await lsp7.totalTokenCampaigns().catch(() => BigInt(0));
+              if (total <= BigInt(0)) return;
+              const items = await lsp7.getTokenCampaigns(0, total);
+              for (const c of items) {
+                const addr = c.contractAddr.toLowerCase();
+                if (seen.has(addr)) continue;
+                seen.add(addr);
+                all.push({
+                  contractAddr: c.contractAddr,
+                  creator: c.creator,
+                  name: c.name,
+                  symbol: c.symbol,
+                  createdAt: Number(c.createdAt),
+                  isNFT: false,
+                });
+              }
+              return;
+            }
+            const items = await lsp7.getCampaigns(0, total);
             for (const c of items) {
               const addr = c.contractAddr.toLowerCase();
               if (seen.has(addr)) continue;
@@ -91,7 +111,7 @@ export default function HomePage() {
                 name: c.name,
                 symbol: c.symbol,
                 createdAt: Number(c.createdAt),
-                isNFT: false,
+                isNFT: Boolean(c.isNonDivisible),
               });
             }
           } catch { /* skip unresponsive factory */ }

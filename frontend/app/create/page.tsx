@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { BrowserProvider, Contract } from "ethers";
 import {
-  LSP7_FACTORY_ABI, LSP8_FACTORY_ABI,
+  LSP7_FACTORY_ABI,
   getProvider,
 } from "../lib/contracts";
 import { uploadAndSetLSP4Metadata, addToLSP12IssuedAssets, type Lsp4Link } from "../lib/lsp4";
@@ -109,25 +109,23 @@ export default function CreatePage() {
       const signer = await provider.getSigner();
       let deployedAddr: string;
 
+      // Both token and NFT drops use the LSP7 factory
+      const factory = new Contract(networkConfig.lsp7Factory, LSP7_FACTORY_ABI, signer);
       if (dropType === "token") {
-        const factory = new Contract(networkConfig.lsp7Factory, LSP7_FACTORY_ABI, signer);
         const tx = await factory.createTokenDrop(name, symbol, amountPerClaim, maxSupply, isNonDivisible);
         setStatus({ message: "Waiting for confirmation...", type: "loading" });
         await tx.wait();
-        const fr = new Contract(networkConfig.lsp7Factory, LSP7_FACTORY_ABI, provider);
-        const t = await fr.totalTokenCampaigns();
-        const items = await fr.getTokenCampaigns(t - BigInt(1), 1);
-        deployedAddr = items[0].contractAddr;
       } else {
-        const factory = new Contract(networkConfig.lsp8Factory, LSP8_FACTORY_ABI, signer);
+        // NFT drop = LSP7 non-divisible (decimals=0, isNonDivisible=true)
         const tx = await factory.createNFTDrop(name, symbol, maxSupply, amountPerClaim);
         setStatus({ message: "Waiting for confirmation...", type: "loading" });
         await tx.wait();
-        const fr = new Contract(networkConfig.lsp8Factory, LSP8_FACTORY_ABI, provider);
-        const t = await fr.totalNFTCampaigns();
-        const items = await fr.getNFTCampaigns(t - BigInt(1), 1);
-        deployedAddr = items[0].contractAddr;
       }
+      // Read back the latest campaign from the unified factory
+      const fr = new Contract(networkConfig.lsp7Factory, LSP7_FACTORY_ABI, provider);
+      const t = await fr.totalCampaigns();
+      const items = await fr.getCampaigns(t - BigInt(1), 1);
+      deployedAddr = items[0].contractAddr;
 
       // LSP4 metadata — always set
       const validLinks = links.filter((l) => l.title.trim() && l.url.trim());

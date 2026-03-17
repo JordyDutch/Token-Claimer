@@ -9,15 +9,22 @@ export const LSP7_FACTORY =
 export const LSP8_FACTORY =
   process.env.NEXT_PUBLIC_LSP8_FACTORY ?? "0xBd545E98F133282bD79dc4a6ac422437478A58b6";
 
-// LSP7DropFactory ABI
+// LSP7DropFactory ABI (includes both divisible token and non-divisible NFT creation)
 export const LSP7_FACTORY_ABI = [
   "function createTokenDrop(string,string,uint256,uint256,bool) returns (address)",
+  "function createNFTDrop(string,string,uint256,uint256) returns (address)",
+  "function totalCampaigns() view returns (uint256)",
+  "function totalNFTCampaigns() view returns (uint256)",
+  "function getCampaigns(uint256,uint256) view returns (tuple(address contractAddr, address creator, string name, string symbol, uint256 createdAt, bool isNonDivisible)[])",
+  "function getNFTCampaigns(uint256,uint256) view returns (tuple(address contractAddr, address creator, string name, string symbol, uint256 createdAt, bool isNonDivisible)[])",
+  "function getCampaignsByCreator(address) view returns (uint256[])",
+  // Legacy aliases for backward compat with old factory deployments
   "function totalTokenCampaigns() view returns (uint256)",
   "function getTokenCampaigns(uint256,uint256) view returns (tuple(address contractAddr, address creator, string name, string symbol, uint256 createdAt)[])",
   "function getTokenCampaignsByCreator(address) view returns (uint256[])",
 ];
 
-// LSP8DropFactory ABI
+// LSP8DropFactory ABI — kept for backward compat with existing LSP8 campaigns
 export const LSP8_FACTORY_ABI = [
   "function createNFTDrop(string,string,uint256,uint256) returns (address)",
   "function totalNFTCampaigns() view returns (uint256)",
@@ -103,11 +110,12 @@ export async function ensureLuksoNetwork(
   }
 }
 
-// Detect if a claim contract is LSP7 or LSP8 by checking for decimals()
-export async function detectTokenType(contract: any): Promise<"LSP7" | "LSP8"> {
+// Detect if a claim contract is LSP7, LSP7-NFT (non-divisible), or LSP8
+// LSP7 with decimals=0 is treated as an NFT collection in the UI
+export async function detectTokenType(contract: any): Promise<"LSP7" | "LSP7-NFT" | "LSP8"> {
   try {
-    await contract.decimals();
-    return "LSP7";
+    const decimals = await contract.decimals();
+    return Number(decimals) === 0 ? "LSP7-NFT" : "LSP7";
   } catch {
     return "LSP8";
   }

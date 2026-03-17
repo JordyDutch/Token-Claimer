@@ -29,7 +29,7 @@ export default function ClaimPage() {
   const [dropName, setDropName] = useState("Loading...");
   const [dropSymbol, setDropSymbol] = useState("");
   const [dropIcon, setDropIcon] = useState<string | null>(null);
-  const [tokenType, setTokenType] = useState<"LSP7" | "LSP8" | null>(null);
+  const [tokenType, setTokenType] = useState<"LSP7" | "LSP7-NFT" | "LSP8" | null>(null);
   const [claimedDisplay, setClaimedDisplay] = useState("-");
   const [supplyDisplay, setSupplyDisplay] = useState("-");
   const [amountDisplay, setAmountDisplay] = useState("");
@@ -140,12 +140,18 @@ export default function ClaimPage() {
       const hasReqs = enrichedTokens.length > 0 || rFollowers > BigInt(0);
       setReqInfo(hasReqs ? { tokens: enrichedTokens, followers: rFollowers } : null);
 
-      if (type === "LSP7") {
+      if (type === "LSP7" || type === "LSP7-NFT") {
         const [, claimers, decimals] = await Promise.all([c.totalClaimedAmount(), c.totalClaimers(), c.decimals()]);
         const dec = Number(decimals);
         setClaimedDisplay(claimers.toString());
-        setSupplyDisplay(supply === BigInt(0) ? "Unlimited" : formatUnits(supply, dec));
-        setAmountDisplay(formatUnits(amount, dec) + " tokens");
+        if (type === "LSP7-NFT") {
+          // Non-divisible LSP7 = NFT-style, show integer amounts
+          setSupplyDisplay(supply === BigInt(0) ? "Unlimited" : supply.toString());
+          setAmountDisplay(amount.toString() + (amount === BigInt(1) ? " NFT" : " NFTs"));
+        } else {
+          setSupplyDisplay(supply === BigInt(0) ? "Unlimited" : formatUnits(supply, dec));
+          setAmountDisplay(formatUnits(amount, dec) + " tokens");
+        }
       } else {
         const totalClaimed = await c.totalClaimed();
         setClaimedDisplay(totalClaimed.toString());
@@ -205,7 +211,7 @@ export default function ClaimPage() {
         : await c.claim();
       setStatus({ message: "Waiting for confirmation...", type: "loading" });
       await tx.wait();
-      setStatus({ message: tokenType === "LSP7" ? "Tokens claimed successfully!" : "NFT claimed successfully!", type: "success" });
+      setStatus({ message: tokenType === "LSP7" ? "Tokens claimed successfully!" : "NFT claimed successfully!", type: "success" });  // Works for LSP7-NFT and LSP8 alike
       setAlreadyClaimed(true);
       await loadState(address);
     } catch (e: any) {
@@ -288,7 +294,7 @@ export default function ClaimPage() {
           <div className="w-32 h-32 sm:w-48 sm:h-48 rounded-xl mx-auto mb-4 sm:mb-6 bg-gradient-to-br from-violet-600 to-purple-400 flex items-center justify-center text-4xl sm:text-6xl overflow-hidden">
             {dropIcon
               ? <img src={dropIcon} alt={dropName} className="w-full h-full object-cover" />
-              : (tokenType === "LSP7" ? "🪙" : "🖼")}
+              : (tokenType === "LSP7" ? "🪙" : "🖼️")}
           </div>
 
           {/* Status badge */}
@@ -299,6 +305,11 @@ export default function ClaimPage() {
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface text-label">
               {tokenType === "LSP7" ? "Token" : "NFT"}
             </span>
+            {tokenType === "LSP7-NFT" && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                LSP7
+              </span>
+            )}
           </div>
 
           <h1 className="text-xl sm:text-2xl font-bold mb-0.5">{dropName}</h1>
@@ -481,7 +492,7 @@ export default function ClaimPage() {
               {claiming
                 ? "Claiming..."
                 : !eligibility || (eligibility.tokenOk && eligibility.followersOk)
-                ? tokenType === "LSP7" ? "Claim Tokens" : "Claim NFT"
+                ? tokenType === "LSP7" ? "Claim Tokens" : tokenType === "LSP7-NFT" ? "Claim NFT" : "Claim NFT"
                 : "Requirements not met"}
             </button>
             </>

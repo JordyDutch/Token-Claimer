@@ -26,7 +26,7 @@ export default function ManagePage() {
 
   const [isOwner, setIsOwner] = useState(false);
   const [status, setStatus] = useState<Status>(null);
-  const [tokenType, setTokenType] = useState<"LSP7" | "LSP8" | null>(null);
+  const [tokenType, setTokenType] = useState<"LSP7" | "LSP7-NFT" | "LSP8" | null>(null);
   const [dropName, setDropName] = useState("");
   const [claimEnabled, setClaimEnabled] = useState(false);
   const [startTime, setStartTime] = useState("");
@@ -109,7 +109,7 @@ export default function ManagePage() {
       if (start > BigInt(0)) setStartTime(new Date(Number(start) * 1000).toISOString().slice(0, 16));
       if (end > BigInt(0)) setEndTime(new Date(Number(end) * 1000).toISOString().slice(0, 16));
       try {
-        if (type === "LSP7") {
+        if (type === "LSP7" || type === "LSP7-NFT") {
           const cl = await c.totalClaimers();
           setTotalClaimed(cl.toString());
         } else {
@@ -237,7 +237,7 @@ export default function ManagePage() {
               ← Claim page
             </Link>
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface text-muted">
-              {tokenType || "..."}
+              {tokenType === "LSP7-NFT" ? "NFT (LSP7)" : tokenType || "..."}
             </span>
           </div>
 
@@ -377,10 +377,10 @@ export default function ManagePage() {
             {/* Amount per claim */}
             <div className={card}>
               <h2 className="text-xs font-semibold text-tertiary mb-1">
-                {tokenType === "LSP7" ? "Tokens" : "NFTs"} Per Claim
+                {tokenType === "LSP7" ? "Tokens" : "Items"} Per Claim
               </h2>
               <p className="text-[10px] text-faint mb-3">
-                How many {tokenType === "LSP7" ? "tokens" : "NFTs"} each user receives when they claim.
+                How many {tokenType === "LSP7" ? "tokens" : "items"} each user receives when they claim.
               </p>
               <input
                 type="number"

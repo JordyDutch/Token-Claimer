@@ -225,7 +225,133 @@ describe("LSP7DropFactory", function () {
     });
   });
 
-  // ── 5. Bytecode size ─────────────────────────────────────────────────────
+  // ── 5. createNFTDrop (LSP7 non-divisible) ──────────────────────────────
+
+  describe("createNFTDrop() — LSP7 non-divisible", function () {
+    it("returns a non-zero contract address", async function () {
+      const addr = await factory
+        .connect(creator1)
+        .createNFTDrop.staticCall("NFT", "NFT", 100n, 1n);
+      expect(addr).to.not.equal(ethers.ZeroAddress);
+    });
+
+    it("increments totalCampaigns() to 1", async function () {
+      await factory.connect(creator1).createNFTDrop("NFT", "NFT", 100n, 1n);
+      expect(await factory.totalCampaigns()).to.equal(1n);
+    });
+
+    it("increments totalNFTCampaigns() to 1", async function () {
+      await factory.connect(creator1).createNFTDrop("NFT", "NFT", 100n, 1n);
+      expect(await factory.totalNFTCampaigns()).to.equal(1n);
+    });
+
+    it("emits NFTCampaignCreated with correct fields", async function () {
+      const addr = await factory
+        .connect(creator1)
+        .createNFTDrop.staticCall("My NFT", "MNFT", 0n, 1n);
+
+      await expect(
+        factory.connect(creator1).createNFTDrop("My NFT", "MNFT", 0n, 1n)
+      )
+        .to.emit(factory, "NFTCampaignCreated")
+        .withArgs(0n, creator1.address, addr, "My NFT", "MNFT");
+    });
+
+    it("stores campaign with isNonDivisible=true", async function () {
+      await factory.connect(creator1).createNFTDrop("NFT Drop", "NFTD", 100n, 2n);
+      const campaign = await factory.tokenCampaigns(0);
+      expect(campaign.isNonDivisible).to.be.true;
+      expect(campaign.name).to.equal("NFT Drop");
+    });
+
+    it("deployed token has 0 decimals", async function () {
+      await factory.connect(creator1).createNFTDrop("NFT", "NFT", 100n, 1n);
+      const { contractAddr } = await factory.tokenCampaigns(0);
+      const token = (await ethers.getContractAt(
+        "LSP7ClaimableToken",
+        contractAddr
+      )) as LSP7ClaimableToken;
+      expect(await token.decimals()).to.equal(0n);
+    });
+
+    it("deployed token has creator as owner", async function () {
+      await factory.connect(creator1).createNFTDrop("NFT", "NFT", 0n, 1n);
+      const { contractAddr } = await factory.tokenCampaigns(0);
+      const token = (await ethers.getContractAt(
+        "LSP7ClaimableToken",
+        contractAddr
+      )) as LSP7ClaimableToken;
+      expect(await token.owner()).to.equal(creator1.address);
+    });
+
+    it("deployed token has correct maxSupply and amountPerClaim", async function () {
+      await factory.connect(creator1).createNFTDrop("NFT", "NFT", 50n, 5n);
+      const { contractAddr } = await factory.tokenCampaigns(0);
+      const token = (await ethers.getContractAt(
+        "LSP7ClaimableToken",
+        contractAddr
+      )) as LSP7ClaimableToken;
+      expect(await token.maxSupply()).to.equal(50n);
+      expect(await token.amountPerClaim()).to.equal(5n);
+    });
+
+    it("claiming works on non-divisible token", async function () {
+      await factory.connect(creator1).createNFTDrop("NFT", "NFT", 100n, 3n);
+      const { contractAddr } = await factory.tokenCampaigns(0);
+      const token = (await ethers.getContractAt(
+        "LSP7ClaimableToken",
+        contractAddr
+      )) as LSP7ClaimableToken;
+
+      // Deploy a mock LSP1 account (LSP7 requires a UP, not an EOA)
+      const MockAccountFactory = await ethers.getContractFactory("MockLSP1Account");
+      const claimer = await MockAccountFactory.deploy();
+      const claimerAddr = await claimer.getAddress();
+
+      // Enable claims
+      await token.connect(creator1).setClaimEnabled(true);
+
+      // Mock account claims via the IClaimable interface
+      await claimer.doClaim(contractAddr);
+      expect(await token.hasClaimed(claimerAddr)).to.be.true;
+      expect(await token.balanceOf(claimerAddr)).to.equal(3n);
+      expect(await token.totalClaimedAmount()).to.equal(3n);
+    });
+
+    it("reverts when maxSupply < amountPerClaim", async function () {
+      await expect(
+        factory.connect(creator1).createNFTDrop("NFT", "NFT", 1n, 5n)
+      ).to.be.revertedWith("maxSupply < amountPerClaim");
+    });
+  });
+
+  // ── 6. getNFTCampaigns() view ─────────────────────────────────────────
+
+  describe("getNFTCampaigns() filtering", function () {
+    it("only returns non-divisible campaigns", async function () {
+      await factory.connect(creator1).createTokenDrop("Token", "TKN", 1n, 0n, false); // id=0 divisible
+      await factory.connect(creator1).createNFTDrop("NFT1", "N1", 0n, 1n);           // id=1 non-divisible
+      await factory.connect(creator1).createTokenDrop("Token2", "T2", 1n, 0n, true);  // id=2 non-divisible via createTokenDrop
+      await factory.connect(creator1).createNFTDrop("NFT2", "N2", 0n, 1n);           // id=3 non-divisible
+
+      expect(await factory.totalCampaigns()).to.equal(4n);
+      expect(await factory.totalNFTCampaigns()).to.equal(3n);
+
+      const nfts = await factory.getNFTCampaigns(0n, 10n);
+      expect(nfts.length).to.equal(3);
+      expect(nfts[0].name).to.equal("NFT1");
+      expect(nfts[1].name).to.equal("Token2"); // non-divisible via createTokenDrop
+      expect(nfts[2].name).to.equal("NFT2");
+    });
+
+    it("returns empty when no NFT campaigns exist", async function () {
+      await factory.connect(creator1).createTokenDrop("Token", "TKN", 1n, 0n, false);
+      expect(await factory.totalNFTCampaigns()).to.equal(0n);
+      expect((await factory.getNFTCampaigns(0n, 10n)).length).to.equal(0);
+    });
+  });
+
+  // ── 7. Bytecode size ─────────────────────────────────────────────────────
 
   describe("Contract size", function () {
     it("deploys without allowUnlimitedContractSize (runtime < 24576 bytes)", async function () {
