@@ -2,6 +2,7 @@
 pragma solidity ^0.8.27;
 
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {LSP7ClaimableToken} from "./LSP7ClaimableToken.sol";
 
 /// @title LSP7DropFactory
@@ -13,7 +14,7 @@ import {LSP7ClaimableToken} from "./LSP7ClaimableToken.sol";
 ///      The implementation contract is set once at factory deployment and is immutable.
 ///      When `maxSupply_` is 0 (unlimited), the factory passes `type(uint256).max`
 ///      to the token's `initialize(...)`, making the cap effectively infinite.
-contract LSP7DropFactory {
+contract LSP7DropFactory is Ownable {
 
     // ──────────────────── Types ────────────────────
 
@@ -33,7 +34,14 @@ contract LSP7DropFactory {
         bool isNonDivisible;
     }
 
+    // ──────────────────── Errors ────────────────────
+
+    error FactoryPaused();
+
     // ──────────────────── Storage ────────────────────
+
+    /// @notice Whether the factory is paused (no new campaigns can be created).
+    bool public paused;
 
     /// @notice The LSP7ClaimableToken implementation contract that all proxies delegate to.
     address public immutable implementation;
@@ -48,6 +56,9 @@ contract LSP7DropFactory {
     uint256[] private _nftCampaignIndices;
 
     // ──────────────────── Events ────────────────────
+
+    /// @notice Emitted when the factory pause state is updated.
+    event PausedUpdated(bool paused);
 
     /// @notice Emitted when a new LSP7 token drop campaign is created.
     /// @param campaignId   Index in the `tokenCampaigns` array.
@@ -84,6 +95,15 @@ contract LSP7DropFactory {
         implementation = address(new LSP7ClaimableToken());
     }
 
+    // ──────────────────── Pause ────────────────────
+
+    /// @notice Toggle factory pause state. Only the owner can call this.
+    /// @param p True to pause, false to unpause.
+    function setPaused(bool p) external onlyOwner {
+        paused = p;
+        emit PausedUpdated(p);
+    }
+
     // ──────────────────── Create ────────────────────
 
     /// @notice Deploys a new LSP7 claimable token drop as an EIP-1167 minimal proxy.
@@ -100,6 +120,7 @@ contract LSP7DropFactory {
         uint256 maxSupply_,
         bool isNonDivisible_
     ) external returns (address) {
+        if (paused) revert FactoryPaused();
         // Clone the implementation
         address proxy = Clones.clone(implementation);
 
@@ -145,6 +166,7 @@ contract LSP7DropFactory {
         uint256 maxSupply_,
         uint256 amountPerClaim_
     ) external returns (address) {
+        if (paused) revert FactoryPaused();
         // Clone the implementation
         address proxy = Clones.clone(implementation);
 

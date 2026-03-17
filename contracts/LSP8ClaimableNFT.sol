@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.27;
 
 import {LSP8IdentifiableDigitalAsset} from "@lukso/lsp8-contracts/contracts/LSP8IdentifiableDigitalAsset.sol";
 import {_LSP8_TOKENID_FORMAT_NUMBER} from "@lukso/lsp8-contracts/contracts/LSP8Constants.sol";
@@ -89,6 +89,7 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
     error ReentrancyGuard();
     error RescueFailed();
     error WrongCodeword();
+    error InvalidTokenRequirement();
 
     // ──────────────────── Constructor ────────────────────
 
@@ -135,7 +136,10 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
 
     function setAmountPerClaim(uint256 amount_) external onlyOwner {
         require(amount_ > 0 && amount_ <= 50, "Must be 1-50");
-        require(maxSupply == 0 || maxSupply >= amount_, "Would exceed maxSupply");
+        if (maxSupply > 0) {
+            uint256 remaining = maxSupply >= _nextTokenId ? maxSupply - _nextTokenId + 1 : 0;
+            require(remaining >= amount_, "Would exceed maxSupply");
+        }
         amountPerClaim = amount_;
         emit AmountPerClaimUpdated(amount_);
     }
@@ -154,7 +158,11 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
         delete _reqTokens;
         delete _reqMinBalances;
         for (uint256 i = 0; i < tokens_.length;) {
-            _reqTokens.push(tokens_[i]);
+            address token = tokens_[i];
+            uint256 codeSize;
+            assembly { codeSize := extcodesize(token) }
+            if (codeSize == 0) revert InvalidTokenRequirement();
+            _reqTokens.push(token);
             _reqMinBalances.push(minBalances_[i]);
             unchecked { ++i; }
         }
@@ -193,6 +201,10 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
         (bool ok, ) = to_.call{value: amount_}("");
         if (!ok) revert RescueFailed();
         emit LYXRescued(to_, amount_);
+    }
+
+    function renounceOwnership() public pure override {
+        revert("Renounce disabled");
     }
 
     // ──────────────────── Claim ────────────────────

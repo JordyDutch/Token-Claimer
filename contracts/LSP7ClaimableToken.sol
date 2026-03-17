@@ -196,8 +196,9 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
     ///        It is not a protocol-level supply constraint — `maxSupply` governs total supply.
     function setAmountPerClaim(uint256 amount_) external onlyOwner {
         if (amount_ == 0 || amount_ > 1e24) revert AmountOutOfRange();
-        if (tokenSupplyCap() != type(uint256).max && tokenSupplyCap() < amount_) {
-            revert AmountExceedsMaxSupply();
+        if (tokenSupplyCap() != type(uint256).max) {
+            uint256 remaining = tokenSupplyCap() - totalSupply();
+            if (remaining < amount_) revert AmountExceedsMaxSupply();
         }
         amountPerClaim = amount_;
         emit AmountPerClaimUpdated(amount_);
@@ -278,6 +279,10 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
         (bool ok, ) = to_.call{value: amount_}("");
         if (!ok) revert RescueFailed();
         emit LYXRescued(to_, amount_);
+    }
+
+    function renounceOwnership() public pure override {
+        revert("Renounce disabled");
     }
 
     // ──────────────────── Claim ────────────────────
