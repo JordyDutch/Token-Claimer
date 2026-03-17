@@ -95,7 +95,10 @@ export default function CreatePage() {
     setStatus({ message: "Connecting...", type: "loading" });
     const addr = await walletConnect();
     if (!addr) {
-      setStatus({ message: "Install the Universal Profile Browser Extension", type: "error" });
+      const mobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+      setStatus(mobile
+        ? { message: "Open universalprofile.cloud on mobile to connect", type: "error" }
+        : { message: "Install the UP Browser Extension to connect", type: "error" });
       return;
     }
     setStatus(null);
