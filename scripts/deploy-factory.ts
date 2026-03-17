@@ -36,37 +36,24 @@ async function main() {
   // This is the master copy. It uses initialize() instead of a constructor.
   // It must NEVER be initialized directly — it serves only as a delegate target.
 
-  console.log("Step 1/4: Deploying LSP7ClaimableToken implementation...");
-  const LSP7Impl = await ethers.getContractFactory("LSP7ClaimableToken");
-  const lsp7Impl = await LSP7Impl.deploy();
-  await lsp7Impl.waitForDeployment();
-  const lsp7ImplAddr = await lsp7Impl.getAddress();
-  console.log("  LSP7ClaimableToken (impl):", lsp7ImplAddr);
+  // ─────────────── Step 1: Deploy LSP7 Factory ───────────────
+  // Factory self-deploys its own implementation in the constructor.
 
-  // ─────────────── Step 2: Deploy LSP7 Factory ───────────────
-  // Factory stores the implementation address and uses Clones.clone() internally.
-
-  console.log("Step 2/4: Deploying LSP7DropFactory...");
+  console.log("Step 1/4: Deploying LSP7DropFactory (self-deploys impl internally)...");
   const LSP7Factory = await ethers.getContractFactory("LSP7DropFactory");
-  const lsp7Factory = await LSP7Factory.deploy(lsp7ImplAddr);
+  const lsp7Factory = await LSP7Factory.deploy();
   await lsp7Factory.waitForDeployment();
   const lsp7FactoryAddr = await lsp7Factory.getAddress();
+  const lsp7ImplAddr = await lsp7Factory.implementation();
   console.log("  LSP7DropFactory:", lsp7FactoryAddr);
+  console.log("  LSP7ClaimableToken (impl):", lsp7ImplAddr);
 
-  // ─────────────── Step 3: Deploy LSP8 Implementation ───────────────
+  // ─────────────── Step 2: Deploy LSP8 Factory ───────────────
+  // LSP8DropFactory deploys full LSP8ClaimableNFT per drop (no EIP-1167).
 
-  console.log("Step 3/4: Deploying LSP8ClaimableNFT implementation...");
-  const LSP8Impl = await ethers.getContractFactory("LSP8ClaimableNFT");
-  const lsp8Impl = await LSP8Impl.deploy();
-  await lsp8Impl.waitForDeployment();
-  const lsp8ImplAddr = await lsp8Impl.getAddress();
-  console.log("  LSP8ClaimableNFT (impl):", lsp8ImplAddr);
-
-  // ─────────────── Step 4: Deploy LSP8 Factory ───────────────
-
-  console.log("Step 4/4: Deploying LSP8DropFactory...");
+  console.log("Step 2/2: Deploying LSP8DropFactory...");
   const LSP8Factory = await ethers.getContractFactory("LSP8DropFactory");
-  const lsp8Factory = await LSP8Factory.deploy(lsp8ImplAddr);
+  const lsp8Factory = await LSP8Factory.deploy();
   await lsp8Factory.waitForDeployment();
   const lsp8FactoryAddr = await lsp8Factory.getAddress();
   console.log("  LSP8DropFactory:", lsp8FactoryAddr);
@@ -77,19 +64,16 @@ async function main() {
   console.log("\n── Verifying implementation references ──");
 
   const storedLsp7Impl = await lsp7Factory.implementation();
-  const storedLsp8Impl = await lsp8Factory.implementation();
-
-  const lsp7Match = storedLsp7Impl === lsp7ImplAddr;
-  const lsp8Match = storedLsp8Impl === lsp8ImplAddr;
+  const lsp7Match = storedLsp7Impl.toLowerCase() === lsp7ImplAddr.toLowerCase();
 
   console.log(
     `  LSP7DropFactory.implementation() = ${storedLsp7Impl} ${lsp7Match ? "✓" : "✗ MISMATCH"}`
   );
   console.log(
-    `  LSP8DropFactory.implementation() = ${storedLsp8Impl} ${lsp8Match ? "✓" : "✗ MISMATCH"}`
+    `  LSP8DropFactory: deploys fresh contracts per drop (no implementation getter)`
   );
 
-  if (!lsp7Match || !lsp8Match) {
+  if (!lsp7Match) {
     throw new Error("Implementation address mismatch — deployment may be corrupted!");
   }
 
@@ -100,7 +84,7 @@ async function main() {
   console.log("═══════════════════════════════════════════");
   console.log(`  LSP7ClaimableToken (impl): ${lsp7ImplAddr}`);
   console.log(`  LSP7DropFactory:           ${lsp7FactoryAddr}`);
-  console.log(`  LSP8ClaimableNFT (impl):   ${lsp8ImplAddr}`);
+  console.log(`  LSP8ClaimableNFT:          deploys fresh per drop (no shared impl)`);
   console.log(`  LSP8DropFactory:           ${lsp8FactoryAddr}`);
   console.log("═══════════════════════════════════════════");
   console.log("\nNext steps:");
