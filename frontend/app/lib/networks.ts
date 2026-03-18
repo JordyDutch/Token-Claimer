@@ -43,22 +43,24 @@ export const NETWORKS: Record<NetworkId, NetworkConfig> = {
     // Active factory — used when creating new drops
     lsp7Factory:
       process.env.NEXT_PUBLIC_LSP7_FACTORY ??
-      "0xF1b5FfA5A82Cee28eaC551165102a1e62fBef7Ab",
+      "0x0B38Ca584553Ec7dA412403c9537B2C0Cd094bf0",
     lsp8Factory:
       process.env.NEXT_PUBLIC_LSP8_FACTORY ??
-      "0xA373f07E94496A4509c30DcB27b431c541b87FbF",
+      "0xdcA867387df33b9ce08B706fdb91FB2e8C4bEB74",
     // All historical factories — queried when listing existing drops
     allLsp7Factories: [
       "0x9b132E764f92c6E6F5E91E276E310758C33dB08F", // v3: codeword support
       "0xE618ddD88869E43E433eD103b0d896E1a05d5b40", // v4: multi-creator
       "0xE2932677195f46341c9d13dD0BBa016ac19B4E05", // v5: EIP-1167 proxies
-      process.env.NEXT_PUBLIC_LSP7_FACTORY ?? "0xF1b5FfA5A82Cee28eaC551165102a1e62fBef7Ab", // v6: LSP7-NFT support (active)
+      "0xF1b5FfA5A82Cee28eaC551165102a1e62fBef7Ab", // v6: LSP7-NFT support
+      process.env.NEXT_PUBLIC_LSP7_FACTORY ?? "0x0B38Ca584553Ec7dA412403c9537B2C0Cd094bf0", // v7: audit fixes (active)
     ],
     allLsp8Factories: [
       "0xBd545E98F133282bD79dc4a6ac422437478A58b6", // v3: codeword support
       "0x9bc9e8D57a94E0F88ab32CDC1865c3fdeF86f72E", // v4: multi-creator
       "0x649Ccee0D46283102De6fEef3456c2e0a6c37461", // v5: OWASP fixes
-      process.env.NEXT_PUBLIC_LSP8_FACTORY ?? "0xA373f07E94496A4509c30DcB27b431c541b87FbF", // v6: LSP7-NFT compat (active)
+      "0xA373f07E94496A4509c30DcB27b431c541b87FbF", // v6: LSP7-NFT compat
+      process.env.NEXT_PUBLIC_LSP8_FACTORY ?? "0xdcA867387df33b9ce08B706fdb91FB2e8C4bEB74", // v7 (active)
     ],
     explorerBase: "https://explorer.execution.mainnet.lukso.network",
   },
