@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNetwork } from "./NetworkProvider";
 import { useTheme } from "./ThemeProvider";
 import { useWallet } from "./WalletProvider";
@@ -14,6 +14,19 @@ export default function Header() {
   const { address, profile, connect, disconnect, connecting } = useWallet();
   const isTestnet = networkId === "testnet";
   const [menuOpen, setMenuOpen] = useState(false);
+  const [walletOpen, setWalletOpen] = useState(false);
+  const walletRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!walletOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (walletRef.current && !walletRef.current.contains(e.target as Node)) {
+        setWalletOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [walletOpen]);
 
   const navLinks = [
     { href: "/", label: "Explore" },
@@ -65,20 +78,38 @@ export default function Header() {
         <div className="hidden md:flex items-center gap-3">
           {/* Wallet */}
           {address ? (
-            <div className="flex items-center gap-1.5">
-              {profile?.image && (
-                <img src={profile.image} alt={profile.name || "wallet"} className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
-              )}
-              <span className="text-xs text-secondary max-w-[100px] truncate">
-                {profile?.name || `${address.slice(0, 6)}…${address.slice(-4)}`}
-              </span>
+            <div className="relative" ref={walletRef}>
               <button
-                onClick={disconnect}
-                title="Disconnect wallet"
-                className="text-[10px] text-faint hover:text-red-400 transition-colors cursor-pointer ml-0.5"
+                onClick={() => setWalletOpen(!walletOpen)}
+                className="flex items-center gap-1.5 px-2 py-1 rounded-full hover:bg-surface-2 transition-colors cursor-pointer"
               >
-                ✕
+                {profile?.image ? (
+                  <img src={profile.image} alt={profile.name || "wallet"} className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
+                ) : (
+                  <span className="w-5 h-5 rounded-full bg-pink-500/20 flex items-center justify-center text-[9px] text-pink-500 flex-shrink-0">
+                    {address.slice(2, 4).toUpperCase()}
+                  </span>
+                )}
+                <span className="text-xs text-secondary max-w-[100px] truncate">
+                  {profile?.name || `${address.slice(0, 6)}…${address.slice(-4)}`}
+                </span>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={`w-3 h-3 text-faint transition-transform ${walletOpen ? "rotate-180" : ""}`}>
+                  <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 011.06 0L10 11.94l3.72-3.72a.75.75 0 111.06 1.06l-4.25 4.25a.75.75 0 01-1.06 0L5.22 9.28a.75.75 0 010-1.06z" clipRule="evenodd" />
+                </svg>
               </button>
+              {walletOpen && (
+                <div className="absolute right-0 top-full mt-1 w-40 rounded-lg border border-border-header bg-bg shadow-lg overflow-hidden z-50">
+                  <div className="px-3 py-2 border-b border-border-header">
+                    <p className="text-[10px] text-faint font-mono truncate">{address.slice(0, 10)}…{address.slice(-6)}</p>
+                  </div>
+                  <button
+                    onClick={() => { disconnect(); setWalletOpen(false); }}
+                    className="w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-red-500/5 transition-colors cursor-pointer"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <button
@@ -129,20 +160,21 @@ export default function Header() {
 
         {/* Mobile right: wallet avatar/connect + hamburger */}
         <div className="flex md:hidden items-center gap-2">
-          {/* Compact wallet indicator */}
+          {/* Compact wallet indicator — tap avatar to open mobile menu which has disconnect */}
           {address ? (
-            <div className="flex items-center gap-1">
-              {profile?.image && (
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="flex items-center gap-1.5 cursor-pointer"
+              title="Open menu"
+            >
+              {profile?.image ? (
                 <img src={profile.image} alt={profile.name || "wallet"} className="w-6 h-6 rounded-full object-cover" />
+              ) : (
+                <span className="w-6 h-6 rounded-full bg-pink-500/20 flex items-center justify-center text-[9px] text-pink-500">
+                  {address.slice(2, 4).toUpperCase()}
+                </span>
               )}
-              <button
-                onClick={disconnect}
-                title="Disconnect wallet"
-                className="text-[10px] text-faint hover:text-red-400 transition-colors cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
+            </button>
           ) : (
             <button
               onClick={connect}
@@ -181,6 +213,18 @@ export default function Header() {
               </Link>
             ))}
           </nav>
+          {/* Disconnect (mobile, only when connected) */}
+          {address && (
+            <div className="border-t border-border-header">
+              <button
+                onClick={() => { disconnect(); setMenuOpen(false); }}
+                className="w-full text-left px-4 py-3 text-sm text-red-500 hover:bg-red-500/5 transition-colors cursor-pointer"
+              >
+                Disconnect wallet
+              </button>
+            </div>
+          )}
+
           {/* Mobile controls row */}
           <div className="flex items-center justify-between px-4 py-3 border-t border-border-header">
             {/* Theme toggle */}
