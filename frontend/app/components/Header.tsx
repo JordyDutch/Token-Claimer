@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { useNetwork } from "./NetworkProvider";
 import { useTheme } from "./ThemeProvider";
 import { useWallet } from "./WalletProvider";
@@ -12,19 +13,38 @@ export default function Header() {
   const { theme, toggleTheme } = useTheme();
   const { address, profile, connect, disconnect, connecting } = useWallet();
   const isTestnet = networkId === "testnet";
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const navLinks = [
+    { href: "/", label: "Explore" },
+    { href: "/activity", label: "Activity" },
+    { href: "/create", label: "Create" },
+    { href: "/my-drops", label: "My Drops" },
+    { href: "/developers", label: "Devs" },
+  ];
 
   const linkClass = (href: string) => {
     const active = pathname === href;
-    return `text-xs sm:text-sm font-medium transition-colors ${
+    return `text-sm font-medium transition-colors ${
       active ? "text-pink-500 dark:text-pink-400" : "text-label hover:text-secondary"
+    }`;
+  };
+
+  const mobileLinkClass = (href: string) => {
+    const active = pathname === href;
+    return `block w-full px-4 py-3 text-sm font-medium transition-colors border-b border-border-header last:border-0 ${
+      active
+        ? "text-pink-500 dark:text-pink-400 bg-pink-50/50 dark:bg-pink-500/5"
+        : "text-secondary hover:bg-surface-2"
     }`;
   };
 
   return (
     <header className="sticky top-0 z-50 backdrop-blur-lg bg-bg-transparent border-b border-border-header">
       <div className="max-w-6xl mx-auto flex items-center justify-between px-4 py-3">
-        <Link href="/" className="flex items-center gap-2 group">
-          <svg className="w-7 h-7" viewBox="0 0 166 185" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* Logo */}
+        <Link href="/" className="flex items-center gap-2 group" onClick={() => setMenuOpen(false)}>
+          <svg className="w-7 h-7 flex-shrink-0" viewBox="0 0 166 185" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path fillRule="evenodd" clipRule="evenodd" d="M165.276 56.9359C165.276 49.1388 161.116 41.934 154.364 38.0354L93.5499 2.92391C86.7975 -0.974638 78.4782 -0.974635 71.7259 2.92391L10.912 38.0354C4.15963 41.934 4.4275e-06 49.1388 4.4275e-06 56.9359L0 127.159C-6.99566e-07 134.956 4.15964 142.161 10.912 146.059L71.7259 181.171C78.4782 185.069 86.7975 185.069 93.5499 181.171L154.364 146.059C161.116 142.161 165.276 134.956 165.276 127.159V56.9359ZM64.0936 48.4204C59.976 48.4204 56.1712 50.6171 54.1124 54.1831L35.5702 86.2997C33.5114 89.8657 33.5114 94.2592 35.5702 97.8252L54.1124 129.942C56.1712 133.508 59.976 135.705 64.0936 135.705H101.178C105.296 135.705 109.1 133.508 111.159 129.942L129.701 97.8252C131.76 94.2592 131.76 89.8657 129.701 86.2997L111.159 54.1831C109.1 50.6171 105.296 48.4204 101.178 48.4204H64.0936Z" fill="#FA2F79"/>
           </svg>
           <span className="text-sm font-semibold text-secondary group-hover:text-primary transition-colors hidden sm:inline">
@@ -32,30 +52,24 @@ export default function Header() {
           </span>
         </Link>
 
-        <nav className="flex items-center gap-3 sm:gap-5">
-          <Link href="/" className={linkClass("/")}>
-            Explore
-          </Link>
-          <Link href="/activity" className={linkClass("/activity")}>
-            Activity
-          </Link>
-          <Link href="/create" className={linkClass("/create")}>
-            Create
-          </Link>
-          <Link href="/my-drops" className={linkClass("/my-drops")}>
-            My Drops
-          </Link>
-          <Link href="/developers" className={linkClass("/developers")}>
-            Devs
-          </Link>
+        {/* Desktop nav */}
+        <nav className="hidden md:flex items-center gap-5">
+          {navLinks.map(({ href, label }) => (
+            <Link key={href} href={href} className={linkClass(href)}>
+              {label}
+            </Link>
+          ))}
+        </nav>
 
-          {/* Wallet connect */}
+        {/* Desktop right controls */}
+        <div className="hidden md:flex items-center gap-3">
+          {/* Wallet */}
           {address ? (
             <div className="flex items-center gap-1.5">
               {profile?.image && (
-                <img src={profile.image} alt="" className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
+                <img src={profile.image} alt={profile.name || "wallet"} className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
               )}
-              <span className="text-xs text-secondary hidden sm:inline max-w-[100px] truncate">
+              <span className="text-xs text-secondary max-w-[100px] truncate">
                 {profile?.name || `${address.slice(0, 6)}…${address.slice(-4)}`}
               </span>
               <button
@@ -93,7 +107,7 @@ export default function Header() {
             )}
           </button>
 
-          {/* Network toggle */}
+          {/* Network badge */}
           <button
             onClick={() => {
               if (pathname.startsWith("/create") || pathname.startsWith("/manage/")) {
@@ -108,15 +122,110 @@ export default function Header() {
                 : "bg-green-50 dark:bg-green-500/10 border-green-300 dark:border-green-500/20 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-500/20"
             }`}
           >
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${
-                isTestnet ? "bg-amber-500" : "bg-green-500"
-              }`}
-            />
+            <span className={`w-1.5 h-1.5 rounded-full ${isTestnet ? "bg-amber-500" : "bg-green-500"}`} />
             {isTestnet ? "Testnet" : "Mainnet"}
           </button>
-        </nav>
+        </div>
+
+        {/* Mobile right: wallet avatar/connect + hamburger */}
+        <div className="flex md:hidden items-center gap-2">
+          {/* Compact wallet indicator */}
+          {address ? (
+            <div className="flex items-center gap-1">
+              {profile?.image && (
+                <img src={profile.image} alt={profile.name || "wallet"} className="w-6 h-6 rounded-full object-cover" />
+              )}
+              <button
+                onClick={disconnect}
+                title="Disconnect wallet"
+                className="text-[10px] text-faint hover:text-red-400 transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={connect}
+              disabled={connecting}
+              className="text-xs font-medium px-2.5 py-1 rounded-full border border-pink-500/50 text-pink-500 hover:bg-pink-500/10 transition-all cursor-pointer disabled:opacity-50"
+            >
+              {connecting ? "…" : "Connect"}
+            </button>
+          )}
+
+          {/* Hamburger */}
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            className="w-8 h-8 flex flex-col items-center justify-center gap-1.5 rounded text-label hover:text-secondary transition-colors cursor-pointer"
+          >
+            <span className={`block w-5 h-0.5 bg-current transition-all duration-200 ${menuOpen ? "rotate-45 translate-y-2" : ""}`} />
+            <span className={`block w-5 h-0.5 bg-current transition-all duration-200 ${menuOpen ? "opacity-0" : ""}`} />
+            <span className={`block w-5 h-0.5 bg-current transition-all duration-200 ${menuOpen ? "-rotate-45 -translate-y-2" : ""}`} />
+          </button>
+        </div>
       </div>
+
+      {/* Mobile dropdown menu */}
+      {menuOpen && (
+        <div className="md:hidden border-t border-border-header bg-bg/95 backdrop-blur-lg">
+          <nav>
+            {navLinks.map(({ href, label }) => (
+              <Link
+                key={href}
+                href={href}
+                className={mobileLinkClass(href)}
+                onClick={() => setMenuOpen(false)}
+              >
+                {label}
+              </Link>
+            ))}
+          </nav>
+          {/* Mobile controls row */}
+          <div className="flex items-center justify-between px-4 py-3 border-t border-border-header">
+            {/* Theme toggle */}
+            <button
+              onClick={() => { toggleTheme(); setMenuOpen(false); }}
+              className="flex items-center gap-2 text-sm text-label hover:text-secondary transition-colors cursor-pointer"
+            >
+              {theme === "dark" ? (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                    <path d="M10 2a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 2zM10 15a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 15zM10 7a3 3 0 100 6 3 3 0 000-6zM15.657 5.404a.75.75 0 10-1.06-1.06l-1.061 1.06a.75.75 0 001.06 1.061l1.06-1.06zM6.464 14.596a.75.75 0 10-1.06-1.06l-1.06 1.06a.75.75 0 001.06 1.06l1.06-1.06zM18 10a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0118 10zM5 10a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 015 10zM14.596 15.657a.75.75 0 001.06-1.06l-1.06-1.061a.75.75 0 10-1.06 1.06l1.06 1.06zM5.404 6.464a.75.75 0 001.06-1.06l-1.06-1.06a.75.75 0 10-1.061 1.06l1.06 1.06z" />
+                  </svg>
+                  Light mode
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                    <path fillRule="evenodd" d="M7.455 2.004a.75.75 0 01.26.77 7 7 0 009.958 7.967.75.75 0 011.067.853A8.5 8.5 0 116.647 1.921a.75.75 0 01.808.083z" clipRule="evenodd" />
+                  </svg>
+                  Dark mode
+                </>
+              )}
+            </button>
+
+            {/* Network badge */}
+            <button
+              onClick={() => {
+                if (pathname.startsWith("/create") || pathname.startsWith("/manage/")) {
+                  if (!window.confirm("Switching networks will reset your form. Continue?")) return;
+                }
+                setNetwork(isTestnet ? "mainnet" : "testnet");
+                setMenuOpen(false);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
+                isTestnet
+                  ? "bg-amber-50 dark:bg-amber-500/10 border-amber-300 dark:border-amber-500/30 text-amber-700 dark:text-amber-400"
+                  : "bg-green-50 dark:bg-green-500/10 border-green-300 dark:border-green-500/20 text-green-700 dark:text-green-400"
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${isTestnet ? "bg-amber-500" : "bg-green-500"}`} />
+              {isTestnet ? "Testnet" : "Mainnet"}
+            </button>
+          </div>
+        </div>
+      )}
     </header>
   );
 }
