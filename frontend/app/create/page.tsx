@@ -137,7 +137,7 @@ export default function CreatePage() {
         // Scale amountPerClaim by token decimals (e.g. 1 token with 18 decimals = 1e18 units)
         const scaledAmount = isNonDivisible
           ? BigInt(amountPerClaim)
-          : BigInt(amountPerClaim) * 10n ** BigInt(tokenDecimals);
+          : BigInt(amountPerClaim) * BigInt(10) ** BigInt(tokenDecimals);
         const tx = dropType === "nft"
           ? await factory.createNFTDrop(name, symbol, maxSupply, 1) // NFT always 1 per claim, 0 decimals
           : await factory.createTokenDrop(name, symbol, scaledAmount, maxSupply, isNonDivisible);
