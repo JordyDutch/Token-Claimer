@@ -57,10 +57,14 @@ export default function ManagePage() {
   const metaIconRef = useRef<HTMLInputElement>(null);
   const metaAssetRef = useRef<HTMLInputElement>(null);
 
-  // Auto-dismiss success toasts after 3s
+  // Auto-dismiss success toasts after 3s, error toasts after 8s
   useEffect(() => {
     if (status?.type === "success") {
       const t = setTimeout(() => setStatus(null), 3000);
+      return () => clearTimeout(t);
+    }
+    if (status?.type === "error") {
+      const t = setTimeout(() => setStatus(null), 8000);
       return () => clearTimeout(t);
     }
   }, [status]);
@@ -417,12 +421,13 @@ export default function ManagePage() {
                 </div>
               </div>
               <button
-                onClick={() =>
+                onClick={() => {
+                  if (claimEnabled && !window.confirm("Are you sure you want to pause this drop?")) return;
                   sendTx(
                     (c) => c.setClaimEnabled(!claimEnabled),
                     claimEnabled ? "Pausing claims..." : "Enabling claims..."
-                  )
-                }
+                  );
+                }}
                 className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer active:scale-[0.97] ${
                   claimEnabled
                     ? "bg-red-50 dark:bg-red-500/20 text-red-700 dark:text-red-400 border border-red-300 dark:border-red-500/30 hover:bg-red-100 dark:hover:bg-red-500/30"
@@ -445,7 +450,10 @@ export default function ManagePage() {
                 </span>
               </div>
               <button
-                onClick={toggleExploreVisibility}
+                onClick={() => {
+                  if (exploreVisible && !window.confirm("Are you sure you want to hide this drop from Explore?")) return;
+                  toggleExploreVisibility();
+                }}
                 disabled={visibilitySaving}
                 className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed ${
                   exploreVisible
@@ -636,7 +644,10 @@ export default function ManagePage() {
                   </button>
                   {codewordEnabled && (
                     <button
-                      onClick={() => sendTx((c) => c.setCodeword(""), "Clearing codeword...")}
+                      onClick={() => {
+                        if (!window.confirm("Are you sure you want to clear the codeword?")) return;
+                        sendTx((c) => c.setCodeword(""), "Clearing codeword...");
+                      }}
                       className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-border-default text-muted hover:border-red-500/30 hover:text-red-400 transition-all cursor-pointer"
                     >
                       Clear Codeword
@@ -826,7 +837,7 @@ export default function ManagePage() {
         {/* Status toast — fixed overlay, visible regardless of scroll position */}
         {status && (
           <div
-            className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-sm px-4 py-3 rounded-xl text-xs sm:text-sm shadow-xl shadow-black/40 transition-all ${
+            className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-sm px-4 py-3 rounded-xl text-xs sm:text-sm shadow-xl shadow-black/40 transition-all flex items-center justify-between gap-3 ${
               status.type === "success"
                 ? "bg-toast-success border border-green-300 dark:border-green-500/30 text-green-700 dark:text-green-400"
                 : status.type === "error"
@@ -834,11 +845,22 @@ export default function ManagePage() {
                 : "bg-dropdown border border-pink-500 dark:border-pink-500/30 text-pink-500 dark:text-pink-400"
             }`}
           >
-            {status.link ? (
+            <span className="flex-1">
+              {status.link ? (
                 <a href={status.link} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
                   {status.message}
                 </a>
               ) : status.message}
+            </span>
+            {status.type === "error" && (
+              <button
+                onClick={() => setStatus(null)}
+                className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity cursor-pointer text-base leading-none"
+                aria-label="Dismiss"
+              >
+                ×
+              </button>
+            )}
           </div>
         )}
 

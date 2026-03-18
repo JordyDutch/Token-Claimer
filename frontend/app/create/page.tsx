@@ -34,12 +34,17 @@ export default function CreatePage() {
   const [secretTokenReqs, setSecretTokenReqs] = useState<Array<{ address: string; minBalance: string }>>([]);
   const [secretMinFollowers, setSecretMinFollowers] = useState("0");
   const [secretFollowAddress, setSecretFollowAddress] = useState("");
-  const [secretIsPublic, setSecretIsPublic] = useState(false);
+  const [secretIsPublic, setSecretIsPublic] = useState(true);
   const [secretImageFile, setSecretImageFile] = useState<File | null>(null);
   const [secretImagePreview, setSecretImagePreview] = useState<string | null>(null);
   const [secretDropId, setSecretDropId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
+  // Touched state for per-field validation
+  const [nameTouch, setNameTouch] = useState(false);
+  const [symbolTouch, setSymbolTouch] = useState(false);
+  const [descriptionTouch, setDescriptionTouch] = useState(false);
+  const [iconTouch, setIconTouch] = useState(false);
   const [maxSupply, setMaxSupply] = useState("100");
   const [amountPerClaim, setAmountPerClaim] = useState("1");
   const [deployedAddress, setDeployedAddress] = useState<string | null>(null);
@@ -92,13 +97,21 @@ export default function CreatePage() {
   }
 
   async function connect() {
+    const mobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+    if (mobile) {
+      setStatus({ message: "Open via the Universal Profiles mobile app", type: "error" });
+      return;
+    }
     setStatus({ message: "Connecting...", type: "loading" });
-    const addr = await walletConnect();
-    if (!addr) {
-      const mobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-      setStatus(mobile
-        ? { message: "Open via the Universal Profiles mobile app", type: "error" }
-        : { message: "Install the UP Browser Extension to connect", type: "error" });
+    const result = await walletConnect();
+    if (!result.address) {
+      if (result.error === "not_installed") {
+        setStatus({ message: "Install the UP Browser Extension to connect", type: "error" });
+      } else if (result.error === "rejected") {
+        setStatus({ message: "Connection rejected", type: "error" });
+      } else {
+        setStatus({ message: "Failed to connect — try again", type: "error" });
+      }
       return;
     }
     setStatus(null);
@@ -112,7 +125,7 @@ export default function CreatePage() {
     }
     try {
       setDeploying(true);
-      setStatus({ message: "Creating your drop... confirm in your wallet", type: "loading" });
+      setStatus({ message: "Step 1/3: Deploying contract...", type: "loading" });
       const provider = new BrowserProvider(p);
       const signer = await provider.getSigner();
       let deployedAddr: string;
@@ -122,7 +135,6 @@ export default function CreatePage() {
         const tx = dropType === "nft"
           ? await factory.createNFTDrop(name, symbol, maxSupply, amountPerClaim)
           : await factory.createTokenDrop(name, symbol, amountPerClaim, maxSupply, false);
-        setStatus({ message: "Waiting for confirmation...", type: "loading" });
         await tx.wait();
         const fr = new Contract(networkConfig.lsp7Factory, LSP7_FACTORY_ABI, provider);
         const t = await fr.totalCampaigns();
@@ -134,6 +146,7 @@ export default function CreatePage() {
       const validLinks = links.filter((l) => l.title.trim() && l.url.trim());
 
       // Step 2: LSP4 metadata + LSP4Creators[] in one tx
+      setStatus({ message: "Step 2/3: Uploading metadata...", type: "loading" });
       await uploadAndSetLSP4Metadata(
         deployedAddr,
         signer,
@@ -144,16 +157,17 @@ export default function CreatePage() {
           links: validLinks,
           assetFiles: assetFiles.length > 0 ? assetFiles : undefined,
         },
-        (msg) => setStatus({ message: msg, type: "loading" }),
+        () => setStatus({ message: "Step 2/3: Uploading metadata...", type: "loading" }),
         address,  // sets LSP4Creators[] on the contract
       );
 
       // Step 3: LSP12IssuedAssets[] on creator's UP → "Verified creator" badge
+      setStatus({ message: "Step 3/3: Registering as issued asset...", type: "loading" });
       await addToLSP12IssuedAssets(
         address,
         deployedAddr,
         signer,
-        (msg) => setStatus({ message: msg, type: "loading" })
+        () => setStatus({ message: "Step 3/3: Registering as issued asset...", type: "loading" })
       );
 
       setDeployedAddress(deployedAddr);
@@ -317,7 +331,7 @@ export default function CreatePage() {
           <div className="space-y-3">
             <Link
               href={`/manage/${deployedAddress}`}
-              className="block w-full py-3 rounded-xl text-sm font-semibold bg-pink-500 text-white hover:bg-pink-500 transition-all active:scale-[0.97]"
+              className="block w-full py-3 rounded-xl text-sm font-semibold bg-pink-500 text-white hover:bg-pink-600 transition-all active:scale-[0.97]"
             >
               Manage Drop →
             </Link>
@@ -432,19 +446,27 @@ export default function CreatePage() {
                   <input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
+                    onBlur={() => setNameTouch(true)}
                     placeholder="My Awesome Drop"
-                    className={`${inp} ${name && !nameValid ? "border-red-500/50" : ""}`}
+                    className={`${inp} ${nameTouch && !nameValid ? "border-red-500/50" : ""}`}
                   />
+                  {nameTouch && !nameValid && (
+                    <p className="text-xs text-red-400 mt-0.5">Required</p>
+                  )}
                 </div>
                 <div>
                   <label className={lbl}>Symbol *</label>
                   <input
                     value={symbol}
                     onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                    onBlur={() => setSymbolTouch(true)}
                     placeholder="DROP"
-                    className={`${inp} ${symbol && !symbolValid ? "border-red-500/50" : ""}`}
+                    className={`${inp} ${symbolTouch && !symbolValid ? "border-red-500/50" : ""}`}
                     maxLength={10}
                   />
+                  {symbolTouch && !symbolValid && (
+                    <p className="text-xs text-red-400 mt-0.5">Required</p>
+                  )}
                 </div>
                 <div>
                   <label className={lbl}>Max Supply</label>
@@ -494,7 +516,7 @@ export default function CreatePage() {
                       )}
                       <button
                         type="button"
-                        onClick={() => fileRef.current?.click()}
+                        onClick={() => { setIconTouch(true); fileRef.current?.click(); }}
                         className="text-xs text-pink-500 hover:text-pink-500 border border-pink-500/30 rounded-lg px-3 py-1.5 transition-colors cursor-pointer"
                       >
                         {iconFile ? "Change image" : "Upload image"}
@@ -505,6 +527,7 @@ export default function CreatePage() {
                           onClick={() => {
                             setIconFile(null);
                             setIconPreview(null);
+                            setIconTouch(true);
                             if (fileRef.current) fileRef.current.value = "";
                           }}
                           className="text-xs text-label hover:text-red-400 transition-colors cursor-pointer"
@@ -523,6 +546,9 @@ export default function CreatePage() {
                     {iconFile && (
                       <p className="text-[10px] text-faint mt-1">{iconFile.name}</p>
                     )}
+                    {iconTouch && !iconValid && (
+                      <p className="text-xs text-red-400 mt-0.5">Required</p>
+                    )}
                   </div>
 
                   {/* Description */}
@@ -531,10 +557,14 @@ export default function CreatePage() {
                     <textarea
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
+                      onBlur={() => setDescriptionTouch(true)}
                       placeholder="What is this drop about?"
                       rows={3}
-                      className={inp + " resize-none"}
+                      className={`${inp} resize-none ${descriptionTouch && !descriptionValid ? "border-red-500/50" : ""}`}
                     />
+                    {descriptionTouch && !descriptionValid && (
+                      <p className="text-xs text-red-400 mt-0.5">Required</p>
+                    )}
                   </div>
 
                   {/* Links */}
@@ -631,7 +661,7 @@ export default function CreatePage() {
                 <button
                   onClick={deploy}
                   disabled={!canDeploy}
-                  className="w-full py-3.5 rounded-xl text-sm font-semibold bg-pink-500 text-white hover:bg-pink-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.97] mt-2"
+                  className="w-full py-3.5 rounded-xl text-sm font-semibold bg-pink-500 text-white hover:bg-pink-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.97] mt-2"
                 >
                   {deploying ? "Deploying..." : `Create ${dropType === "nft" ? "NFT" : "Token"} Drop`}
                 </button>
@@ -704,6 +734,7 @@ export default function CreatePage() {
                               value={req.minBalance}
                               onChange={(e) => setSecretTokenReqs((prev) => prev.map((r, j) => j === i ? { ...r, minBalance: e.target.value } : r))}
                               className={inp} />
+                            <p className="text-[10px] text-faint mt-0.5">Assumes 18 decimal places. For different decimals, enter the raw token amount.</p>
                           </div>
                           <button type="button"
                             onClick={() => setSecretTokenReqs((prev) => prev.filter((_, j) => j !== i))}
@@ -801,19 +832,10 @@ export default function CreatePage() {
                     <div>
                       <span className="text-xs text-secondary">Show on Explore page</span>
                       <p className="text-[10px] text-faint">
-                        {secretIsPublic ? "Anyone can discover this drop" : "Only accessible via direct link"}
+                        {secretIsPublic ? "Discoverable on Explore — toggle off for link-only access" : "Only accessible via direct link"}
                       </p>
                     </div>
                   </div>
-
-                  {status && (
-                    <div className={`px-3 py-2 rounded-lg text-xs ${
-                      status.type === "error" ? "bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-500/20" :
-                      status.type === "success" ? "bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-500/20" :
-                      "bg-pink-500/15 dark:bg-pink-500/20 text-pink-600 dark:text-pink-400 border border-pink-500 dark:border-pink-500/30"}`}>
-                      {status.message}
-                    </div>
-                  )}
 
                   <button
                     onClick={createSecretDrop}

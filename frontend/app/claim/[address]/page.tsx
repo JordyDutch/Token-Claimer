@@ -11,6 +11,7 @@ import {
 import { fetchProfile, ProfileInfo } from "../../lib/profile";
 import { LSP4_METADATA_KEY } from "../../lib/lsp4";
 import { fetchAssetByAddress, getEnvioEndpoint } from "../../lib/envio";
+import { timeSince } from "../../lib/time";
 import Link from "next/link";
 import CopyButton from "../../components/CopyButton";
 import Footer from "../../components/Footer";
@@ -33,16 +34,6 @@ interface ClaimerInfo {
   profile?: ProfileInfo | null;
 }
 
-function timeSince(timestamp: number): string {
-  if (!timestamp) return "";
-  const seconds = Math.floor(Date.now() / 1000 - timestamp);
-  if (seconds < 60) return "just now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  if (seconds < 2592000) return `${Math.floor(seconds / 86400)}d ago`;
-  return new Date(timestamp * 1000).toLocaleDateString();
-}
-
 type Status = { message: string; type: "success" | "error" | "loading"; link?: string } | null;
 
 export default function ClaimPage() {
@@ -56,6 +47,7 @@ export default function ClaimPage() {
   const [dropName, setDropName] = useState("Loading...");
   const [dropSymbol, setDropSymbol] = useState("");
   const [dropIcon, setDropIcon] = useState<string | null>(null);
+  const [dropDescription, setDropDescription] = useState<string | null>(null);
   const [tokenType, setTokenType] = useState<"LSP7" | "LSP7-NFT" | "LSP8" | null>(null);
   const [isNftStyle, setIsNftStyle] = useState(false);
   const [claimedDisplay, setClaimedDisplay] = useState("-");
@@ -76,7 +68,10 @@ export default function ClaimPage() {
   const [startTime, setStartTime] = useState<number>(0);
   const [endTime, setEndTime] = useState<number>(0);
   const [pageLoading, setPageLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
+  const [dropNotFound, setDropNotFound] = useState(false);
+  const [copiedShare, setCopiedShare] = useState(false);
+  const [copiedClaimLink, setCopiedClaimLink] = useState(false);
+  const [claimedAt, setClaimedAt] = useState<string | null>(null);
   const [codewordRequired, setCodewordRequired] = useState(false);
   const [codewordInput, setCodewordInput] = useState("");
   const [claimers, setClaimers] = useState<ClaimerInfo[]>([]);
@@ -145,7 +140,11 @@ export default function ClaimPage() {
               setDropIcon(`https://api.universalprofile.cloud/ipfs/${icon.replace("ipfs://", "")}`);
             }
           }
-        } catch { /* no icon, keep fallback */ }
+          const desc = json?.LSP4Metadata?.description;
+          if (desc && typeof desc === "string" && desc.trim()) {
+            setDropDescription(desc.trim());
+          }
+        } catch { /* no icon/description, keep fallback */ }
       });
       setIsActive(active);
       setClaimEnabled(enabled);
@@ -244,6 +243,15 @@ export default function ClaimPage() {
   // Load contract state on mount, reload when wallet connects or network changes
   useEffect(() => { loadState(address ?? undefined); }, [loadState, address]);
 
+  // Check localStorage for claimed date (#28)
+  useEffect(() => {
+    if (!contractAddress) return;
+    try {
+      const stored = localStorage.getItem('claimed_' + contractAddress);
+      if (stored) setClaimedAt(new Date(Number(stored)).toLocaleDateString());
+    } catch {}
+  }, [contractAddress]);
+
   // Fetch claimers list from on-chain events
   const loadClaimers = useCallback(async () => {
     if (!contractAddress) return;
@@ -319,17 +327,25 @@ export default function ClaimPage() {
   useEffect(() => { loadClaimers(); }, [loadClaimers]);
 
   async function connect() {
+    const mobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+    if (mobile) {
+      setStatus({ message: "Open via the Universal Profiles mobile app", type: "error", link: "https://universalprofile.cloud/" });
+      return;
+    }
     setStatus({ message: "Connecting...", type: "loading" });
-    const addr = await walletConnect();
-    if (!addr) {
-      const mobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-      setStatus(mobile
-        ? { message: "Open via the Universal Profiles mobile app", type: "error", link: "https://universalprofile.cloud/" }
-        : { message: "Install the UP Browser Extension", type: "error", link: "https://chromewebstore.google.com/detail/universal-profiles/abchhpf8hn4lfpcnhbmgfkbiimhmbpkh" });
+    const result = await walletConnect();
+    if (!result.address) {
+      if (result.error === "not_installed") {
+        setStatus({ message: "Install the UP Browser Extension", type: "error", link: "https://chromewebstore.google.com/detail/universal-profiles/abchhpf8hn4lfpcnhbmgfkbiimhmbpkh" });
+      } else if (result.error === "rejected") {
+        setStatus({ message: "Connection rejected", type: "error" });
+      } else {
+        setStatus({ message: "Failed to connect — try again", type: "error" });
+      }
       return;
     }
     setStatus(null);
-    await loadState(addr);
+    await loadState(result.address);
   }
 
   async function claim() {
@@ -353,6 +369,8 @@ export default function ClaimPage() {
       await tx.wait();
       setStatus({ message: isNftStyle ? "NFT claimed successfully!" : "Tokens claimed successfully!", type: "success" });
       setAlreadyClaimed(true);
+      try { localStorage.setItem('claimed_' + contractAddress, Date.now().toString()); } catch {}
+      setClaimedAt(new Date().toLocaleDateString());
       await loadState(address);
       loadClaimers();
     } catch (e: any) {
@@ -369,13 +387,13 @@ export default function ClaimPage() {
         await navigator.share({ title: `Claim ${dropName}`, url });
       } else {
         await navigator.clipboard.writeText(url);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        setCopiedShare(true);
+        setTimeout(() => setCopiedShare(false), 2000);
       }
     } catch {
       await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopiedShare(true);
+      setTimeout(() => setCopiedShare(false), 2000);
     }
   }
 
@@ -425,6 +443,31 @@ export default function ClaimPage() {
     );
   }
 
+  if (dropNotFound) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4">
+        <div className="max-w-md w-full text-center">
+          <div className="bg-card rounded-xl border border-border-muted card-elevated p-8 sm:p-10">
+            <div className="w-20 h-20 rounded-2xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 flex items-center justify-center text-4xl mx-auto mb-5">
+              🔍
+            </div>
+            <h1 className="text-xl sm:text-2xl font-bold mb-2">Drop not found</h1>
+            <p className="text-label text-sm mb-2">
+              No valid claim contract was found at this address.
+            </p>
+            <p className="text-faint text-xs font-mono mb-6 break-all">{contractAddress}</p>
+            <Link
+              href="/"
+              className="inline-block px-5 py-2.5 rounded-xl text-sm font-semibold border-2 border-pink-500 text-pink-500 hover:bg-pink-500/10 transition-all"
+            >
+              ← Back to all drops
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={inIframe ? "min-h-dvh flex items-center justify-center px-4 py-3" : "min-h-dvh flex items-center justify-center px-3 py-6 sm:p-4"}>
       <div className={inIframe ? "w-full relative" : "max-w-2xl w-full"}>
@@ -461,7 +504,7 @@ export default function ClaimPage() {
                   {creatorProfile && (
                     <span className="flex items-center gap-1">
                       by
-                      {creatorProfile.image && <img src={creatorProfile.image} alt="" className="w-4 h-4 rounded-full object-cover" />}
+                      {creatorProfile.image && <img src={creatorProfile.image} alt={creatorProfile.name || "Creator"} className="w-4 h-4 rounded-full object-cover" />}
                       <span className="text-muted">{creatorProfile.name || (owner ? `${owner.slice(0, 6)}…${owner.slice(-4)}` : "")}</span>
                     </span>
                   )}
@@ -499,12 +542,17 @@ export default function ClaimPage() {
                 <div className="flex items-center justify-center gap-1.5 mb-3">
                   <span className="text-label text-xs">by</span>
                   {creatorProfile.image && (
-                    <img src={creatorProfile.image} alt="" className="w-4 h-4 rounded-full object-cover" />
+                    <img src={creatorProfile.image} alt={creatorProfile.name || "Creator"} className="w-4 h-4 rounded-full object-cover" />
                   )}
                   <span className="text-muted text-xs">
                     {creatorProfile.name || (owner ? `${owner.slice(0, 6)}...${owner.slice(-4)}` : "")}
                   </span>
                 </div>
+              )}
+
+              {/* LSP4 Description */}
+              {dropDescription && (
+                <p className="text-sm text-muted mb-3 line-clamp-2 px-2">{dropDescription}</p>
               )}
             </>
           )}
@@ -538,7 +586,7 @@ export default function ClaimPage() {
 
           {/* Amount per claim — hidden in iframe (shown inline in header) */}
           {!inIframe && amountDisplay && (
-            <div className="inline-block bg-pink-500 dark:bg-pink-500/10 border border-pink-500 dark:border-pink-500/20 text-pink-500 dark:text-pink-400 px-3 py-1 rounded-full text-xs font-medium mb-4">
+            <div className="inline-block bg-pink-500 dark:bg-pink-500/10 border border-pink-500 dark:border-pink-500/20 text-white dark:text-pink-400 px-3 py-1 rounded-full text-xs font-medium mb-4">
               {amountDisplay} per claim
             </div>
           )}
@@ -642,14 +690,26 @@ export default function ClaimPage() {
               Connect Universal Profile
             </button>
           ) : alreadyClaimed ? (
-            <button
-              disabled
-              className={`w-full rounded-xl font-semibold bg-green-50 dark:bg-green-500/20 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-500/30 cursor-not-allowed ${inIframe ? "py-3 text-sm" : "py-3.5 sm:py-4 text-base sm:text-lg"}`}
-            >
-              Already Claimed ✓
-            </button>
+            <>
+              <button
+                disabled
+                className={`w-full rounded-xl font-semibold bg-green-50 dark:bg-green-500/20 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-500/30 cursor-not-allowed ${inIframe ? "py-3 text-sm" : "py-3.5 sm:py-4 text-base sm:text-lg"}`}
+              >
+                Already Claimed ✓
+              </button>
+              {claimedAt && <p className="text-[10px] text-faint mt-1">Claimed on {claimedAt}</p>}
+            </>
           ) : (
             <>
+              {/* Bug #8: Manage link for drop owner */}
+              {owner && address.toLowerCase() === owner.toLowerCase() && (
+                <Link
+                  href={`/manage/${contractAddress}`}
+                  className="block w-full text-center py-2.5 rounded-xl text-sm font-medium border border-pink-500/30 text-pink-500 hover:bg-pink-500/10 transition-all mb-2"
+                >
+                  Manage this drop →
+                </Link>
+              )}
               {codewordRequired && (
                 <div className={inIframe ? "mb-4" : "mb-3"}>
                   <label className={`text-[10px] text-label uppercase tracking-wider block text-center ${inIframe ? "mb-1" : "mb-1.5"}`}>
@@ -665,12 +725,13 @@ export default function ClaimPage() {
                     autoComplete="off"
                     spellCheck={false}
                   />
+                  <p className="text-[10px] text-faint text-center mt-1">Case-sensitive</p>
                 </div>
               )}
             <button
               onClick={claim}
               disabled={!canClaim}
-              className={`w-full rounded-xl font-semibold bg-pink-500 text-white hover:bg-pink-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.97] ${inIframe ? "py-3 text-sm" : "py-3.5 sm:py-4 text-base sm:text-lg"}`}
+              className={`w-full rounded-xl font-semibold bg-pink-500 text-white hover:bg-pink-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.97] ${inIframe ? "py-3 text-sm" : "py-3.5 sm:py-4 text-base sm:text-lg"}`}
             >
               {claiming
                 ? "Claiming..."
@@ -678,6 +739,25 @@ export default function ClaimPage() {
                 ? isNftStyle ? "Claim NFT" : "Claim Tokens"
                 : "Requirements not met"}
             </button>
+              {/* Bug #12: Inline explanation when requirements not met */}
+              {eligibility && (!eligibility.tokenOk || !eligibility.followersOk) && (
+                <div className="mt-2 text-xs text-left space-y-1">
+                  {reqInfo?.tokens.map((t, i) =>
+                    tokenMet.length > i && !tokenMet[i] ? (
+                      <div key={i} className="text-red-500 dark:text-red-400">
+                        ✗ Missing: hold {t.amount > BigInt(0) ? t.amount.toString() : "any"}{" "}
+                        <span className="font-semibold">{t.name}</span>
+                        {t.symbol && t.symbol !== t.name && <span className="text-red-400"> ({t.symbol})</span>}
+                      </div>
+                    ) : null
+                  )}
+                  {eligibility && !eligibility.followersOk && reqInfo && reqInfo.followers > BigInt(0) && (
+                    <div className="text-red-500 dark:text-red-400">
+                      ✗ Need {reqInfo.followers.toString()}+ followers
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
 
@@ -731,14 +811,14 @@ export default function ClaimPage() {
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(claimUrl).then(() => {
-                        setCopied(true);
-                        setTimeout(() => setCopied(false), 2000);
+                        setCopiedClaimLink(true);
+                        setTimeout(() => setCopiedClaimLink(false), 2000);
                       });
                     }}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border-default text-muted hover:text-primary hover:border-pink-500/30 transition-all cursor-pointer"
                   >
                     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                    {copied ? "Copied!" : "Copy link"}
+                    {copiedClaimLink ? "Copied!" : "Copy link"}
                   </button>
                 </div>
               </div>
@@ -756,7 +836,7 @@ export default function ClaimPage() {
                   <div key={c.address} className="flex items-center gap-2.5 px-2 py-1.5">
                     <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-600 to-pink-600 flex items-center justify-center flex-shrink-0 overflow-hidden">
                       {c.profile?.image ? (
-                        <img src={c.profile.image} alt="" className="w-full h-full object-cover" />
+                        <img src={c.profile.image} alt={c.profile?.name || c.address.slice(0,6)} className="w-full h-full object-cover" />
                       ) : (
                         <span className="text-white font-medium text-[8px]">
                           {c.address.slice(2, 4).toUpperCase()}
@@ -780,6 +860,7 @@ export default function ClaimPage() {
                   {showAllClaimers ? "Show less" : `Show all ${claimers.length} claimers`}
                 </button>
               )}
+              <p className="text-[10px] text-faint text-center mt-2">Showing claimers from the last ~35 days</p>
             </div>
           )}
         </div>
@@ -795,11 +876,12 @@ export default function ClaimPage() {
             </Link>
 
             <div className="flex items-center gap-3">
+              {/* Bug #11: Copy link always visible */}
               <button
                 onClick={shareLink}
                 className="text-faint text-[10px] sm:text-xs hover:text-pink-500 transition-colors cursor-pointer"
               >
-                {copied ? "Link copied!" : "Share"}
+                {copiedShare ? "Link copied!" : "Share"}
               </button>
               <a
                 href={explorerUrl}

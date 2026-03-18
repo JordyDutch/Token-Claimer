@@ -25,6 +25,13 @@ export const metadata: Metadata = {
     title: "Token Claimer | LUKSO",
     description: "Claim exclusive token drops on LUKSO",
     type: "website",
+    url: "https://agent-token-claimer.vercel.app",
+    images: [{ url: "https://agent-token-claimer.vercel.app/og.png", width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    site: "@LUKSOAgent",
+    creator: "@LUKSOAgent",
   },
 };
 

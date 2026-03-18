@@ -34,7 +34,6 @@ async function fetchCampaignIcon(contractAddr: string, provider: JsonRpcProvider
 }
 import Link from "next/link";
 import Footer from "./components/Footer";
-import { useWallet } from "./components/WalletProvider";
 import { useNetwork } from "./components/NetworkProvider";
 import { useUPProvider } from "./components/UPProviderInit";
 
@@ -49,7 +48,7 @@ interface Campaign {
   icon?: string | null;
 }
 
-type FilterTab = "all" | "tokens" | "nfts" | "secret" | "mine";
+type FilterTab = "all" | "tokens" | "nfts" | "secret";
 
 type FeedItem =
   | { kind: "onchain"; data: Campaign }
@@ -62,7 +61,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterTab>("all");
   const [search, setSearch] = useState("");
-  const { address: walletAddress, connect: walletConnect } = useWallet();
+
   const { config: networkConfig, networkId } = useNetwork();
   const { inIframe } = useUPProvider();
 
@@ -78,11 +77,6 @@ export default function HomePage() {
     return () => { stale = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [networkId]);
-
-  async function connectForMyDrops() {
-    const addr = await walletConnect();
-    if (addr) setFilter("mine");
-  }
 
   async function loadCampaigns(cfg: typeof networkConfig, isStale: () => boolean) {
     const rpc = new JsonRpcProvider(cfg.rpc);
@@ -249,10 +243,6 @@ export default function HomePage() {
     if (filter === "tokens") { if (item.kind !== "onchain" || item.data.isNFT) return false; }
     else if (filter === "nfts") { if (item.kind !== "onchain" || !item.data.isNFT) return false; }
     else if (filter === "secret") { if (item.kind !== "secret") return false; }
-    else if (filter === "mine" && walletAddress) {
-      const creator = item.kind === "onchain" ? item.data.creator : item.data.creator;
-      if (creator.toLowerCase() !== walletAddress.toLowerCase()) return false;
-    }
     // Search filter
     if (search) {
       const q = search.toLowerCase();
@@ -309,7 +299,7 @@ export default function HomePage() {
           </p>
           <Link
             href="/create"
-            className="inline-block px-6 py-3 rounded-xl text-sm sm:text-base font-semibold bg-pink-500 text-white hover:bg-pink-500 transition-all active:scale-[0.97]"
+            className="inline-block px-6 py-3 rounded-xl text-sm sm:text-base font-semibold bg-pink-500 text-white hover:bg-pink-600 transition-all active:scale-[0.97]"
           >
             + Create a Drop
           </Link>
@@ -317,37 +307,28 @@ export default function HomePage() {
 
         {/* Search + Filters */}
         <div className="mb-4 space-y-3">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, symbol, or address..."
-            className="w-full bg-card border border-border-muted rounded-xl px-4 py-2.5 text-sm text-tertiary placeholder:text-faint focus:outline-none focus:border-pink-500/40 transition-colors"
-          />
+          <div className="relative">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name, symbol, or address..."
+              className="w-full bg-card border border-border-muted rounded-xl px-4 py-2.5 pr-8 text-sm text-tertiary placeholder:text-faint focus:outline-none focus:border-pink-500/40 transition-colors"
+            />
+            {search && <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-faint hover:text-muted text-sm cursor-pointer">×</button>}
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
             <button onClick={() => setFilter("all")} className={tabClass("all")}>
               All
             </button>
-            <button onClick={() => setFilter("tokens")} className={tabClass("tokens")}>
-              Tokens
-            </button>
             <button onClick={() => setFilter("nfts")} className={tabClass("nfts")}>
               NFTs
             </button>
-            <button onClick={() => setFilter("secret")} className={tabClass("secret")}>
-              Secret
+            <button onClick={() => setFilter("tokens")} className={tabClass("tokens")}>
+              Tokens
             </button>
-            <button
-              onClick={() => {
-                if (!walletAddress) {
-                  connectForMyDrops();
-                } else {
-                  setFilter("mine");
-                }
-              }}
-              className={tabClass("mine")}
-            >
-              My Drops
+            <button onClick={() => setFilter("secret")} className={tabClass("secret")}>
+              Secrets
             </button>
             <span className="text-faint text-xs ml-auto">
               {loading ? "Loading..." : `${filtered.length} drop${filtered.length !== 1 ? "s" : ""}`}
@@ -382,18 +363,8 @@ export default function HomePage() {
             <p className="text-muted text-sm">
               {search
                 ? "No drops match your search"
-                : filter === "mine"
-                ? "You haven't created any drops yet"
                 : "No drops yet. Be the first to create one!"}
             </p>
-            {filter === "mine" && (
-              <Link
-                href="/create"
-                className="inline-block mt-3 text-xs text-pink-500 hover:text-pink-500"
-              >
-                Create your first drop →
-              </Link>
-            )}
           </div>
         )}
 
@@ -404,12 +375,12 @@ export default function HomePage() {
               <Link
                 key={item.data.contractAddr}
                 href={`/claim/${item.data.contractAddr}`}
-                className="block bg-card rounded-xl p-4 sm:p-5 border border-border-muted hover:border-pink-500/30 card-elevated transition-all group"
+                className="block bg-card rounded-xl p-4 sm:p-5 border border-border-muted hover:border-pink-500/30 card-elevated transition-all group focus:ring-2 focus:ring-pink-500 focus:outline-none"
               >
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br from-violet-600 to-pink-600 flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden">
                     {item.data.icon ? (
-                      <img src={item.data.icon} alt="" className="w-full h-full object-cover" />
+                      <img src={item.data.icon} alt={item.data.name} className="w-full h-full object-cover" />
                     ) : (
                       item.data.isNFT ? "🖼" : "🪙"
                     )}
@@ -449,7 +420,7 @@ export default function HomePage() {
               <Link
                 key={item.data.id}
                 href={`/secret-drop/${item.data.id}`}
-                className="block bg-card rounded-xl p-4 sm:p-5 border border-border-muted hover:border-violet-500/30 card-elevated transition-all group"
+                className="block bg-card rounded-xl p-4 sm:p-5 border border-border-muted hover:border-violet-500/30 card-elevated transition-all group focus:ring-2 focus:ring-pink-500 focus:outline-none"
               >
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden">
