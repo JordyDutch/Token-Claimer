@@ -47,6 +47,7 @@ export default function CreatePage() {
   const [iconTouch, setIconTouch] = useState(false);
   const [maxSupply, setMaxSupply] = useState("100");
   const [amountPerClaim, setAmountPerClaim] = useState("1");
+  const [tokenDecimals, setTokenDecimals] = useState(18); // 18 by default, 0 = non-divisible
   const [deployedAddress, setDeployedAddress] = useState<string | null>(null);
   const [deploying, setDeploying] = useState(false);
 
@@ -132,9 +133,14 @@ export default function CreatePage() {
 
       {
         const factory = new Contract(networkConfig.lsp7Factory, LSP7_FACTORY_ABI, signer);
+        const isNonDivisible = tokenDecimals === 0;
+        // Scale amountPerClaim by token decimals (e.g. 1 token with 18 decimals = 1e18 units)
+        const scaledAmount = isNonDivisible
+          ? BigInt(amountPerClaim)
+          : BigInt(amountPerClaim) * 10n ** BigInt(tokenDecimals);
         const tx = dropType === "nft"
-          ? await factory.createNFTDrop(name, symbol, maxSupply, amountPerClaim)
-          : await factory.createTokenDrop(name, symbol, amountPerClaim, maxSupply, false);
+          ? await factory.createNFTDrop(name, symbol, maxSupply, 1) // NFT always 1 per claim, 0 decimals
+          : await factory.createTokenDrop(name, symbol, scaledAmount, maxSupply, isNonDivisible);
         await tx.wait();
         const fr = new Contract(networkConfig.lsp7Factory, LSP7_FACTORY_ABI, provider);
         const t = await fr.totalCampaigns();
@@ -493,6 +499,35 @@ export default function CreatePage() {
                     min="1"
                   />
                 </div>
+                {/* Decimals selector — only for token drops */}
+                {dropType === "token" && (
+                  <div>
+                    <label className={lbl}>Decimals</label>
+                    <div className="flex gap-2 flex-wrap">
+                      {[18, 8, 6, 2, 0].map((d) => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => setTokenDecimals(d)}
+                          className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
+                            tokenDecimals === d
+                              ? "bg-pink-500 border-pink-500 text-white"
+                              : "bg-surface border-border-default text-secondary hover:border-pink-500/50"
+                          }`}
+                        >
+                          {d === 0 ? "0 (whole units)" : d}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-faint mt-1">
+                      {tokenDecimals === 18
+                        ? "Standard ERC-20 precision (recommended)."
+                        : tokenDecimals === 0
+                        ? "Non-divisible — 1 token is the smallest unit. Explorer shows as NFT."
+                        : `${tokenDecimals} decimal places. Tokens per claim will be scaled accordingly.`}
+                    </p>
+                  </div>
+                )}
 
                 {/* LSP4 Metadata */}
                 <div className="border-t border-border-muted pt-4 mt-1">
