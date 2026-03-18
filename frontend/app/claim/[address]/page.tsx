@@ -508,12 +508,14 @@ export default function ClaimPage() {
                       <span className="text-muted">{creatorProfile.name || (owner ? `${owner.slice(0, 6)}…${owner.slice(-4)}` : "")}</span>
                     </span>
                   )}
-                  {amountDisplay && (
-                    <span className="text-pink-500 dark:text-pink-400 font-medium">{amountDisplay}/claim</span>
-                  )}
                   <span className="text-pink-500 dark:text-pink-400 font-semibold">{claimedDisplay}</span>
-                  <span className="text-faint">/ {supplyDisplay}</span>
+                  <span className="text-faint">/ {supplyDisplay} claimed</span>
                 </div>
+                {amountDisplay && (
+                  <div className="text-[10px] text-label mt-0.5">
+                    {amountDisplay} per claim
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -575,19 +577,6 @@ export default function ClaimPage() {
               >
                 Disconnect
               </button>
-            </div>
-          )}
-
-          {!address && !alreadyClaimed && (
-            <p className={`text-label text-xs ${inIframe ? "mb-4" : "mb-3 sm:text-sm"}`}>
-              Connect your Universal Profile to claim
-            </p>
-          )}
-
-          {/* Amount per claim — hidden in iframe (shown inline in header) */}
-          {!inIframe && amountDisplay && (
-            <div className="inline-block bg-pink-500 dark:bg-pink-500/10 border border-pink-500 dark:border-pink-500/20 text-white dark:text-pink-400 px-3 py-1 rounded-full text-xs font-medium mb-4">
-              {amountDisplay} per claim
             </div>
           )}
 
@@ -678,17 +667,34 @@ export default function ClaimPage() {
                   {supplyDisplay}
                 </div>
               </div>
+              {amountDisplay && (
+                <div>
+                  <div className="text-[10px] sm:text-xs text-label uppercase tracking-wider">
+                    Per Claim
+                  </div>
+                  <div className="text-lg sm:text-xl font-semibold text-pink-500 dark:text-pink-400">
+                    {amountDisplay}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
           {/* Action button */}
           {!address ? (
-            <button
-              onClick={connect}
-              className={`w-full rounded-xl font-semibold border-2 border-pink-500 text-pink-500 hover:bg-pink-500/10 transition-all cursor-pointer active:scale-[0.97] ${inIframe ? "py-3 text-sm" : "py-3.5 sm:py-4 text-base sm:text-lg"}`}
-            >
-              Connect Universal Profile
-            </button>
+            inIframe ? (
+              <div className="flex items-center justify-center gap-2 py-3 text-sm text-pink-500 border-2 border-dashed border-pink-300 dark:border-pink-500/40 rounded-xl">
+                <span className="text-lg">↖</span>
+                <span className="font-medium">Connect your UP above to claim</span>
+              </div>
+            ) : (
+              <button
+                onClick={connect}
+                className="w-full rounded-xl font-semibold border-2 border-pink-500 text-pink-500 hover:bg-pink-500/10 transition-all cursor-pointer active:scale-[0.97] py-3.5 sm:py-4 text-base sm:text-lg"
+              >
+                Connect Universal Profile to Claim
+              </button>
+            )
           ) : alreadyClaimed ? (
             <>
               <button
