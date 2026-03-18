@@ -95,7 +95,12 @@ export default function Header() {
 
           {/* Network toggle */}
           <button
-            onClick={() => setNetwork(isTestnet ? "mainnet" : "testnet")}
+            onClick={() => {
+              if (pathname.startsWith("/create") || pathname.startsWith("/manage/")) {
+                if (!window.confirm("Switching networks will reset your form. Continue?")) return;
+              }
+              setNetwork(isTestnet ? "mainnet" : "testnet");
+            }}
             title={`Switch to ${isTestnet ? "Mainnet" : "Testnet"}`}
             className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold border transition-all cursor-pointer ${
               isTestnet

@@ -331,7 +331,7 @@ export default function CreatePage() {
           <div className="space-y-3">
             <Link
               href={`/manage/${deployedAddress}`}
-              className="block w-full py-3 rounded-xl text-sm font-semibold bg-pink-500 text-white hover:bg-pink-500 transition-all active:scale-[0.97]"
+              className="block w-full py-3 rounded-xl text-sm font-semibold bg-pink-500 text-white hover:bg-pink-600 transition-all active:scale-[0.97]"
             >
               Manage Drop →
             </Link>
@@ -661,7 +661,7 @@ export default function CreatePage() {
                 <button
                   onClick={deploy}
                   disabled={!canDeploy}
-                  className="w-full py-3.5 rounded-xl text-sm font-semibold bg-pink-500 text-white hover:bg-pink-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.97] mt-2"
+                  className="w-full py-3.5 rounded-xl text-sm font-semibold bg-pink-500 text-white hover:bg-pink-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.97] mt-2"
                 >
                   {deploying ? "Deploying..." : `Create ${dropType === "nft" ? "NFT" : "Token"} Drop`}
                 </button>

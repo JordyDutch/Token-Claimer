@@ -194,6 +194,7 @@ export default function ActivityPage() {
   const { inIframe } = useUPProvider();
   const [items, setItems] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [visibleCount, setVisibleCount] = useState(20);
   const lastBlockRef = useRef(0);
   const dropMapRef = useRef(new Map<string, DropInfo>());
   const profileCacheRef = useRef(new Map<string, ProfileInfo | null>());
@@ -352,7 +353,7 @@ export default function ActivityPage() {
         {/* Feed */}
         {items.length > 0 && (
           <div className="space-y-2">
-            {items.map((item) => (
+            {items.slice(0, visibleCount).map((item) => (
               <Link
                 key={item.id}
                 href={`/claim/${item.dropAddress}`}
@@ -406,6 +407,14 @@ export default function ActivityPage() {
                 </div>
               </Link>
             ))}
+            {visibleCount < items.length && (
+              <button
+                onClick={() => setVisibleCount((v) => v + 20)}
+                className="w-full py-2.5 rounded-xl text-xs text-label hover:text-secondary border border-border-muted hover:border-pink-500/30 transition-all cursor-pointer mt-1"
+              >
+                Load more
+              </button>
+            )}
           </div>
         )}
 

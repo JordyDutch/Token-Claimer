@@ -301,8 +301,16 @@ export default function MyDropsPage() {
 
         {/* Error */}
         {error && (
-          <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400 px-3 py-2.5 rounded-xl text-xs sm:text-sm mb-4">
-            {error}
+          <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400 px-3 py-2.5 rounded-xl text-xs sm:text-sm mb-4 flex items-center justify-between gap-3">
+            <span>{error}</span>
+            {address && (
+              <button
+                onClick={() => loadDrops(address)}
+                className="flex-shrink-0 text-xs font-medium underline underline-offset-2 hover:no-underline cursor-pointer"
+              >
+                Try again
+              </button>
+            )}
           </div>
         )}
 
