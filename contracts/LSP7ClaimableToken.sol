@@ -7,7 +7,7 @@ import {
 import {
     LSP7CappedSupplyInitAbstract
 } from "@lukso/lsp7-contracts/contracts/extensions/LSP7CappedSupplyInitAbstract.sol";
-import {_LSP4_TOKEN_TYPE_TOKEN} from "@lukso/lsp4-contracts/contracts/LSP4Constants.sol";
+import {_LSP4_TOKEN_TYPE_TOKEN, _LSP4_TOKEN_TYPE_NFT} from "@lukso/lsp4-contracts/contracts/LSP4Constants.sol";
 import {
     ReentrancyGuardUpgradeable
 } from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
@@ -142,11 +142,14 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
         bool isNonDivisible_
     ) external initializer {
         // Initialize LSP7 base (name, symbol, owner, token type, divisibility)
+        // Non-divisible (0 decimals) tokens get LSP4TokenType=1 (NFT) so the
+        // LUKSO explorer categorises them as collectibles rather than fungible tokens.
+        uint256 tokenType = isNonDivisible_ ? _LSP4_TOKEN_TYPE_NFT : _LSP4_TOKEN_TYPE_TOKEN;
         LSP7DigitalAssetInitAbstract._initialize(
             name_,
             symbol_,
             owner_,
-            _LSP4_TOKEN_TYPE_TOKEN,
+            tokenType,
             isNonDivisible_
         );
 
