@@ -769,7 +769,7 @@ export default function ClaimPage() {
                   ? "bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 text-green-700 dark:text-green-400"
                   : status.type === "error"
                   ? "bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400"
-                  : "bg-pink-500 dark:bg-pink-500/10 border border-pink-500 dark:border-pink-500/20 text-pink-500 dark:text-pink-400"
+                  : "bg-pink-500 dark:bg-pink-500/10 border border-pink-500 dark:border-pink-500/20 text-white dark:text-pink-400"
               }`}
             >
               {status.link ? (
