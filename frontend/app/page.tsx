@@ -328,7 +328,7 @@ export default function HomePage() {
               Tokens
             </button>
             <button onClick={() => setFilter("secret")} className={tabClass("secret")}>
-              Secret
+              Secrets
             </button>
             <span className="text-faint text-xs ml-auto">
               {loading ? "Loading..." : `${filtered.length} drop${filtered.length !== 1 ? "s" : ""}`}
