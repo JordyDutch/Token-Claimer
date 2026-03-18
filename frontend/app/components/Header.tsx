@@ -4,11 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useNetwork } from "./NetworkProvider";
 import { useTheme } from "./ThemeProvider";
+import { useWallet } from "./WalletProvider";
 
 export default function Header() {
   const pathname = usePathname();
   const { networkId, setNetwork } = useNetwork();
   const { theme, toggleTheme } = useTheme();
+  const { address, profile, connect, disconnect, connecting } = useWallet();
   const isTestnet = networkId === "testnet";
 
   const linkClass = (href: string) => {
@@ -46,6 +48,33 @@ export default function Header() {
           <Link href="/developers" className={linkClass("/developers")}>
             Devs
           </Link>
+
+          {/* Wallet connect */}
+          {address ? (
+            <div className="flex items-center gap-1.5">
+              {profile?.image && (
+                <img src={profile.image} alt="" className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
+              )}
+              <span className="text-xs text-secondary hidden sm:inline max-w-[100px] truncate">
+                {profile?.name || `${address.slice(0, 6)}…${address.slice(-4)}`}
+              </span>
+              <button
+                onClick={disconnect}
+                title="Disconnect wallet"
+                className="text-[10px] text-faint hover:text-red-400 transition-colors cursor-pointer ml-0.5"
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={connect}
+              disabled={connecting}
+              className="text-xs font-medium px-2.5 py-1 rounded-full border border-pink-500/50 text-pink-500 hover:bg-pink-500/10 transition-all cursor-pointer disabled:opacity-50"
+            >
+              {connecting ? "…" : "Connect"}
+            </button>
+          )}
 
           {/* Theme toggle */}
           <button

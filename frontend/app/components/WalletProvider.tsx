@@ -6,13 +6,15 @@ import { fetchProfile, ProfileInfo } from "../lib/profile";
 import { useNetwork } from "./NetworkProvider";
 import { useUPProvider } from "./UPProviderInit";
 
+export type WalletConnectError = "rejected" | "not_installed" | "unknown";
+
 interface WalletState {
   address: string | null;
   /** The profile being viewed on universaleverything.io (contextAccounts[0]) */
   contextAddress: string | null;
   profile: ProfileInfo | null;
   connecting: boolean;
-  connect: () => Promise<string | null>;
+  connect: () => Promise<{ address: string; error: null } | { address: null; error: WalletConnectError }>;
   disconnect: () => void;
 }
 
@@ -21,7 +23,7 @@ const WalletContext = createContext<WalletState>({
   contextAddress: null,
   profile: null,
   connecting: false,
-  connect: async () => null,
+  connect: async () => ({ address: null, error: "unknown" }),
   disconnect: () => {},
 });
 
@@ -133,9 +135,15 @@ export default function WalletProvider({ children }: { children: ReactNode }) {
     };
   }, [upReady, inIframe]);
 
-  const connect = useCallback(async (): Promise<string | null> => {
+  const connect = useCallback(async (): Promise<{ address: string; error: null } | { address: null; error: WalletConnectError }> => {
+    // Check for UP extension before trying (standalone only)
+    if (!isInIframe() && typeof window !== "undefined" && !(window as any).lukso) {
+      return { address: null, error: "not_installed" };
+    }
+
     const p = getProvider();
-    if (!p) return null;
+    if (!p) return { address: null, error: "not_installed" };
+
     try {
       setConnecting(true);
 
@@ -146,9 +154,9 @@ export default function WalletProvider({ children }: { children: ReactNode }) {
           const addr = accounts[0];
           setAddress(addr);
           fetchProfile(addr).then(setProfile).catch(() => {});
-          return addr;
+          return { address: addr, error: null };
         }
-        return null;
+        return { address: null, error: "unknown" };
       }
 
       // Standalone: switch network then request accounts
@@ -157,9 +165,13 @@ export default function WalletProvider({ children }: { children: ReactNode }) {
       const addr = accounts[0];
       setAddress(addr);
       fetchProfile(addr).then(setProfile).catch(() => {});
-      return addr;
-    } catch {
-      return null;
+      return { address: addr, error: null };
+    } catch (e: any) {
+      // EIP-1193 rejection: code 4001 or ethers ACTION_REJECTED
+      if (e?.code === 4001 || e?.code === "ACTION_REJECTED" || e?.message?.toLowerCase().includes("user rejected")) {
+        return { address: null, error: "rejected" };
+      }
+      return { address: null, error: "unknown" };
     } finally {
       setConnecting(false);
     }
