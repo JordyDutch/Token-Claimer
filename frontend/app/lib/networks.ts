@@ -73,17 +73,19 @@ export const NETWORKS: Record<NetworkId, NetworkConfig> = {
     // Active factory — used when creating new drops
     lsp7Factory:
       process.env.NEXT_PUBLIC_TESTNET_LSP7_FACTORY ??
-      "0x26AeD9C6f0BAA907f9ec9a5Fd1135C21F4B1aBB0",
+      "0xC449f5c77f64cB57adc11a04DDbEfE458E8933B6",
     lsp8Factory:
       process.env.NEXT_PUBLIC_TESTNET_LSP8_FACTORY ??
-      "0xee28A2464178F4814EA356735e27B5A0e219F47D",
+      "0xCdedcD1e5d487302745ca570cf35cE3d42683240",
     allLsp7Factories: [
       "0x58877A19286c054acBcE221c7E92ab9039Bf2909", // previous testnet
-      process.env.NEXT_PUBLIC_TESTNET_LSP7_FACTORY ?? "0x26AeD9C6f0BAA907f9ec9a5Fd1135C21F4B1aBB0", // v5 (active)
+      "0x26AeD9C6f0BAA907f9ec9a5Fd1135C21F4B1aBB0", // v5
+      process.env.NEXT_PUBLIC_TESTNET_LSP7_FACTORY ?? "0xC449f5c77f64cB57adc11a04DDbEfE458E8933B6", // v6: LSP7-NFT support (active)
     ],
     allLsp8Factories: [
       "0x6625eDFaca73475dD44b4dAFC8666d92e4d3CAFf", // previous testnet
-      process.env.NEXT_PUBLIC_TESTNET_LSP8_FACTORY ?? "0xee28A2464178F4814EA356735e27B5A0e219F47D", // v5 (active)
+      "0xee28A2464178F4814EA356735e27B5A0e219F47D", // v5
+      process.env.NEXT_PUBLIC_TESTNET_LSP8_FACTORY ?? "0xCdedcD1e5d487302745ca570cf35cE3d42683240", // v6: OWASP fixes (active)
     ],
     explorerBase: "https://explorer.execution.testnet.lukso.network",
     faucet: "https://faucet.testnet.lukso.network",
