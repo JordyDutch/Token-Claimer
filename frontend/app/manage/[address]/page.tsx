@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
-import { BrowserProvider, Contract, JsonRpcProvider } from "ethers";
+import { BrowserProvider, Contract, JsonRpcProvider, formatUnits, parseUnits } from "ethers";
 import { uploadAndSetLSP4Metadata, setLSP4Creators, addToLSP12IssuedAssets, LSP4_METADATA_KEY, type Lsp4Link, type Lsp4Icon } from "../../lib/lsp4";
 import {
   CLAIM_ABI, LSP7_EXTRA_ABI, LSP8_EXTRA_ABI, ZERO,
@@ -30,6 +30,7 @@ export default function ManagePage() {
   const [status, setStatus] = useState<Status>(null);
   const [tokenType, setTokenType] = useState<"LSP7" | "LSP7-NFT" | "LSP8" | null>(null);
   const [isNftStyle, setIsNftStyle] = useState(false);
+  const [tokenDecimals, setTokenDecimals] = useState(18);
   const [dropName, setDropName] = useState("");
   const [claimEnabled, setClaimEnabled] = useState(false);
   const [startTime, setStartTime] = useState("");
@@ -107,7 +108,10 @@ export default function ManagePage() {
       setCodewordEnabled(Boolean(codeEnabled));
       setDropName(nameRaw && nameRaw !== "0x" ? Buffer.from(nameRaw.replace(/^0x/, ""), "hex").toString("utf8") : "");
       setClaimEnabled(enabled);
-      setAmountPerClaim(amount ? amount.toString() : "0");
+      // Display as human-readable (will be re-scaled on save); decimals loaded below
+      // We store formatted value here; tokenDecimals may not be set yet — will be overwritten
+      // after decimals() resolves. Use a ref-safe approach: store raw, format after decimals load.
+      setAmountPerClaim(amount ? amount.toString() : "0"); // raw, reformatted below once decimals known
       // type(uint256).max from v5 proxy = unlimited; treat as "0" for display
       const isUnlimited = supply === BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
       setMaxSupply(isUnlimited ? "0" : (supply ? supply.toString() : "0"));
@@ -126,7 +130,14 @@ export default function ManagePage() {
           const cl = await c.totalClaimers();
           setTotalClaimed(cl.toString());
           const dec = await c.decimals();
-          setIsNftStyle(type === "LSP7-NFT" || Number(dec) === 0);
+          const decNum = Number(dec);
+          setTokenDecimals(decNum);
+          setIsNftStyle(type === "LSP7-NFT" || decNum === 0);
+          // Reformat amountPerClaim now that we know decimals
+          // amount was loaded as raw BigInt above — reformat to human-readable
+          if (amount && decNum > 0) {
+            setAmountPerClaim(formatUnits(amount, decNum));
+          }
         } else {
           const cl = await c.totalClaimed();
           setTotalClaimed(cl.toString());
@@ -519,9 +530,13 @@ export default function ManagePage() {
                 min="1"
               />
               <button
-                onClick={() =>
-                  sendTx((c) => c.setAmountPerClaim(amountPerClaim), "Updating amount...")
-                }
+                onClick={() => {
+                  // Parse human-readable back to raw units before sending to contract
+                  const raw = isNftStyle
+                    ? BigInt(Math.round(Number(amountPerClaim)))
+                    : parseUnits(amountPerClaim || "0", tokenDecimals);
+                  sendTx((c) => c.setAmountPerClaim(raw), "Updating amount...");
+                }}
                 className={btn + " mt-3"}
               >
                 Update Amount
