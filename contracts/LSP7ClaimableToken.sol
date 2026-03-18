@@ -160,6 +160,9 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
         __ReentrancyGuard_init();
 
         if (amountPerClaim_ == 0) revert AmountPerClaimZero();
+        // Same upper bound as setAmountPerClaim() — 1e24 = 1,000,000 tokens at 18 decimals.
+        // Prevents irreversible misconfiguration at deploy time (initialize has no upgrade path).
+        if (amountPerClaim_ > 1e24) revert AmountOutOfRange();
         if (maxSupply_ != type(uint256).max && maxSupply_ < amountPerClaim_) {
             revert MaxSupplyBelowAmountPerClaim();
         }

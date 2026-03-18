@@ -73,21 +73,23 @@ export const NETWORKS: Record<NetworkId, NetworkConfig> = {
     // Active factory — used when creating new drops
     lsp7Factory:
       process.env.NEXT_PUBLIC_TESTNET_LSP7_FACTORY ??
-      "0x7511858f7bA003acF2cc34F8CCe76e5F09c45B87",
+      "0x51480Ab4EB8529846d495AA9745dcc0B39362Ebe",
     lsp8Factory:
       process.env.NEXT_PUBLIC_TESTNET_LSP8_FACTORY ??
-      "0x1634Bd2C58f0425a57C8841e9B3Ec1B6c3424Bdd",
+      "0xE0FEC12979636dE2a747B7F6944aD263FC58c85A",
     allLsp7Factories: [
       "0x58877A19286c054acBcE221c7E92ab9039Bf2909", // previous testnet
       "0x26AeD9C6f0BAA907f9ec9a5Fd1135C21F4B1aBB0", // v5
       "0xC449f5c77f64cB57adc11a04DDbEfE458E8933B6", // v6
-      process.env.NEXT_PUBLIC_TESTNET_LSP7_FACTORY ?? "0x7511858f7bA003acF2cc34F8CCe76e5F09c45B87", // v7: NFT token type fix (active)
+      "0x7511858f7bA003acF2cc34F8CCe76e5F09c45B87", // v7
+      process.env.NEXT_PUBLIC_TESTNET_LSP7_FACTORY ?? "0x51480Ab4EB8529846d495AA9745dcc0B39362Ebe", // v8: audit fixes (active)
     ],
     allLsp8Factories: [
       "0x6625eDFaca73475dD44b4dAFC8666d92e4d3CAFf", // previous testnet
       "0xee28A2464178F4814EA356735e27B5A0e219F47D", // v5
       "0xCdedcD1e5d487302745ca570cf35cE3d42683240", // v6
-      process.env.NEXT_PUBLIC_TESTNET_LSP8_FACTORY ?? "0x1634Bd2C58f0425a57C8841e9B3Ec1B6c3424Bdd", // v7 (active)
+      "0x1634Bd2C58f0425a57C8841e9B3Ec1B6c3424Bdd", // v7
+      process.env.NEXT_PUBLIC_TESTNET_LSP8_FACTORY ?? "0xE0FEC12979636dE2a747B7F6944aD263FC58c85A", // v8 (active)
     ],
     explorerBase: "https://explorer.execution.testnet.lukso.network",
     faucet: "https://faucet.testnet.lukso.network",

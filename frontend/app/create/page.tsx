@@ -134,13 +134,24 @@ export default function CreatePage() {
       {
         const factory = new Contract(networkConfig.lsp7Factory, LSP7_FACTORY_ABI, signer);
         const isNonDivisible = tokenDecimals === 0;
+        const scale = BigInt(10) ** BigInt(tokenDecimals);
         // Scale amountPerClaim by token decimals (e.g. 1 token with 18 decimals = 1e18 units)
         const scaledAmount = isNonDivisible
           ? BigInt(amountPerClaim)
-          : BigInt(amountPerClaim) * BigInt(10) ** BigInt(tokenDecimals);
+          : BigInt(amountPerClaim) * scale;
+        // Sanity cap: 1M tokens max per claim (matches contract's setAmountPerClaim cap)
+        if (scaledAmount > BigInt(10) ** BigInt(24)) {
+          setStatus({ message: "Amount per claim too large (max 1,000,000 tokens)", type: "error" });
+          setDeploying(false);
+          return;
+        }
+        // Scale maxSupply the same way (0 = unlimited, factory converts to type(uint256).max)
+        const scaledMaxSupply = isNonDivisible || maxSupply === "0"
+          ? maxSupply
+          : String(BigInt(maxSupply) * scale);
         const tx = dropType === "nft"
           ? await factory.createNFTDrop(name, symbol, maxSupply, 1) // NFT always 1 per claim, 0 decimals
-          : await factory.createTokenDrop(name, symbol, scaledAmount, maxSupply, isNonDivisible);
+          : await factory.createTokenDrop(name, symbol, scaledAmount, scaledMaxSupply, isNonDivisible);
         await tx.wait();
         const fr = new Contract(networkConfig.lsp7Factory, LSP7_FACTORY_ABI, provider);
         const t = await fr.totalCampaigns();
@@ -503,8 +514,8 @@ export default function CreatePage() {
                 {dropType === "token" && (
                   <div>
                     <label className={lbl}>Decimals</label>
-                    <div className="flex gap-2 flex-wrap">
-                      {[18, 8, 6, 2, 0].map((d) => (
+                    <div className="flex gap-2">
+                      {[18, 0].map((d) => (
                         <button
                           key={d}
                           type="button"
@@ -515,16 +526,14 @@ export default function CreatePage() {
                               : "bg-surface border-border-default text-secondary hover:border-pink-500/50"
                           }`}
                         >
-                          {d === 0 ? "0 (whole units)" : d}
+                          {d === 0 ? "0 (whole units)" : "18 (standard)"}
                         </button>
                       ))}
                     </div>
                     <p className="text-[10px] text-faint mt-1">
                       {tokenDecimals === 18
-                        ? "Standard ERC-20 precision (recommended)."
-                        : tokenDecimals === 0
-                        ? "Non-divisible — 1 token is the smallest unit. Explorer shows as NFT."
-                        : `${tokenDecimals} decimal places. Tokens per claim will be scaled accordingly.`}
+                        ? "Standard precision — 1 token = 1,000,000,000,000,000,000 units. Recommended."
+                        : "Non-divisible — 1 token is the smallest unit. Explorer shows as collectible."}
                     </p>
                   </div>
                 )}
