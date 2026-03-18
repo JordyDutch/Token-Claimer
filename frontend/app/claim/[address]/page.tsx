@@ -811,14 +811,14 @@ export default function ClaimPage() {
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(claimUrl).then(() => {
-                        setCopied(true);
-                        setTimeout(() => setCopied(false), 2000);
+                        setCopiedClaimLink(true);
+                        setTimeout(() => setCopiedClaimLink(false), 2000);
                       });
                     }}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border-default text-muted hover:text-primary hover:border-pink-500/30 transition-all cursor-pointer"
                   >
                     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                    {copied ? "Copied!" : "Copy link"}
+                    {copiedClaimLink ? "Copied!" : "Copy link"}
                   </button>
                 </div>
               </div>
@@ -836,7 +836,7 @@ export default function ClaimPage() {
                   <div key={c.address} className="flex items-center gap-2.5 px-2 py-1.5">
                     <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-600 to-pink-600 flex items-center justify-center flex-shrink-0 overflow-hidden">
                       {c.profile?.image ? (
-                        <img src={c.profile.image} alt="" className="w-full h-full object-cover" />
+                        <img src={c.profile.image} alt={c.profile?.name || c.address.slice(0,6)} className="w-full h-full object-cover" />
                       ) : (
                         <span className="text-white font-medium text-[8px]">
                           {c.address.slice(2, 4).toUpperCase()}
@@ -860,6 +860,7 @@ export default function ClaimPage() {
                   {showAllClaimers ? "Show less" : `Show all ${claimers.length} claimers`}
                 </button>
               )}
+              <p className="text-[10px] text-faint text-center mt-2">Showing claimers from the last ~35 days</p>
             </div>
           )}
         </div>
@@ -880,7 +881,7 @@ export default function ClaimPage() {
                 onClick={shareLink}
                 className="text-faint text-[10px] sm:text-xs hover:text-pink-500 transition-colors cursor-pointer"
               >
-                {copied ? "Link copied!" : "Copy link"}
+                {copiedShare ? "Link copied!" : "Share"}
               </button>
               <a
                 href={explorerUrl}

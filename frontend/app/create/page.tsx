@@ -34,7 +34,7 @@ export default function CreatePage() {
   const [secretTokenReqs, setSecretTokenReqs] = useState<Array<{ address: string; minBalance: string }>>([]);
   const [secretMinFollowers, setSecretMinFollowers] = useState("0");
   const [secretFollowAddress, setSecretFollowAddress] = useState("");
-  const [secretIsPublic, setSecretIsPublic] = useState(false);
+  const [secretIsPublic, setSecretIsPublic] = useState(true);
   const [secretImageFile, setSecretImageFile] = useState<File | null>(null);
   const [secretImagePreview, setSecretImagePreview] = useState<string | null>(null);
   const [secretDropId, setSecretDropId] = useState<string | null>(null);
@@ -125,7 +125,7 @@ export default function CreatePage() {
     }
     try {
       setDeploying(true);
-      setStatus({ message: "Creating your drop... confirm in your wallet", type: "loading" });
+      setStatus({ message: "Step 1/3: Deploying contract...", type: "loading" });
       const provider = new BrowserProvider(p);
       const signer = await provider.getSigner();
       let deployedAddr: string;
@@ -135,7 +135,6 @@ export default function CreatePage() {
         const tx = dropType === "nft"
           ? await factory.createNFTDrop(name, symbol, maxSupply, amountPerClaim)
           : await factory.createTokenDrop(name, symbol, amountPerClaim, maxSupply, false);
-        setStatus({ message: "Waiting for confirmation...", type: "loading" });
         await tx.wait();
         const fr = new Contract(networkConfig.lsp7Factory, LSP7_FACTORY_ABI, provider);
         const t = await fr.totalCampaigns();
@@ -147,6 +146,7 @@ export default function CreatePage() {
       const validLinks = links.filter((l) => l.title.trim() && l.url.trim());
 
       // Step 2: LSP4 metadata + LSP4Creators[] in one tx
+      setStatus({ message: "Step 2/3: Uploading metadata...", type: "loading" });
       await uploadAndSetLSP4Metadata(
         deployedAddr,
         signer,
@@ -157,16 +157,17 @@ export default function CreatePage() {
           links: validLinks,
           assetFiles: assetFiles.length > 0 ? assetFiles : undefined,
         },
-        (msg) => setStatus({ message: msg, type: "loading" }),
+        () => setStatus({ message: "Step 2/3: Uploading metadata...", type: "loading" }),
         address,  // sets LSP4Creators[] on the contract
       );
 
       // Step 3: LSP12IssuedAssets[] on creator's UP → "Verified creator" badge
+      setStatus({ message: "Step 3/3: Registering as issued asset...", type: "loading" });
       await addToLSP12IssuedAssets(
         address,
         deployedAddr,
         signer,
-        (msg) => setStatus({ message: msg, type: "loading" })
+        () => setStatus({ message: "Step 3/3: Registering as issued asset...", type: "loading" })
       );
 
       setDeployedAddress(deployedAddr);
@@ -831,7 +832,7 @@ export default function CreatePage() {
                     <div>
                       <span className="text-xs text-secondary">Show on Explore page</span>
                       <p className="text-[10px] text-faint">
-                        {secretIsPublic ? "Anyone can discover this drop" : "Only accessible via direct link"}
+                        {secretIsPublic ? "Discoverable on Explore — toggle off for link-only access" : "Only accessible via direct link"}
                       </p>
                     </div>
                   </div>
