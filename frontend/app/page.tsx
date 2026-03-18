@@ -375,12 +375,12 @@ export default function HomePage() {
               <Link
                 key={item.data.contractAddr}
                 href={`/claim/${item.data.contractAddr}`}
-                className="block bg-card rounded-xl p-4 sm:p-5 border border-border-muted hover:border-pink-500/30 card-elevated transition-all group"
+                className="block bg-card rounded-xl p-4 sm:p-5 border border-border-muted hover:border-pink-500/30 card-elevated transition-all group focus:ring-2 focus:ring-pink-500 focus:outline-none"
               >
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br from-violet-600 to-pink-600 flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden">
                     {item.data.icon ? (
-                      <img src={item.data.icon} alt="" className="w-full h-full object-cover" />
+                      <img src={item.data.icon} alt={item.data.name} className="w-full h-full object-cover" />
                     ) : (
                       item.data.isNFT ? "🖼" : "🪙"
                     )}
@@ -420,7 +420,7 @@ export default function HomePage() {
               <Link
                 key={item.data.id}
                 href={`/secret-drop/${item.data.id}`}
-                className="block bg-card rounded-xl p-4 sm:p-5 border border-border-muted hover:border-violet-500/30 card-elevated transition-all group"
+                className="block bg-card rounded-xl p-4 sm:p-5 border border-border-muted hover:border-violet-500/30 card-elevated transition-all group focus:ring-2 focus:ring-pink-500 focus:outline-none"
               >
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden">
