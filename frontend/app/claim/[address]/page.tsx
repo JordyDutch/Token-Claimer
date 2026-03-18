@@ -705,7 +705,7 @@ export default function ClaimPage() {
               {owner && address.toLowerCase() === owner.toLowerCase() && (
                 <Link
                   href={`/manage/${contractAddress}`}
-                  className="block border border-pink-500/30 text-pink-500 text-sm px-4 py-2 rounded-xl w-full mb-2 hover:bg-pink-500/10 transition-all text-center"
+                  className="block w-full text-center py-2.5 rounded-xl text-sm font-medium border border-pink-500/30 text-pink-500 hover:bg-pink-500/10 transition-all mb-2"
                 >
                   Manage this drop →
                 </Link>
