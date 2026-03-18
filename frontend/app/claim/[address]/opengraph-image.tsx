@@ -20,7 +20,7 @@ function hexToUtf8(hex: string): string {
 
 function ipfsToHttp(url: string): string {
   if (!url) return "";
-  if (url.startsWith("ipfs://")) return `https://api.universalprofile.cloud/ipfs/${url.slice(7)}`;
+  if (url.startsWith("ipfs://")) return `https://cloudflare-ipfs.com/ipfs/${url.slice(7)}`;
   return url;
 }
 

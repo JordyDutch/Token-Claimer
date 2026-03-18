@@ -18,7 +18,7 @@ function hexToUtf8(hex: string): string {
 function ipfsToHttp(url: string): string {
   if (!url) return "";
   if (url.startsWith("ipfs://"))
-    return `https://api.universalprofile.cloud/ipfs/${url.slice(7)}`;
+    return `https://cloudflare-ipfs.com/ipfs/${url.slice(7)}`;
   return url;
 }
 
@@ -102,7 +102,9 @@ export async function generateMetadata({
   const { address } = params;
   const { name, description, iconUrl } = await fetchDropMeta(address);
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "https://agent-token-claimer.vercel.app";
+  const baseUrl =
+    process.env.NEXT_PUBLIC_BASE_URL ??
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://agent-token-claimer.vercel.app");
   const ogImageUrl = `${baseUrl}/claim/${address}/opengraph-image`;
 
   return {
