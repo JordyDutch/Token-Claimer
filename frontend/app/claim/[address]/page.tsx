@@ -586,7 +586,7 @@ export default function ClaimPage() {
 
           {/* Amount per claim — hidden in iframe (shown inline in header) */}
           {!inIframe && amountDisplay && (
-            <div className="inline-block bg-pink-500 dark:bg-pink-500/10 border border-pink-500 dark:border-pink-500/20 text-pink-500 dark:text-pink-400 px-3 py-1 rounded-full text-xs font-medium mb-4">
+            <div className="inline-block bg-pink-500 dark:bg-pink-500/10 border border-pink-500 dark:border-pink-500/20 text-white dark:text-pink-400 px-3 py-1 rounded-full text-xs font-medium mb-4">
               {amountDisplay} per claim
             </div>
           )}

@@ -321,11 +321,11 @@ export default function HomePage() {
             <button onClick={() => setFilter("all")} className={tabClass("all")}>
               All
             </button>
-            <button onClick={() => setFilter("tokens")} className={tabClass("tokens")}>
-              Tokens
-            </button>
             <button onClick={() => setFilter("nfts")} className={tabClass("nfts")}>
               NFTs
+            </button>
+            <button onClick={() => setFilter("tokens")} className={tabClass("tokens")}>
+              Tokens
             </button>
             <button onClick={() => setFilter("secret")} className={tabClass("secret")}>
               Secret
