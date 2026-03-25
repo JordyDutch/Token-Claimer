@@ -193,6 +193,7 @@ export default function ActivityPage() {
   const { config: networkConfig, networkId } = useNetwork();
   const { inIframe } = useUPProvider();
   const [items, setItems] = useState<ActivityItem[]>([]);
+  const [hiddenDrops, setHiddenDrops] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [visibleCount, setVisibleCount] = useState(20);
   const lastBlockRef = useRef(0);
@@ -210,18 +211,31 @@ export default function ActivityPage() {
   const load = useCallback(async () => {
     setLoading(true);
     setItems([]);
+    setHiddenDrops(new Set());
     profileCacheRef.current.clear();
     const rpc = new JsonRpcProvider(networkConfig.rpc);
 
     try {
-      const map = await buildDropMap(rpc, networkConfig);
+      // Fetch hidden drops in parallel with drop map
+      const [map, hidden] = await Promise.all([
+        buildDropMap(rpc, networkConfig),
+        fetch(`/api/drop-visibility?network=${networkConfig.id}`)
+          .then((r) => r.ok ? r.json() : { hidden: [] })
+          .then((d) => new Set<string>((d.hidden ?? []).map((a: string) => a.toLowerCase())))
+          .catch(() => new Set<string>()),
+      ]);
       dropMapRef.current = map;
+      setHiddenDrops(hidden);
 
       const currentBlock = await rpc.getBlockNumber();
       const fromBlock = Math.max(0, currentBlock - BLOCK_RANGE);
       lastBlockRef.current = currentBlock;
 
-      const events = await fetchEvents(rpc, networkConfig, map, fromBlock, currentBlock);
+      const allEvents = await fetchEvents(rpc, networkConfig, map, fromBlock, currentBlock);
+      // Hide creation events for hidden drops; keep claim events
+      const events = allEvents.filter(
+        (e) => !(e.type === "create" && hidden.has(e.dropAddress.toLowerCase())),
+      );
       setItems(events);
       setLoading(false);
 
@@ -353,12 +367,9 @@ export default function ActivityPage() {
         {/* Feed */}
         {items.length > 0 && (
           <div className="space-y-2">
-            {items.slice(0, visibleCount).map((item) => (
-              <Link
-                key={item.id}
-                href={`/claim/${item.dropAddress}`}
-                className="block bg-card rounded-xl px-4 py-3 border border-border-muted hover:border-pink-500/30 card-elevated transition-all group"
-              >
+            {items.slice(0, visibleCount).map((item) => {
+              const isHidden = hiddenDrops.has(item.dropAddress.toLowerCase());
+              const inner = (
                 <div className="flex items-center gap-3">
                   {/* Avatar */}
                   <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-600 to-pink-600 flex items-center justify-center flex-shrink-0 overflow-hidden">
@@ -397,6 +408,11 @@ export default function ActivityPage() {
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface text-muted flex-shrink-0">
                         {item.isNFT ? "NFT" : "Token"}
                       </span>
+                      {isHidden && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 font-medium flex-shrink-0">
+                          Hidden
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -405,8 +421,25 @@ export default function ActivityPage() {
                     {timeSince(item.timestamp)}
                   </span>
                 </div>
-              </Link>
-            ))}
+              );
+
+              return isHidden ? (
+                <div
+                  key={item.id}
+                  className="block bg-card rounded-xl px-4 py-3 border border-border-muted card-elevated opacity-60"
+                >
+                  {inner}
+                </div>
+              ) : (
+                <Link
+                  key={item.id}
+                  href={`/claim/${item.dropAddress}`}
+                  className="block bg-card rounded-xl px-4 py-3 border border-border-muted hover:border-pink-500/30 card-elevated transition-all group"
+                >
+                  {inner}
+                </Link>
+              );
+            })}
             {visibleCount < items.length && (
               <button
                 onClick={() => setVisibleCount((v) => v + 20)}
