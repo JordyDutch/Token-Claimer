@@ -411,6 +411,8 @@ export default function ClaimPage() {
   const hasTimeWindow = startTime > 0 || endTime > 0;
 
   // Determine claim status label
+  const fullyMinted = supplyDisplay !== "-" && supplyDisplay !== "Unlimited" && claimedDisplay !== "-" && claimedDisplay === supplyDisplay;
+  const windowEnded = endTime > 0 && Date.now() / 1000 > endTime;
   let statusLabel = "";
   let statusColor = "";
   if (!claimEnabled) {
@@ -419,6 +421,9 @@ export default function ClaimPage() {
   } else if (isActive) {
     statusLabel = "Live";
     statusColor = "text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-500/10 border-green-300 dark:border-green-500/20";
+  } else if (fullyMinted || windowEnded) {
+    statusLabel = "Ended";
+    statusColor = "text-gray-700 dark:text-gray-400 bg-gray-50 dark:bg-gray-500/10 border-gray-300 dark:border-gray-500/20";
   } else {
     statusLabel = "Scheduled";
     statusColor = "text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 border-blue-300 dark:border-blue-500/20";
@@ -639,12 +644,16 @@ export default function ClaimPage() {
             </div>
           )}
 
-          {/* Inactive warning */}
+          {/* Inactive warning / fully minted banner */}
           {!isActive && tokenType && (
             <div className={`bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400 rounded-xl text-xs ${inIframe ? "px-3 py-2 mb-4" : "px-3 py-2.5 mb-4 sm:text-sm"}`}>
-              {!claimEnabled
-                ? "This drop is currently paused by the creator"
-                : "Claim window has not started yet"}
+              {fullyMinted
+                ? `Fully minted — all ${supplyDisplay} claimed!`
+                : !claimEnabled
+                  ? "This drop is currently paused by the creator"
+                  : windowEnded
+                    ? "Claim window has ended"
+                    : "Claim window has not started yet"}
             </div>
           )}
 
