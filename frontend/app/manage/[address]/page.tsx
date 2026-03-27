@@ -16,6 +16,7 @@ import { useWallet } from "../../components/WalletProvider";
 import { useNetwork } from "../../components/NetworkProvider";
 import { useUPProvider } from "../../components/UPProviderInit";
 import TokenSearchInput from "../../components/TokenSearchInput";
+import UPSearchInput from "../../components/UPSearchInput";
 
 type Status = { message: string; type: "success" | "error" | "loading"; link?: string } | null;
 
@@ -40,6 +41,7 @@ export default function ManagePage() {
   const [maxSupply, setMaxSupply] = useState("0");
   const [tokenReqs, setTokenReqs] = useState<{ addr: string; amount: string }[]>([]);
   const [reqFollowers, setReqFollowers] = useState("");
+  const [reqFollowAddress, setReqFollowAddress] = useState("");
   const [linkCopied, setLinkCopied] = useState(false);
   const [exploreVisible, setExploreVisible] = useState(true);
   const [visibilitySaving, setVisibilitySaving] = useState(false);
@@ -93,7 +95,7 @@ export default function ManagePage() {
       const owner = await c.owner();
       setIsOwner(owner.toLowerCase() === userAddr.toLowerCase());
       const safe = (p: Promise<any>, fallback: any = null) => p.catch(() => fallback);
-      const [nameRaw, enabled, start, end, amount, supply, reqResult, rF, codeEnabled] = await Promise.all([
+      const [nameRaw, enabled, start, end, amount, supply, reqResult, rF, codeEnabled, followAddr] = await Promise.all([
         safe(c.getData(LSP4_TOKEN_NAME_KEY), null),
         safe(c.claimEnabled(), false),
         safe(c.startTime(), BigInt(0)),
@@ -104,6 +106,7 @@ export default function ManagePage() {
         safe(c.getTokenRequirements(), { tokens: [], minBalances: [] }),
         safe(c.requiredFollowers(), BigInt(0)),
         safe(c.codewordEnabled(), false),
+        safe(c.requiredFollowAddress(), null),
       ]);
       setCodewordEnabled(Boolean(codeEnabled));
       setDropName(nameRaw && nameRaw !== "0x" ? Buffer.from(nameRaw.replace(/^0x/, ""), "hex").toString("utf8") : "");
@@ -123,6 +126,9 @@ export default function ManagePage() {
         amount: balancesArr[i]?.toString() ?? "0",
       })));
       setReqFollowers(rF > BigInt(0) ? rF.toString() : "");
+      if (followAddr && followAddr !== "0x0000000000000000000000000000000000000000") {
+        setReqFollowAddress(followAddr);
+      }
       if (start > BigInt(0)) setStartTime(new Date(Number(start) * 1000).toISOString().slice(0, 16));
       if (end > BigInt(0)) setEndTime(new Date(Number(end) * 1000).toISOString().slice(0, 16));
       try {
@@ -602,6 +608,23 @@ export default function ManagePage() {
                     className={inp + " mt-1"}
                   />
                 </div>
+                <div>
+                  <label className={lbl}>Must follow UP <span className="text-faint">(optional — claimer must follow this profile)</span></label>
+                  <UPSearchInput
+                    value={reqFollowAddress}
+                    onChange={setReqFollowAddress}
+                    placeholder="Search by name or paste 0x address…"
+                  />
+                  {reqFollowAddress && (
+                    <button
+                      type="button"
+                      onClick={() => setReqFollowAddress("")}
+                      className="text-[10px] text-faint hover:text-red-400 transition-colors mt-1 cursor-pointer"
+                    >
+                      Clear follow requirement
+                    </button>
+                  )}
+                </div>
                 <button
                   onClick={() => {
                     const invalidTokenReqs = tokenReqs.filter(r => r.addr && r.addr !== ZERO && (!r.amount || Number(r.amount) < 1));
@@ -612,7 +635,7 @@ export default function ManagePage() {
                     const tokens = tokenReqs.map((r) => r.addr || ZERO);
                     const amounts = tokenReqs.map((r) => r.amount || "0");
                     sendTx(
-                      (c) => c.setRequirements(tokens, amounts, reqFollowers || "0"),
+                      (c) => c.setRequirements(tokens, amounts, reqFollowers || "0", reqFollowAddress || "0x0000000000000000000000000000000000000000"),
                       "Updating requirements..."
                     );
                   }}
