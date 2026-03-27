@@ -167,12 +167,31 @@ const REVERT_ERRORS: Record<string, string> = {
   "0xd05cb609": "Max supply has been reached",
   "0xe4455cae": "You don't hold enough required tokens",
   "0x94303d52": "You don't have enough followers",
-  "0x4aa20f9c": "Incorrect codeword",
+  "0x4aa20f9c": "Wrong code — check the codeword and try again",
   "0x8beb9d16": "Transaction failed, please try again",
   "0xb8eaf7a1": "Rescue failed",
 };
 
 export function friendlyRevert(e: any, fallback = "Transaction failed"): string {
-  const selector = (e.data ?? e.error?.data ?? "").slice(0, 10);
-  return REVERT_ERRORS[selector] ?? e.reason ?? e.message?.slice(0, 100) ?? fallback;
+  // Walk common ethers v6 / provider error shapes to find the revert selector.
+  // estimateGas failures often bury data in e.error?.error?.data or e.info?.error?.data.
+  const candidates = [
+    e.data,
+    e.error?.data,
+    e.error?.error?.data,
+    e.info?.error?.data,
+    e.cause?.data,
+  ];
+  for (const raw of candidates) {
+    if (typeof raw === "string" && raw.length >= 10) {
+      const sel = raw.slice(0, 10).toLowerCase();
+      if (REVERT_ERRORS[sel]) return REVERT_ERRORS[sel];
+    }
+  }
+  // Fallback: check reason string for codeword hints
+  const msg = (e.reason ?? e.message ?? "").toLowerCase();
+  if (msg.includes("codeword") || msg.includes("wrong code") || msg.includes("incorrect code")) {
+    return "Wrong code — check the codeword and try again";
+  }
+  return e.reason ?? e.message?.slice(0, 100) ?? fallback;
 }
