@@ -133,10 +133,12 @@ export default function ManagePage() {
           const decNum = Number(dec);
           setTokenDecimals(decNum);
           setIsNftStyle(type === "LSP7-NFT" || decNum === 0);
-          // Reformat amountPerClaim now that we know decimals
-          // amount was loaded as raw BigInt above — reformat to human-readable
+          // Reformat amountPerClaim and maxSupply now that we know decimals
           if (amount && decNum > 0) {
             setAmountPerClaim(formatUnits(amount, decNum));
+          }
+          if (supply && decNum > 0 && !isUnlimited) {
+            setMaxSupply(formatUnits(supply, decNum));
           }
         } else {
           const cl = await c.totalClaimed();

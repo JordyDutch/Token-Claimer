@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { JsonRpcProvider, Contract } from "ethers";
+import { JsonRpcProvider, Contract, formatUnits } from "ethers";
 import {
   LSP7_FACTORY_ABI, LSP8_FACTORY_ABI, CLAIM_ABI,
   LSP7_EXTRA_ABI, LSP8_EXTRA_ABI,
@@ -151,6 +151,7 @@ export default function MyDropsPage() {
           const safe = (p: Promise<any>, fb: any) => p.catch(() => fb);
           try {
             const type = await detectTokenType(c);
+            const isNFT = type === "LSP8" || type === "LSP7-NFT";
             const [enabled, active, supply] = await Promise.all([
               safe(c.claimEnabled(), false),
               safe(c.isClaimActive(), false),
@@ -159,7 +160,7 @@ export default function MyDropsPage() {
             ]);
 
             let claimed = "0";
-            if (type === "LSP7") {
+            if (type === "LSP7" || type === "LSP7-NFT") {
               const cl = await safe(c.totalClaimers(), BigInt(0));
               claimed = cl.toString();
             } else {
@@ -167,12 +168,24 @@ export default function MyDropsPage() {
               claimed = cl.toString();
             }
 
+            // Format supply with decimals for fungible LSP7 tokens
+            let supplyDisplay = "Unlimited";
+            if (supply !== BigInt(0)) {
+              if (type === "LSP7") {
+                const dec = await safe(c.decimals(), BigInt(18));
+                supplyDisplay = formatUnits(supply, Number(dec));
+              } else {
+                supplyDisplay = supply.toString();
+              }
+            }
+
             return {
               ...raw,
+              isNFT,
               claimEnabled: enabled,
               isActive: active,
               totalClaimed: claimed,
-              maxSupply: supply === BigInt(0) ? "Unlimited" : supply.toString(),
+              maxSupply: supplyDisplay,
             };
           } catch {
             return {
