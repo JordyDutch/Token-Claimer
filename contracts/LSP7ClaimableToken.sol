@@ -34,6 +34,7 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
     error MaxSupplyReached();
     error InsufficientTokenBalance();
     error InsufficientFollowers();
+    error NotFollowingRequired();
     error RescueFailed();
     error WrongCodeword();
     error AmountPerClaimZero();
@@ -74,6 +75,9 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
     /// @notice Minimum LSP26 follower count a claimer must have (0 = no requirement).
     uint256 public requiredFollowers;
 
+    /// @notice Address a claimer must follow to claim (zero address = no requirement).
+    address public requiredFollowAddress;
+
     /// @dev LSP26 Follower System registry on LUKSO mainnet.
     address public constant LSP26_REGISTRY = 0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA;
 
@@ -100,7 +104,8 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
     /// @notice Emitted when the owner updates the claim requirements.
     /// @param tokenCount Number of token requirements set.
     /// @param followers  Minimum follower count.
-    event RequirementsUpdated(uint256 tokenCount, uint256 followers);
+    /// @param followAddress Address a claimer must follow.
+    event RequirementsUpdated(uint256 tokenCount, uint256 followers, address followAddress);
 
     /// @notice Emitted when the owner changes the amount of tokens given per claim.
     event AmountPerClaimUpdated(uint256 newAmount);
@@ -217,6 +222,7 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
     ///                     permanently blocking all claims (DoS).
     /// @param minBalances_ Corresponding minimum balances (must equal tokens_.length).
     /// @param followers_   Minimum LSP26 follower count (0 = none).
+    /// @param followAddress_ Address the claimer must follow (zero address = none).
     /// @dev ⚠️ SYBIL NOTE: Requirements are checked against `msg.sender` (the claimer address).
     ///      On LUKSO, deploying additional Universal Profiles is cheap, so a determined actor
     ///      can bypass claim-once limits via multiple addresses. Token/follower requirements
@@ -225,7 +231,8 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
     function setRequirements(
         address[] calldata tokens_,
         uint256[] calldata minBalances_,
-        uint256 followers_
+        uint256 followers_,
+        address followAddress_
     ) external onlyOwner {
         if (tokens_.length != minBalances_.length) revert RequirementsLengthMismatch();
         if (tokens_.length > 10) revert TooManyTokenRequirements();
@@ -243,7 +250,8 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
             unchecked { ++i; }
         }
         requiredFollowers = followers_;
-        emit RequirementsUpdated(tokens_.length, followers_);
+        requiredFollowAddress = followAddress_;
+        emit RequirementsUpdated(tokens_.length, followers_, followAddress_);
     }
 
     /// @notice Returns all token requirements.
@@ -321,9 +329,10 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
             if (keccak256(abi.encodePacked(codeword)) != _codewordHash) revert WrongCodeword();
         }
 
-        (bool tokenOk, bool followersOk) = _checkRequirements(msg.sender);
+        (bool tokenOk, bool followersOk, bool followOk) = _checkRequirements(msg.sender);
         if (!tokenOk) revert InsufficientTokenBalance();
         if (!followersOk) revert InsufficientFollowers();
+        if (!followOk) revert NotFollowingRequired();
 
         hasClaimed[msg.sender] = true;
         claimerCount++;
@@ -353,7 +362,12 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
     /// @param addr The address to check.
     /// @return tokenOk Whether the address holds enough of all required tokens.
     /// @return followersOk Whether the address has enough LSP26 followers.
-    function meetsRequirements(address addr) external view returns (bool tokenOk, bool followersOk) {
+    /// @return followOk Whether the address follows the required profile.
+    function meetsRequirements(address addr)
+        external
+        view
+        returns (bool tokenOk, bool followersOk, bool followOk)
+    {
         return _checkRequirements(addr);
     }
 
@@ -376,16 +390,18 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
     /// @param addrs Array of addresses to check.
     /// @return tokenOk Array of booleans for token requirement.
     /// @return followersOk Array of booleans for follower requirement.
+    /// @return followOk Array of booleans for required-follow requirement.
     function batchMeetsRequirements(address[] calldata addrs)
         external
         view
-        returns (bool[] memory tokenOk, bool[] memory followersOk)
+        returns (bool[] memory tokenOk, bool[] memory followersOk, bool[] memory followOk)
     {
         uint256 len = addrs.length;
         tokenOk = new bool[](len);
         followersOk = new bool[](len);
+        followOk = new bool[](len);
         for (uint256 i = 0; i < len;) {
-            (tokenOk[i], followersOk[i]) = _checkRequirements(addrs[i]);
+            (tokenOk[i], followersOk[i], followOk[i]) = _checkRequirements(addrs[i]);
             unchecked { ++i; }
         }
     }
@@ -396,9 +412,15 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
     /// @param addr The address to check requirements for.
     /// @return tokenOk True if the address holds enough of every required token.
     /// @return followersOk True if the address has enough LSP26 followers.
-    function _checkRequirements(address addr) internal view returns (bool tokenOk, bool followersOk) {
+    /// @return followOk True if the address follows the required profile.
+    function _checkRequirements(address addr)
+        internal
+        view
+        returns (bool tokenOk, bool followersOk, bool followOk)
+    {
         tokenOk = true;
         followersOk = true;
+        followOk = true;
 
         uint256 len = _reqTokens.length;
         for (uint256 i = 0; i < len;) {
@@ -413,6 +435,10 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
 
         if (requiredFollowers > 0) {
             followersOk = ILSP26Followers(LSP26_REGISTRY).followerCount(addr) >= requiredFollowers;
+        }
+
+        if (requiredFollowAddress != address(0)) {
+            followOk = ILSP26Followers(LSP26_REGISTRY).isFollowing(addr, requiredFollowAddress);
         }
     }
 }

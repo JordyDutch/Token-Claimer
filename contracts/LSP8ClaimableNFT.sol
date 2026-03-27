@@ -49,6 +49,9 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
     /// @notice Minimum LSP26 follower count a claimer must have (0 = no requirement).
     uint256 public requiredFollowers;
 
+    /// @notice Address a claimer must follow to claim (zero address = no requirement).
+    address public requiredFollowAddress;
+
     /// @dev LSP26 Follower System registry on LUKSO mainnet.
     address public constant LSP26_REGISTRY = 0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA;
 
@@ -72,7 +75,8 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
     /// @notice Emitted when the owner updates the claim requirements.
     /// @param tokenCount Number of token requirements set.
     /// @param followers  Minimum follower count.
-    event RequirementsUpdated(uint256 tokenCount, uint256 followers);
+    /// @param followAddress Address a claimer must follow.
+    event RequirementsUpdated(uint256 tokenCount, uint256 followers, address followAddress);
 
     event AmountPerClaimUpdated(uint256 newAmount);
     event LYXRescued(address indexed to, uint256 amount);
@@ -86,6 +90,7 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
     error MaxSupplyReached();
     error InsufficientTokenBalance();
     error InsufficientFollowers();
+    error NotFollowingRequired();
     error ReentrancyGuard();
     error RescueFailed();
     error WrongCodeword();
@@ -148,10 +153,12 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
     /// @param tokens_      Array of LSP7/LSP8 contract addresses claimers must hold.
     /// @param minBalances_ Corresponding minimum balances (must equal tokens_.length).
     /// @param followers_   Minimum LSP26 follower count (0 = none).
+    /// @param followAddress_ Address the claimer must follow (zero address = none).
     function setRequirements(
         address[] calldata tokens_,
         uint256[] calldata minBalances_,
-        uint256 followers_
+        uint256 followers_,
+        address followAddress_
     ) external onlyOwner {
         require(tokens_.length == minBalances_.length, "Length mismatch");
         require(tokens_.length <= 10, "Max 10 token requirements");
@@ -167,7 +174,8 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
             unchecked { ++i; }
         }
         requiredFollowers = followers_;
-        emit RequirementsUpdated(tokens_.length, followers_);
+        requiredFollowAddress = followAddress_;
+        emit RequirementsUpdated(tokens_.length, followers_, followAddress_);
     }
 
     /// @notice Returns all token requirements.
@@ -240,9 +248,10 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
             if (remaining < toMint) toMint = remaining;
         }
 
-        (bool tokenOk, bool followersOk) = _checkRequirements(msg.sender);
+        (bool tokenOk, bool followersOk, bool followOk) = _checkRequirements(msg.sender);
         if (!tokenOk) revert InsufficientTokenBalance();
         if (!followersOk) revert InsufficientFollowers();
+        if (!followOk) revert NotFollowingRequired();
 
         hasClaimed[msg.sender] = true;
         claimerCount++;
@@ -284,7 +293,11 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
         return claimerCount;
     }
 
-    function meetsRequirements(address addr) external view returns (bool tokenOk, bool followersOk) {
+    function meetsRequirements(address addr)
+        external
+        view
+        returns (bool tokenOk, bool followersOk, bool followOk)
+    {
         return _checkRequirements(addr);
     }
 
@@ -303,23 +316,29 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
     function batchMeetsRequirements(address[] calldata addrs)
         external
         view
-        returns (bool[] memory tokenOk, bool[] memory followersOk)
+        returns (bool[] memory tokenOk, bool[] memory followersOk, bool[] memory followOk)
     {
         uint256 len = addrs.length;
         tokenOk = new bool[](len);
         followersOk = new bool[](len);
+        followOk = new bool[](len);
         for (uint256 i = 0; i < len;) {
-            (tokenOk[i], followersOk[i]) = _checkRequirements(addrs[i]);
+            (tokenOk[i], followersOk[i], followOk[i]) = _checkRequirements(addrs[i]);
             unchecked { ++i; }
         }
     }
 
     // ──────────────────── Internal ────────────────────
 
-    /// @dev Checks all token requirements (ALL must pass) and follower requirement.
-    function _checkRequirements(address addr) internal view returns (bool tokenOk, bool followersOk) {
+    /// @dev Checks all token requirements (ALL must pass), follower requirement, and follow requirement.
+    function _checkRequirements(address addr)
+        internal
+        view
+        returns (bool tokenOk, bool followersOk, bool followOk)
+    {
         tokenOk = true;
         followersOk = true;
+        followOk = true;
 
         uint256 len = _reqTokens.length;
         for (uint256 i = 0; i < len;) {
@@ -334,6 +353,10 @@ contract LSP8ClaimableNFT is LSP8IdentifiableDigitalAsset {
 
         if (requiredFollowers > 0) {
             followersOk = ILSP26Followers(LSP26_REGISTRY).followerCount(addr) >= requiredFollowers;
+        }
+
+        if (requiredFollowAddress != address(0)) {
+            followOk = ILSP26Followers(LSP26_REGISTRY).isFollowing(addr, requiredFollowAddress);
         }
     }
 }

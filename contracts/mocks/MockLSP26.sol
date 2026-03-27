@@ -14,9 +14,18 @@ contract MockLSP26 {
     /// @notice Follower counts per address.
     /// @dev Slot 0 — storage layout must match what the test helper computes.
     mapping(address => uint256) public followerCount;
+    mapping(address => mapping(address => bool)) private _following;
 
     /// @notice Write a follower count (callable by anyone — test-only).
     function setFollowerCount(address account, uint256 count) external {
         followerCount[account] = count;
+    }
+
+    function setFollowing(address follower, address target, bool val) external {
+        _following[follower][target] = val;
+    }
+
+    function isFollowing(address follower, address addr) external view returns (bool) {
+        return _following[follower][addr];
     }
 }
