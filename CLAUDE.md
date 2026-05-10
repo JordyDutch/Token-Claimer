@@ -8,7 +8,8 @@ Read this before touching any LUKSO-related code.
 ## Project: Token Claimer
 
 A Next.js 15 dApp on LUKSO that lets creators deploy token/NFT drop campaigns. Claimers must
-hold LSP tokens and/or follow via LSP26 to be eligible.
+hold LSP tokens and/or follow via LSP26 to be eligible. Secret Drops are a separate off-chain
+module backed by signed wallet challenges and Vercel KV; they are not factory-created token/NFT contracts.
 
 **Repo:** `https://github.com/JordyDutch/Token-Claimer`
 **Frontend:** `frontend/` (Next.js 15 + Tailwind + ethers.js v6)
@@ -91,7 +92,8 @@ The only difference from Ethereum is the smart contract standards (LSPs) and nat
 - Used for "Verified Creator" badge: creator's UP lists the token contract here.
 
 ### LSP26 — FollowerSystem
-- Registry address (mainnet + testnet): `0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA`
+- Mainnet registry address: `0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA`
+- Factories/drops take the registry as a constructor/initialize parameter. Do not hardcode it in contracts.
 - `follow(address)` — follow a UP
 - `followerCount(address)` → uint256
 - `isFollowing(address follower, address addr)` → bool
@@ -122,15 +124,15 @@ In the Token Claimer code: `raw.slice(2 + 8 + 64)` skips the prefix.
 ### Contracts (Mainnet)
 | Contract | Address |
 |----------|---------|
-| LSP7DropFactory (active) | `0x9b132E764f92c6E6F5E91E276E310758C33dB08F` |
-| LSP8DropFactory (active) | `0xBd545E98F133282bD79dc4a6ac422437478A58b6` |
+| LSP7DropFactory (active) | `0x0B38Ca584553Ec7dA412403c9537B2C0Cd094bf0` |
+| LSP8DropFactory (active) | `0xdcA867387df33b9ce08B706fdb91FB2e8C4bEB74` |
 | LSP26 FollowerRegistry | `0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA` |
 
 ### Contracts (Testnet)
 | Contract | Address |
 |----------|---------|
-| LSP7DropFactory | `0x58877A19286c054acBcE221c7E92ab9039Bf2909` |
-| LSP8DropFactory | `0x6625eDFaca73475dD44b4dAFC8666d92e4d3CAFf` |
+| LSP7DropFactory | `0x51480Ab4EB8529846d495AA9745dcc0B39362Ebe` |
+| LSP8DropFactory | `0xE0FEC12979636dE2a747B7F6944aD263FC58c85A` |
 | LSP26 FollowerRegistry | `0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA` |
 
 ### Project UPs (Mainnet)
@@ -172,8 +174,7 @@ function setClaimEnabled(bool enabled);
 function setClaimWindow(uint256 start, uint256 end);
 function setAmountPerClaim(uint256 amount);
 function setRequirements(address[] tokens, uint256[] minBalances, uint256 minFollowers, address followAddress);
-function setCodeword(string calldata word);  // keccak256 hash stored, never plaintext
-function clearCodeword();
+function setCodeword(string calldata word);  // keccak256 hash stored; plaintext is revealed in claim calldata
 
 // Views
 function claimEnabled() view returns (bool);
@@ -200,6 +201,12 @@ async function detectTokenType(contract): Promise<"LSP7" | "LSP8"> {
 `0x8232e30f` — if a contract reverts with `0xbb370b2b` (NoExtensionFoundForFunctionSelector),
 the contract was deployed with an old factory that doesn't have this function.
 
+### Codeword security model
+The on-chain codeword is a lightweight access gate, not strong secrecy. The contract stores only
+`keccak256(codeword)`, but the plaintext is revealed in transaction calldata when `claimWithCode`
+is called. Use it for livestream phrases and low-risk access control. Use Secret Drops for private
+links/codes that should be distributed server-side after signed wallet verification.
+
 ---
 
 ## Frontend Architecture
@@ -221,6 +228,17 @@ frontend/app/
 ├── manage/[address]/page.tsx # Owner management
 └── my-drops/page.tsx        # Creator's drop list
 ```
+
+### Secret Drops architecture
+Secret Drops are intentionally separate from factory-created token/NFT drops:
+
+```text
+Signed UP challenge → Next.js API route → Vercel KV → private code/link returned
+```
+
+They can verify token and LSP26 requirements on-chain, but they do not mint and are not on-chain
+drop contracts. Keep Secret Drop code inside `frontend/app/api/secret-drop/*`,
+`frontend/app/secret-drop/*`, and `frontend/app/lib/secret-drop.ts` / `server/verify-claim.ts`.
 
 ### Network context
 ```typescript
@@ -369,6 +387,8 @@ await expect(contract.claim()).to.be.revertedWithCustomError(contract, "AlreadyC
 | `NEXT_PUBLIC_LSP8_FACTORY` | Vercel / `.env.local` | Active LSP8 factory |
 | `NEXT_PUBLIC_TESTNET_LSP7_FACTORY` | Vercel / `.env.local` | Testnet LSP7 factory |
 | `NEXT_PUBLIC_TESTNET_LSP8_FACTORY` | Vercel / `.env.local` | Testnet LSP8 factory |
+| `LSP26_REGISTRY` | Deploy scripts / Vercel | Mainnet LSP26 follower registry |
+| `TESTNET_LSP26_REGISTRY` | Deploy scripts / Vercel | Optional testnet LSP26 override |
 | `PINATA_JWT` | Vercel / `.env.local` | IPFS upload (server-side only, no NEXT_PUBLIC_) |
 | `KV_REST_API_URL` | Vercel / `.env.local` | Upstash Redis (Secret Drops) |
 | `KV_REST_API_TOKEN` | Vercel / `.env.local` | Upstash Redis (Secret Drops) |

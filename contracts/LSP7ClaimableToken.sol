@@ -48,6 +48,8 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
     error AlreadyInitialized();
     /// @notice Reverts when a token requirement address has no contract code (EOA or zero address).
     error InvalidTokenRequirement();
+    /// @notice Reverts when the LSP26 registry address is zero.
+    error InvalidLSP26Registry();
 
     // ──────────────────── Storage ────────────────────
 
@@ -78,8 +80,8 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
     /// @notice Address a claimer must follow to claim (zero address = no requirement).
     address public requiredFollowAddress;
 
-    /// @dev LSP26 Follower System registry on LUKSO mainnet.
-    address public constant LSP26_REGISTRY = 0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA;
+    /// @notice LSP26 Follower System registry used for follower/follow checks.
+    address public lsp26Registry;
 
     /// @notice Tracks whether an address has already claimed.
     /// @dev Keyed by `msg.sender`. One claim per address — not per identity.
@@ -138,13 +140,15 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
     /// @param amountPerClaim_ Number of tokens minted per claim.
     /// @param maxSupply_ Hard cap on total supply. Pass `type(uint256).max` for unlimited.
     /// @param isNonDivisible_ If true, the token has 0 decimals.
+    /// @param lsp26Registry_ LSP26 Follower System registry for this network.
     function initialize(
         string memory name_,
         string memory symbol_,
         address owner_,
         uint256 amountPerClaim_,
         uint256 maxSupply_,
-        bool isNonDivisible_
+        bool isNonDivisible_,
+        address lsp26Registry_
     ) external initializer {
         // Initialize LSP7 base (name, symbol, owner, token type, divisibility)
         // Non-divisible (0 decimals) tokens get LSP4TokenType=1 (NFT) so the
@@ -171,8 +175,10 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
         if (maxSupply_ != type(uint256).max && maxSupply_ < amountPerClaim_) {
             revert MaxSupplyBelowAmountPerClaim();
         }
+        if (lsp26Registry_ == address(0)) revert InvalidLSP26Registry();
 
         amountPerClaim = amountPerClaim_;
+        lsp26Registry = lsp26Registry_;
     }
 
     // ──────────────────── Receive ────────────────────
@@ -240,11 +246,9 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
         delete _reqMinBalances;
         for (uint256 i = 0; i < tokens_.length;) {
             address token = tokens_[i];
-            // Validate that the address has contract code. A zero address or EOA would
-            // cause `balanceOf` to revert during claim, permanently blocking all claims.
-            uint256 codeSize;
-            assembly { codeSize := extcodesize(token) }
-            if (codeSize == 0) revert InvalidTokenRequirement();
+            // Validate that the address has contract code and answers `balanceOf(address)`
+            // via staticcall. Otherwise one bad requirement would make every claim revert.
+            if (!_supportsBalanceOf(token)) revert InvalidTokenRequirement();
             _reqTokens.push(token);
             _reqMinBalances.push(minBalances_[i]);
             unchecked { ++i; }
@@ -425,7 +429,12 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
         uint256 len = _reqTokens.length;
         for (uint256 i = 0; i < len;) {
             if (_reqMinBalances[i] > 0) {
-                if (ILSP7Balance(_reqTokens[i]).balanceOf(addr) < _reqMinBalances[i]) {
+                try ILSP7Balance(_reqTokens[i]).balanceOf(addr) returns (uint256 balance) {
+                    if (balance < _reqMinBalances[i]) {
+                        tokenOk = false;
+                        break;
+                    }
+                } catch {
                     tokenOk = false;
                     break;
                 }
@@ -434,11 +443,32 @@ contract LSP7ClaimableToken is LSP7CappedSupplyInitAbstract, ReentrancyGuardUpgr
         }
 
         if (requiredFollowers > 0) {
-            followersOk = ILSP26Followers(LSP26_REGISTRY).followerCount(addr) >= requiredFollowers;
+            try ILSP26Followers(lsp26Registry).followerCount(addr) returns (uint256 count) {
+                followersOk = count >= requiredFollowers;
+            } catch {
+                followersOk = false;
+            }
         }
 
         if (requiredFollowAddress != address(0)) {
-            followOk = ILSP26Followers(LSP26_REGISTRY).isFollowing(addr, requiredFollowAddress);
+            try ILSP26Followers(lsp26Registry).isFollowing(addr, requiredFollowAddress) returns (bool isFollowing_) {
+                followOk = isFollowing_;
+            } catch {
+                followOk = false;
+            }
         }
+    }
+
+    /// @dev Preflight validation for token requirements. Requires contract code and a
+    ///      successful staticcall to `balanceOf(address)` returning at least one word.
+    function _supportsBalanceOf(address token) internal view returns (bool) {
+        uint256 codeSize;
+        assembly { codeSize := extcodesize(token) }
+        if (codeSize == 0) return false;
+
+        (bool ok, bytes memory data) = token.staticcall(
+            abi.encodeCall(ILSP7Balance.balanceOf, (address(this)))
+        );
+        return ok && data.length >= 32;
     }
 }

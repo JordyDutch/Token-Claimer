@@ -14,6 +14,10 @@ import {LSP8ClaimableNFT} from "./LSP8ClaimableNFT.sol";
 ///      factory stays at ~16–18 KB.
 contract LSP8DropFactory {
 
+    // ──────────────────── Errors ────────────────────
+
+    error InvalidLSP26Registry();
+
     // ──────────────────── Types ────────────────────
 
     /// @notice Metadata stored for each deployed LSP8 campaign.
@@ -31,6 +35,9 @@ contract LSP8DropFactory {
     }
 
     // ──────────────────── Storage ────────────────────
+
+    /// @notice LSP26 Follower System registry passed into every created drop.
+    address public immutable lsp26Registry;
 
     /// @notice All LSP8 NFT drop campaigns, in deployment order.
     Campaign[] public nftCampaigns;
@@ -54,6 +61,14 @@ contract LSP8DropFactory {
         string symbol
     );
 
+    // ──────────────────── Constructor ────────────────────
+
+    /// @param lsp26Registry_ LSP26 Follower System registry for this network.
+    constructor(address lsp26Registry_) {
+        if (lsp26Registry_ == address(0)) revert InvalidLSP26Registry();
+        lsp26Registry = lsp26Registry_;
+    }
+
     // ──────────────────── Create ────────────────────
 
     /// @notice Deploys a new LSP8 claimable NFT drop.
@@ -69,7 +84,7 @@ contract LSP8DropFactory {
         uint256 amountPerClaim_
     ) external returns (address) {
         LSP8ClaimableNFT nft = new LSP8ClaimableNFT(
-            name_, symbol_, msg.sender, maxSupply_, amountPerClaim_
+            name_, symbol_, msg.sender, maxSupply_, amountPerClaim_, lsp26Registry
         );
 
         uint256 id = nftCampaigns.length;

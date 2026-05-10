@@ -37,6 +37,7 @@ contract LSP7DropFactory is Ownable {
     // ──────────────────── Errors ────────────────────
 
     error FactoryPaused();
+    error InvalidLSP26Registry();
 
     // ──────────────────── Storage ────────────────────
 
@@ -45,6 +46,9 @@ contract LSP7DropFactory is Ownable {
 
     /// @notice The LSP7ClaimableToken implementation contract that all proxies delegate to.
     address public immutable implementation;
+
+    /// @notice LSP26 Follower System registry passed into every created drop.
+    address public immutable lsp26Registry;
 
     /// @notice All LSP7 token drop campaigns, in deployment order.
     Campaign[] public tokenCampaigns;
@@ -91,7 +95,10 @@ contract LSP7DropFactory is Ownable {
     // ──────────────────── Constructor ────────────────────
 
     /// @notice Deploys the factory and creates the implementation contract.
-    constructor() {
+    /// @param lsp26Registry_ LSP26 Follower System registry for this network.
+    constructor(address lsp26Registry_) {
+        if (lsp26Registry_ == address(0)) revert InvalidLSP26Registry();
+        lsp26Registry = lsp26Registry_;
         implementation = address(new LSP7ClaimableToken());
     }
 
@@ -129,7 +136,7 @@ contract LSP7DropFactory is Ownable {
 
         // Initialize the proxy
         LSP7ClaimableToken(payable(proxy)).initialize(
-            name_, symbol_, msg.sender, amountPerClaim_, cap, isNonDivisible_
+            name_, symbol_, msg.sender, amountPerClaim_, cap, isNonDivisible_, lsp26Registry
         );
 
         uint256 id = tokenCampaigns.length;
@@ -175,7 +182,7 @@ contract LSP7DropFactory is Ownable {
 
         // Initialize with isNonDivisible = true
         LSP7ClaimableToken(payable(proxy)).initialize(
-            name_, symbol_, msg.sender, amountPerClaim_, cap, true
+            name_, symbol_, msg.sender, amountPerClaim_, cap, true, lsp26Registry
         );
 
         uint256 id = tokenCampaigns.length;

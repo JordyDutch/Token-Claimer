@@ -452,7 +452,7 @@ export default function CreatePage() {
                       : "bg-surface text-muted border border-border-default"
                   }`}
                 >
-                  🔐 Secret Drop
+                  🔐 Secret Drop (off-chain)
                 </button>
               </div>
 

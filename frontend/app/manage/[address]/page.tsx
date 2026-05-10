@@ -650,7 +650,7 @@ export default function ManagePage() {
             <div className={card}>
               <h2 className="text-xs font-semibold text-tertiary mb-1">Codeword</h2>
               <p className="text-[10px] text-faint mb-3">
-                Require claimers to enter a secret word — say it in a livestream. Only the keccak256 hash is stored on-chain, not the plaintext.
+                Require claimers to enter a livestream phrase. Only the keccak256 hash is stored, but the plaintext is revealed in claim calldata — not for high-value secrets.
               </p>
               <div className="flex items-center gap-2 mb-3">
                 <span className={`text-xs font-semibold ${codewordEnabled ? "text-green-600 dark:text-green-400" : "text-label"}`}>
@@ -668,7 +668,7 @@ export default function ManagePage() {
                   spellCheck={false}
                 />
                 <p className="text-[10px] text-faint">
-                  Use a longer passphrase for better security. Empty = clear codeword.
+                  Use this as a lightweight access gate. For private links/codes, use Secret Drops instead.
                 </p>
                 <div className="flex gap-2">
                   <button

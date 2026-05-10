@@ -67,7 +67,8 @@ async function deployNFT(
     "NFT",
     owner.address,
     opts.maxSupply ?? 0n,
-    opts.amountPerClaim ?? 1n
+    opts.amountPerClaim ?? 1n,
+    LSP26_REGISTRY
   )) as LSP8ClaimableNFT;
 }
 
@@ -138,37 +139,37 @@ describe("LSP8ClaimableNFT", function () {
 
     it("defaults amountPerClaim to 1 when 0 is passed", async function () {
       const Factory = await ethers.getContractFactory("LSP8ClaimableNFT");
-      const n = (await Factory.deploy("Z", "Z", owner.address, 0n, 0n)) as LSP8ClaimableNFT;
+      const n = (await Factory.deploy("Z", "Z", owner.address, 0n, 0n, LSP26_REGISTRY)) as LSP8ClaimableNFT;
       expect(await n.amountPerClaim()).to.equal(1n);
     });
 
     it("reverts when amountPerClaim_ > 50", async function () {
       const Factory = await ethers.getContractFactory("LSP8ClaimableNFT");
-      await expect(Factory.deploy("Z", "Z", owner.address, 0n, 51n)).to.be.revertedWith(
+      await expect(Factory.deploy("Z", "Z", owner.address, 0n, 51n, LSP26_REGISTRY)).to.be.revertedWith(
         "Max 50 per claim"
       );
     });
 
     it("accepts amountPerClaim_ == 50", async function () {
       const Factory = await ethers.getContractFactory("LSP8ClaimableNFT");
-      await expect(Factory.deploy("Z", "Z", owner.address, 0n, 50n)).to.not.be.reverted;
+      await expect(Factory.deploy("Z", "Z", owner.address, 0n, 50n, LSP26_REGISTRY)).to.not.be.reverted;
     });
 
     it("reverts when maxSupply < amountPerClaim (non-zero maxSupply)", async function () {
       const Factory = await ethers.getContractFactory("LSP8ClaimableNFT");
-      await expect(Factory.deploy("Z", "Z", owner.address, 2n, 5n)).to.be.revertedWith(
+      await expect(Factory.deploy("Z", "Z", owner.address, 2n, 5n, LSP26_REGISTRY)).to.be.revertedWith(
         "maxSupply < amountPerClaim"
       );
     });
 
     it("allows maxSupply == amountPerClaim", async function () {
       const Factory = await ethers.getContractFactory("LSP8ClaimableNFT");
-      await expect(Factory.deploy("Z", "Z", owner.address, 5n, 5n)).to.not.be.reverted;
+      await expect(Factory.deploy("Z", "Z", owner.address, 5n, 5n, LSP26_REGISTRY)).to.not.be.reverted;
     });
 
     it("allows maxSupply == 0 (unlimited)", async function () {
       const Factory = await ethers.getContractFactory("LSP8ClaimableNFT");
-      await expect(Factory.deploy("Z", "Z", owner.address, 0n, 5n)).to.not.be.reverted;
+      await expect(Factory.deploy("Z", "Z", owner.address, 0n, 5n, LSP26_REGISTRY)).to.not.be.reverted;
     });
 
     it("starts with empty token requirements", async function () {
@@ -342,6 +343,19 @@ describe("LSP8ClaimableNFT", function () {
       await expect(
         nft.setRequirements([tokenAddr], [100n, 200n], 0n, ethers.ZeroAddress)
       ).to.be.revertedWith("Length mismatch");
+    });
+
+    it("reverts when a token requirement does not support balanceOf(address)", async function () {
+      const nonToken = await deployAccount();
+      await expect(
+        nft.setRequirements([await nonToken.getAddress()], [1n], 0n, ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(nft, "InvalidTokenRequirement");
+    });
+
+    it("reverts when a token requirement is an EOA", async function () {
+      await expect(
+        nft.setRequirements([stranger.address], [1n], 0n, ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(nft, "InvalidTokenRequirement");
     });
 
     it("reverts when more than 10 token requirements are provided", async function () {

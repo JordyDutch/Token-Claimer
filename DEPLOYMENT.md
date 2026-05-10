@@ -1,181 +1,139 @@
-# Deployment Guide — Token Claimer (Proxy Pattern)
+# Deployment Guide — Token Claimer
 
-## Architecture: EIP-1167 Minimal Proxies
+## Factory model
 
-Token Claimer factories now use the **EIP-1167 minimal proxy pattern** (via OpenZeppelin's `Clones` library) instead of deploying full contract bytecode for every campaign.
+Token Claimer uses factories for release hygiene and lower deployment cost:
 
-### Before (full deployment)
+- `LSP7DropFactory` deploys EIP-1167 minimal proxies for `LSP7ClaimableToken`.
+- `LSP8DropFactory` deploys fresh `LSP8ClaimableNFT` contracts per drop to stay under EIP-170 size limits.
+- Both factories are deployed with an `LSP26_REGISTRY` constructor parameter. Drops inherit that registry and use it for follower-count and required-follow checks.
 
-Each `createTokenDrop()` call deployed the entire `LSP7ClaimableToken` bytecode (~16 KB). This cost **~3-4M gas** per campaign creation.
+## Active addresses
 
-### After (minimal proxies)
+### Mainnet
 
-1. A single **implementation contract** is deployed once per token type
-2. Each `createTokenDrop()` call deploys a tiny **45-byte proxy** that delegates all calls to the implementation
-3. The proxy is then initialized via `initialize()` with the campaign parameters
+- LSP7 factory: `0x0B38Ca584553Ec7dA412403c9537B2C0Cd094bf0`
+- LSP8 factory: `0xdcA867387df33b9ce08B706fdb91FB2e8C4bEB74`
+- LSP26 registry: `0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA`
 
-Cost: **~300-400K gas** per campaign creation — roughly **10x cheaper**.
+### Testnet
 
-### How it works
+- LSP7 factory: `0x51480Ab4EB8529846d495AA9745dcc0B39362Ebe`
+- LSP8 factory: `0xE0FEC12979636dE2a747B7F6944aD263FC58c85A`
 
-```
-User calls factory.createTokenDrop(name, symbol, ...)
-  → Factory calls Clones.clone(implementation)       // deploys 45-byte proxy
-  → Factory calls proxy.initialize(name, symbol, ...)  // sets up state
-  → Factory records campaign metadata
-  → Returns proxy address
-```
-
-Every proxy is a fully independent contract with its own storage, but shares the implementation's code. From the outside, each proxy behaves identically to a standalone `LSP7ClaimableToken`.
-
----
-
-## Deployed Contracts
-
-After running `deploy-factory.ts`, you'll have 4 contracts:
-
-| Contract | Role |
-|---|---|
-| `LSP7ClaimableToken` | Implementation (master copy, never used directly) |
-| `LSP7DropFactory` | Creates LSP7 token drop campaigns via cloning |
-| `LSP8ClaimableNFT` | Implementation (master copy, never used directly) |
-| `LSP8DropFactory` | Creates LSP8 NFT drop campaigns via cloning |
-
----
-
-## Deployment
+## Deploy factories
 
 ```bash
-# Testnet
-npx hardhat run scripts/deploy-factory.ts --network luksoTestnet
+cp .env.example .env
+# Edit LUKSO_RPC_URL / PRIVATE_KEY in your local setup if needed.
 
-# Mainnet
-npx hardhat run scripts/deploy-factory.ts --network lukso
+LSP26_REGISTRY=0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA \
+  npx hardhat run scripts/deploy-factory.ts --network lukso
 ```
 
-### Post-deployment
+Testnet:
 
-1. **Verify contracts** on the LUKSO explorer:
-   ```bash
-   # Verify implementations
-   npx hardhat verify --network lukso <LSP7_IMPL_ADDRESS>
-   npx hardhat verify --network lukso <LSP8_IMPL_ADDRESS>
-
-   # Verify factories (pass implementation address as constructor arg)
-   npx hardhat verify --network lukso <LSP7_FACTORY_ADDRESS> <LSP7_IMPL_ADDRESS>
-   npx hardhat verify --network lukso <LSP8_FACTORY_ADDRESS> <LSP8_IMPL_ADDRESS>
-   ```
-
-2. **Update frontend environment variables** (`.env.local` and Vercel):
-   ```
-   NEXT_PUBLIC_LSP7_FACTORY=<new LSP7DropFactory address>
-   NEXT_PUBLIC_LSP8_FACTORY=<new LSP8DropFactory address>
-   ```
-
-3. **Preserve old drops** — add previous factory addresses to `allLsp7Factories` / `allLsp8Factories` in `frontend/app/lib/networks.ts` so existing campaigns remain visible.
-
----
-
-## Implementation Contract Safety
-
-### Why it must not be initialized directly
-
-The implementation contract is a bare master copy. If someone calls `initialize()` on it directly, they become the "owner" of the implementation. While this doesn't affect proxies (each proxy has its own storage), it's a known attack vector:
-
-- An attacker could initialize the implementation and call `selfdestruct` (if available), bricking all proxies
-- Even without `selfdestruct`, it's considered a hygiene issue
-
-### Protection
-
-The implementation contracts use OpenZeppelin's `Initializable` pattern:
-
-- `initialize()` can only be called once per contract instance (proxy or implementation)
-- The implementation's constructor calls `_disableInitializers()` to permanently lock it from being initialized
-- Any call to `initialize()` on the implementation contract will revert
-
-This is the standard OZ pattern — no extra steps needed after deployment.
-
-### What if the implementation IS initialized?
-
-On post-Shanghai EVM (which LUKSO uses), `selfdestruct` is neutered — it only sends ETH, it doesn't delete code. So even if the implementation were initialized by a third party, proxies would continue to work. But `_disableInitializers()` prevents this scenario entirely.
-
----
-
-## Interacting with the Factory
-
-### Creating a token drop
-
-```typescript
-import { ethers } from "ethers";
-
-const factory = new ethers.Contract(LSP7_FACTORY_ADDRESS, LSP7_FACTORY_ABI, signer);
-
-const tx = await factory.createTokenDrop(
-  "My Token",        // name
-  "MTK",             // symbol
-  1000,              // amountPerClaim (tokens per claim)
-  1000000,           // maxSupply (0 = unlimited)
-  false              // isNonDivisible (false = 18 decimals)
-);
-
-const receipt = await tx.wait();
-// Parse TokenCampaignCreated event to get the proxy address
+```bash
+TESTNET_LSP26_REGISTRY=<testnet-registry-if-different> \
+LSP26_REGISTRY=${TESTNET_LSP26_REGISTRY:-0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA} \
+  npx hardhat run scripts/deploy-factory.ts --network luksoTestnet
 ```
 
-### Creating an NFT drop
+The script prints:
 
-```typescript
-const nftFactory = new ethers.Contract(LSP8_FACTORY_ADDRESS, LSP8_FACTORY_ABI, signer);
+- `LSP7DropFactory`
+- `LSP7ClaimableToken` implementation used by the LSP7 proxy factory
+- `LSP8DropFactory`
+- `LSP26 registry`
 
-const tx = await nftFactory.createNFTDrop(
-  "My NFT Collection",  // name
-  "MNFT",               // symbol
-  100,                   // maxSupply (0 = unlimited)
-  1                      // amountPerClaim (NFTs per claim, max 50)
-);
+## Verify contracts
 
-const receipt = await tx.wait();
-// Parse NFTCampaignCreated event to get the proxy address
+`LSP7DropFactory` and `LSP8DropFactory` constructor arg is the LSP26 registry address:
+
+```bash
+npx hardhat verify --network lukso <LSP7_FACTORY_ADDRESS> 0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA
+npx hardhat verify --network lukso <LSP8_FACTORY_ADDRESS> 0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA
 ```
 
-### Reading campaigns
+The LSP7 implementation is self-deployed by the factory constructor. Read it with:
 
 ```typescript
-// Total campaigns
-const total = await factory.totalCampaigns();
-
-// Paginated read
-const campaigns = await factory.getCampaigns(0, 10);
-
-// By creator
-const indices = await factory.getCampaignsByCreator(creatorAddress);
+await lsp7Factory.implementation();
 ```
 
-### Interacting with a deployed drop (proxy)
+## Frontend env
 
-Once deployed, each proxy is a standard `LSP7ClaimableToken` / `LSP8ClaimableNFT`. Interact with it using the same ABI as the implementation:
+Update `.env.local` and Vercel after redeploying factories:
+
+```bash
+NEXT_PUBLIC_LUKSO_RPC=https://rpc.mainnet.lukso.network
+NEXT_PUBLIC_LSP7_FACTORY=<new LSP7DropFactory>
+NEXT_PUBLIC_LSP8_FACTORY=<new LSP8DropFactory>
+LSP26_REGISTRY=0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA
+PINATA_JWT=<server-side-only>
+```
+
+If Secret Drops are enabled:
+
+```bash
+KV_REST_API_URL=<server-side-only>
+KV_REST_API_TOKEN=<server-side-only>
+```
+
+Do not expose `PINATA_JWT`, `KV_REST_API_URL`, or `KV_REST_API_TOKEN` with `NEXT_PUBLIC_`.
+
+## Preserve old drops
+
+When deploying new factories:
+
+1. Add previous active addresses to `allLsp7Factories` / `allLsp8Factories` in `frontend/app/lib/networks.ts`.
+2. Change `NEXT_PUBLIC_LSP7_FACTORY` / `NEXT_PUBLIC_LSP8_FACTORY` to the new active factories.
+3. Run `npm run lint` and `npm run build` in `frontend`.
+
+The frontend queries all historical factories for listing, but only the active factories create new drops.
+
+## Creating drops
 
 ```typescript
-const drop = new ethers.Contract(proxyAddress, LSP7_CLAIMABLE_ABI, signer);
+const lsp7Factory = new ethers.Contract(LSP7_FACTORY, LSP7_FACTORY_ABI, signer);
+await lsp7Factory.createTokenDrop("My Token", "MTK", amountPerClaim, maxSupply, false);
 
-// Owner operations
+const lsp8Factory = new ethers.Contract(LSP8_FACTORY, LSP8_FACTORY_ABI, signer);
+await lsp8Factory.createNFTDrop("My NFT", "MNFT", maxSupply, amountPerClaim);
+```
+
+## Managing a deployed drop
+
+```typescript
+const drop = new ethers.Contract(dropAddress, CLAIM_ABI, signer);
+
 await drop.setClaimEnabled(true);
 await drop.setClaimWindow(startTimestamp, endTimestamp);
 await drop.setRequirements(tokenAddresses, minBalances, minFollowers, followAddress);
-
-// Claimer operations
-await drop.claim();
-await drop.claimWithCode("secret");
+await drop.setCodeword("livestream phrase");
 ```
 
----
+## Codeword security model
 
-## Gas Comparison
+Codeword is honest but limited:
 
-| Operation | Old (full deploy) | New (proxy) | Savings |
-|---|---|---|---|
-| Create LSP7 drop | ~3.5M gas | ~350K gas | ~90% |
-| Create LSP8 drop | ~3.8M gas | ~380K gas | ~90% |
-| Claim (unchanged) | ~120K gas | ~120K gas | 0% |
+- Only `keccak256(codeword)` is stored on-chain.
+- The plaintext is revealed in calldata when a claimer calls `claimWithCode`.
+- Treat it as a livestream/low-risk access phrase, not private-key-level secrecy.
+- For private links/codes, use the separate Secret Drops module.
 
-The proxy pattern only saves gas on deployment. Runtime operations (claiming, owner management) cost the same since `delegatecall` adds negligible overhead (~700 gas).
+## Secret Drops architecture
+
+Secret Drops are off-chain and separate from token/NFT drop contracts:
+
+```text
+Signed UP challenge → Next.js API route → Vercel KV → one code/link returned
+```
+
+They can verify token/follower requirements on-chain, but they do not mint and are not factory-created contracts.
+
+## Gas notes
+
+- LSP7 factory creation is cheap because drops are minimal proxies.
+- LSP8 drops are fresh deployments because LSP8 bytecode and feature set made proxy/unified-factory layouts less practical under size limits.
+- Runtime claiming costs are not materially changed by the factory model.

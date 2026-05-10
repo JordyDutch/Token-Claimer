@@ -86,7 +86,7 @@ async function deployTokenProxy(
 
   // Use the DropFactory instead:
   const DropFactory = await ethers.getContractFactory("LSP7DropFactory");
-  const factory = await DropFactory.deploy();
+  const factory = await DropFactory.deploy(LSP26_REGISTRY);
   await factory.waitForDeployment();
 
   // The factory normalizes maxSupply=0 to type(uint256).max internally,
@@ -192,7 +192,7 @@ describe("LSP7ClaimableToken", function () {
 
     it("reverts when amountPerClaim_ is 0", async function () {
       const DropFactory = await ethers.getContractFactory("LSP7DropFactory");
-      const factory = await DropFactory.deploy();
+      const factory = await DropFactory.deploy(LSP26_REGISTRY);
       await expect(
         factory.createTokenDrop("D", "D", 0n, 0n, false)
       ).to.be.revertedWithCustomError(
@@ -203,7 +203,7 @@ describe("LSP7ClaimableToken", function () {
 
     it("reverts when maxSupply < amountPerClaim (non-zero maxSupply)", async function () {
       const DropFactory = await ethers.getContractFactory("LSP7DropFactory");
-      const factory = await DropFactory.deploy();
+      const factory = await DropFactory.deploy(LSP26_REGISTRY);
       await expect(
         factory.createTokenDrop("D", "D", 100n, 50n, false)
       ).to.be.revertedWithCustomError(
@@ -232,7 +232,7 @@ describe("LSP7ClaimableToken", function () {
 
     it("cannot be initialized twice", async function () {
       await expect(
-        token.initialize("X", "X", owner.address, 1n, MAX_SUPPLY_UNLIMITED, false)
+        token.initialize("X", "X", owner.address, 1n, MAX_SUPPLY_UNLIMITED, false, LSP26_REGISTRY)
       ).to.be.reverted;
     });
   });
@@ -455,6 +455,19 @@ describe("LSP7ClaimableToken", function () {
       await expect(
         token.setRequirements([tokenAddr], [100n, 200n], 0n, ethers.ZeroAddress)
       ).to.be.revertedWithCustomError(token, "RequirementsLengthMismatch");
+    });
+
+    it("reverts when a token requirement does not support balanceOf(address)", async function () {
+      const nonToken = await deployAccount();
+      await expect(
+        token.setRequirements([await nonToken.getAddress()], [1n], 0n, ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(token, "InvalidTokenRequirement");
+    });
+
+    it("reverts when a token requirement is an EOA", async function () {
+      await expect(
+        token.setRequirements([stranger.address], [1n], 0n, ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(token, "InvalidTokenRequirement");
     });
 
     it("reverts when more than 10 token requirements are provided", async function () {

@@ -5,6 +5,7 @@
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",
+    "deploy:factory": "hardhat run scripts/deploy-factory.ts",
     "deploy:testnet": "hardhat run scripts/deploy.ts --network luksoTestnet",
     "deploy:mainnet": "hardhat run scripts/deploy.ts --network lukso",
     "dev": "cd frontend && npm run dev"

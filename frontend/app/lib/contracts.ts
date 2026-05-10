@@ -5,9 +5,9 @@ export const LUKSO_CHAIN_ID = "0x2a";
 export const ZERO = "0x0000000000000000000000000000000000000000";
 
 export const LSP7_FACTORY =
-  process.env.NEXT_PUBLIC_LSP7_FACTORY ?? "0xF1b5FfA5A82Cee28eaC551165102a1e62fBef7Ab";
+  process.env.NEXT_PUBLIC_LSP7_FACTORY ?? "0x0B38Ca584553Ec7dA412403c9537B2C0Cd094bf0";
 export const LSP8_FACTORY =
-  process.env.NEXT_PUBLIC_LSP8_FACTORY ?? "0xA373f07E94496A4509c30DcB27b431c541b87FbF";
+  process.env.NEXT_PUBLIC_LSP8_FACTORY ?? "0xdcA867387df33b9ce08B706fdb91FB2e8C4bEB74";
 
 // LSP7DropFactory ABI
 // Includes both old (`totalTokenCampaigns`) and new (`totalCampaigns`) names —
