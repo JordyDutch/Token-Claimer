@@ -171,7 +171,7 @@ function claimWithCode(string calldata codeword) external;
 function setClaimEnabled(bool enabled);
 function setClaimWindow(uint256 start, uint256 end);
 function setAmountPerClaim(uint256 amount);
-function setRequirements(address[] tokens, uint256[] minBalances, uint256 minFollowers);
+function setRequirements(address[] tokens, uint256[] minBalances, uint256 minFollowers, address followAddress);
 function setCodeword(string calldata word);  // keccak256 hash stored, never plaintext
 function clearCodeword();
 
@@ -183,7 +183,7 @@ function maxSupply() view returns (uint256);
 function amountPerClaim() view returns (uint256);
 function getTokenRequirements() view returns (address[] tokens, uint256[] minBalances);
 function requiredFollowers() view returns (uint256);
-function meetsRequirements(address) view returns (bool tokenOk, bool followersOk);
+function meetsRequirements(address) view returns (bool tokenOk, bool followersOk, bool followOk);
 function codewordEnabled() view returns (bool);
 ```
 

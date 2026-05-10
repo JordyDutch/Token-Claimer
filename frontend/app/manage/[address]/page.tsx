@@ -627,15 +627,16 @@ export default function ManagePage() {
                 </div>
                 <button
                   onClick={() => {
-                    const invalidTokenReqs = tokenReqs.filter(r => r.addr && r.addr !== ZERO && (!r.amount || Number(r.amount) < 1));
+                    const activeTokenReqs = tokenReqs.filter((r) => r.addr && r.addr !== ZERO);
+                    const invalidTokenReqs = activeTokenReqs.filter((r) => !r.amount || Number(r.amount) < 1);
                     if (invalidTokenReqs.length > 0) {
                       setStatus({ message: "Token requirements must have a minimum balance of at least 1", type: "error" });
                       return;
                     }
-                    const tokens = tokenReqs.map((r) => r.addr || ZERO);
-                    const amounts = tokenReqs.map((r) => r.amount || "0");
+                    const tokens = activeTokenReqs.map((r) => r.addr);
+                    const amounts = activeTokenReqs.map((r) => r.amount);
                     sendTx(
-                      (c) => c.setRequirements(tokens, amounts, reqFollowers || "0", reqFollowAddress || "0x0000000000000000000000000000000000000000"),
+                      (c) => c.setRequirements(tokens, amounts, reqFollowers || "0", reqFollowAddress || ZERO),
                       "Updating requirements..."
                     );
                   }}

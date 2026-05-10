@@ -161,7 +161,7 @@ const drop = new ethers.Contract(proxyAddress, LSP7_CLAIMABLE_ABI, signer);
 // Owner operations
 await drop.setClaimEnabled(true);
 await drop.setClaimWindow(startTimestamp, endTimestamp);
-await drop.setRequirements(tokenAddresses, minBalances, minFollowers);
+await drop.setRequirements(tokenAddresses, minBalances, minFollowers, followAddress);
 
 // Claimer operations
 await drop.claim();

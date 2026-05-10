@@ -61,7 +61,7 @@ export const CLAIM_ABI = [
   "function requiredFollowers() view returns (uint256)",
   "function meetsRequirements(address) view returns (bool tokenOk, bool followersOk, bool followOk)",
   "function requiredFollowAddress() view returns (address)",
-  "function batchMeetsRequirements(address[]) view returns (bool[] tokenOk, bool[] followersOk)",
+  "function batchMeetsRequirements(address[]) view returns (bool[] tokenOk, bool[] followersOk, bool[] followOk)",
   "function setClaimEnabled(bool)",
   "function setClaimWindow(uint256,uint256)",
   "function setAmountPerClaim(uint256)",
