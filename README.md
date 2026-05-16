@@ -98,3 +98,5 @@ setAmountPerClaim(amount)           // Change amount per claim
 ## License
 
 MIT
+
+
