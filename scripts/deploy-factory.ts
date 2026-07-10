@@ -32,6 +32,13 @@ async function main() {
   const balance = await ethers.provider.getBalance(deployer.address);
   console.log("Balance:", ethers.formatEther(balance), "LYX\n");
 
+  const lsp26Registry =
+    process.env.LSP26_REGISTRY ?? "0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA";
+  if (!ethers.isAddress(lsp26Registry) || lsp26Registry === ethers.ZeroAddress) {
+    throw new Error("LSP26_REGISTRY must be a non-zero address");
+  }
+  console.log("LSP26 registry:", lsp26Registry, "\n");
+
   // ─────────────── Step 1: Deploy LSP7 Implementation ───────────────
   // This is the master copy. It uses initialize() instead of a constructor.
   // It must NEVER be initialized directly — it serves only as a delegate target.
@@ -41,22 +48,24 @@ async function main() {
 
   console.log("Step 1/4: Deploying LSP7DropFactory (self-deploys impl internally)...");
   const LSP7Factory = await ethers.getContractFactory("LSP7DropFactory");
-  const lsp7Factory = await LSP7Factory.deploy();
+  const lsp7Factory = await LSP7Factory.deploy(lsp26Registry);
   await lsp7Factory.waitForDeployment();
   const lsp7FactoryAddr = await lsp7Factory.getAddress();
   const lsp7ImplAddr = await lsp7Factory.implementation();
   console.log("  LSP7DropFactory:", lsp7FactoryAddr);
   console.log("  LSP7ClaimableToken (impl):", lsp7ImplAddr);
+  console.log("  LSP26 registry:", await lsp7Factory.lsp26Registry());
 
   // ─────────────── Step 2: Deploy LSP8 Factory ───────────────
   // LSP8DropFactory deploys full LSP8ClaimableNFT per drop (no EIP-1167).
 
   console.log("Step 2/2: Deploying LSP8DropFactory...");
   const LSP8Factory = await ethers.getContractFactory("LSP8DropFactory");
-  const lsp8Factory = await LSP8Factory.deploy();
+  const lsp8Factory = await LSP8Factory.deploy(lsp26Registry);
   await lsp8Factory.waitForDeployment();
   const lsp8FactoryAddr = await lsp8Factory.getAddress();
   console.log("  LSP8DropFactory:", lsp8FactoryAddr);
+  console.log("  LSP26 registry:", await lsp8Factory.lsp26Registry());
 
   // ─────────────── Verification ───────────────
   // Confirm the factories stored the correct implementation addresses.
@@ -86,6 +95,7 @@ async function main() {
   console.log(`  LSP7DropFactory:           ${lsp7FactoryAddr}`);
   console.log(`  LSP8ClaimableNFT:          deploys fresh per drop (no shared impl)`);
   console.log(`  LSP8DropFactory:           ${lsp8FactoryAddr}`);
+  console.log(`  LSP26 registry:            ${lsp26Registry}`);
   console.log("═══════════════════════════════════════════");
   console.log("\nNext steps:");
   console.log("  1. Verify contracts on explorer (npx hardhat verify ...)");

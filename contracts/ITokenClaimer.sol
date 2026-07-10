@@ -22,4 +22,10 @@ interface ILSP26Followers {
     /// @param addr The address whose follower count is queried.
     /// @return The number of followers.
     function followerCount(address addr) external view returns (uint256);
+
+    /// @notice Returns whether `follower` follows `addr`.
+    /// @param follower The account that may be following.
+    /// @param addr The account being followed.
+    /// @return True if `follower` follows `addr`.
+    function isFollowing(address follower, address addr) external view returns (bool);
 }

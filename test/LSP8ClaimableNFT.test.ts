@@ -67,7 +67,8 @@ async function deployNFT(
     "NFT",
     owner.address,
     opts.maxSupply ?? 0n,
-    opts.amountPerClaim ?? 1n
+    opts.amountPerClaim ?? 1n,
+    LSP26_REGISTRY
   )) as LSP8ClaimableNFT;
 }
 
@@ -138,37 +139,37 @@ describe("LSP8ClaimableNFT", function () {
 
     it("defaults amountPerClaim to 1 when 0 is passed", async function () {
       const Factory = await ethers.getContractFactory("LSP8ClaimableNFT");
-      const n = (await Factory.deploy("Z", "Z", owner.address, 0n, 0n)) as LSP8ClaimableNFT;
+      const n = (await Factory.deploy("Z", "Z", owner.address, 0n, 0n, LSP26_REGISTRY)) as LSP8ClaimableNFT;
       expect(await n.amountPerClaim()).to.equal(1n);
     });
 
     it("reverts when amountPerClaim_ > 50", async function () {
       const Factory = await ethers.getContractFactory("LSP8ClaimableNFT");
-      await expect(Factory.deploy("Z", "Z", owner.address, 0n, 51n)).to.be.revertedWith(
+      await expect(Factory.deploy("Z", "Z", owner.address, 0n, 51n, LSP26_REGISTRY)).to.be.revertedWith(
         "Max 50 per claim"
       );
     });
 
     it("accepts amountPerClaim_ == 50", async function () {
       const Factory = await ethers.getContractFactory("LSP8ClaimableNFT");
-      await expect(Factory.deploy("Z", "Z", owner.address, 0n, 50n)).to.not.be.reverted;
+      await expect(Factory.deploy("Z", "Z", owner.address, 0n, 50n, LSP26_REGISTRY)).to.not.be.reverted;
     });
 
     it("reverts when maxSupply < amountPerClaim (non-zero maxSupply)", async function () {
       const Factory = await ethers.getContractFactory("LSP8ClaimableNFT");
-      await expect(Factory.deploy("Z", "Z", owner.address, 2n, 5n)).to.be.revertedWith(
+      await expect(Factory.deploy("Z", "Z", owner.address, 2n, 5n, LSP26_REGISTRY)).to.be.revertedWith(
         "maxSupply < amountPerClaim"
       );
     });
 
     it("allows maxSupply == amountPerClaim", async function () {
       const Factory = await ethers.getContractFactory("LSP8ClaimableNFT");
-      await expect(Factory.deploy("Z", "Z", owner.address, 5n, 5n)).to.not.be.reverted;
+      await expect(Factory.deploy("Z", "Z", owner.address, 5n, 5n, LSP26_REGISTRY)).to.not.be.reverted;
     });
 
     it("allows maxSupply == 0 (unlimited)", async function () {
       const Factory = await ethers.getContractFactory("LSP8ClaimableNFT");
-      await expect(Factory.deploy("Z", "Z", owner.address, 0n, 5n)).to.not.be.reverted;
+      await expect(Factory.deploy("Z", "Z", owner.address, 0n, 5n, LSP26_REGISTRY)).to.not.be.reverted;
     });
 
     it("starts with empty token requirements", async function () {
@@ -301,7 +302,7 @@ describe("LSP8ClaimableNFT", function () {
   describe("setRequirements", function () {
     it("stores single token requirement via getTokenRequirements()", async function () {
       const tokenAddr = await mockToken.getAddress();
-      await nft.setRequirements([tokenAddr], [200n], 5n);
+      await nft.setRequirements([tokenAddr], [200n], 5n, ethers.ZeroAddress);
       const [tokens, balances] = await nft.getTokenRequirements();
       expect(tokens.length).to.equal(1);
       expect(tokens[0]).to.equal(tokenAddr);
@@ -312,7 +313,7 @@ describe("LSP8ClaimableNFT", function () {
     it("stores multiple token requirements", async function () {
       const addr1 = await mockToken.getAddress();
       const addr2 = await mockToken2.getAddress();
-      await nft.setRequirements([addr1, addr2], [100n, 300n], 0n);
+      await nft.setRequirements([addr1, addr2], [100n, 300n], 0n, ethers.ZeroAddress);
       const [tokens, balances] = await nft.getTokenRequirements();
       expect(tokens.length).to.equal(2);
       expect(tokens[0]).to.equal(addr1);
@@ -321,16 +322,16 @@ describe("LSP8ClaimableNFT", function () {
       expect(balances[1]).to.equal(300n);
     });
 
-    it("emits RequirementsUpdated with tokenCount and followers", async function () {
+    it("emits RequirementsUpdated with tokenCount, followers, and follow address", async function () {
       const tokenAddr = await mockToken.getAddress();
-      await expect(nft.setRequirements([tokenAddr], [200n], 5n))
+      await expect(nft.setRequirements([tokenAddr], [200n], 5n, ethers.ZeroAddress))
         .to.emit(nft, "RequirementsUpdated")
-        .withArgs(1n, 5n);
+        .withArgs(1n, 5n, ethers.ZeroAddress);
     });
 
     it("can clear requirements", async function () {
-      await nft.setRequirements([await mockToken.getAddress()], [200n], 5n);
-      await nft.setRequirements([], [], 0n);
+      await nft.setRequirements([await mockToken.getAddress()], [200n], 5n, ethers.ZeroAddress);
+      await nft.setRequirements([], [], 0n, ethers.ZeroAddress);
       const [tokens, balances] = await nft.getTokenRequirements();
       expect(tokens.length).to.equal(0);
       expect(balances.length).to.equal(0);
@@ -340,14 +341,27 @@ describe("LSP8ClaimableNFT", function () {
     it("reverts when arrays have different lengths", async function () {
       const tokenAddr = await mockToken.getAddress();
       await expect(
-        nft.setRequirements([tokenAddr], [100n, 200n], 0n)
+        nft.setRequirements([tokenAddr], [100n, 200n], 0n, ethers.ZeroAddress)
       ).to.be.revertedWith("Length mismatch");
+    });
+
+    it("reverts when a token requirement does not support balanceOf(address)", async function () {
+      const nonToken = await deployAccount();
+      await expect(
+        nft.setRequirements([await nonToken.getAddress()], [1n], 0n, ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(nft, "InvalidTokenRequirement");
+    });
+
+    it("reverts when a token requirement is an EOA", async function () {
+      await expect(
+        nft.setRequirements([stranger.address], [1n], 0n, ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(nft, "InvalidTokenRequirement");
     });
 
     it("reverts when more than 10 token requirements are provided", async function () {
       const addrs = Array(11).fill(await mockToken.getAddress());
       const amounts = Array(11).fill(1n);
-      await expect(nft.setRequirements(addrs, amounts, 0n)).to.be.revertedWith(
+      await expect(nft.setRequirements(addrs, amounts, 0n, ethers.ZeroAddress)).to.be.revertedWith(
         "Max 10 token requirements"
       );
     });
@@ -355,11 +369,11 @@ describe("LSP8ClaimableNFT", function () {
     it("accepts exactly 10 token requirements", async function () {
       const addrs = Array(10).fill(await mockToken.getAddress());
       const amounts = Array(10).fill(1n);
-      await expect(nft.setRequirements(addrs, amounts, 0n)).to.not.be.reverted;
+      await expect(nft.setRequirements(addrs, amounts, 0n, ethers.ZeroAddress)).to.not.be.reverted;
     });
 
     it("reverts for non-owner", async function () {
-      await expect(nft.connect(stranger).setRequirements([], [], 0n)).to.be.reverted;
+      await expect(nft.connect(stranger).setRequirements([], [], 0n, ethers.ZeroAddress)).to.be.reverted;
     });
   });
 
@@ -375,7 +389,7 @@ describe("LSP8ClaimableNFT", function () {
     it("returns correct data after setRequirements", async function () {
       const addr1 = await mockToken.getAddress();
       const addr2 = await mockToken2.getAddress();
-      await nft.setRequirements([addr1, addr2], [111n, 222n], 0n);
+      await nft.setRequirements([addr1, addr2], [111n, 222n], 0n, ethers.ZeroAddress);
       const [tokens, balances] = await nft.getTokenRequirements();
       expect(tokens[0]).to.equal(addr1);
       expect(tokens[1]).to.equal(addr2);
@@ -465,7 +479,7 @@ describe("LSP8ClaimableNFT", function () {
 
     it("InsufficientTokenBalance when required token not held", async function () {
       await nft.setClaimEnabled(true);
-      await nft.setRequirements([await mockToken.getAddress()], [500n], 0n);
+      await nft.setRequirements([await mockToken.getAddress()], [500n], 0n, ethers.ZeroAddress);
       await expect(claimer1.doClaim(await nft.getAddress())).to.be.revertedWithCustomError(
         nft,
         "InsufficientTokenBalance"
@@ -474,7 +488,7 @@ describe("LSP8ClaimableNFT", function () {
 
     it("InsufficientFollowers when below minimum", async function () {
       await nft.setClaimEnabled(true);
-      await nft.setRequirements([], [], 10n);
+      await nft.setRequirements([], [], 10n, ethers.ZeroAddress);
       await expect(claimer1.doClaim(await nft.getAddress())).to.be.revertedWithCustomError(
         nft,
         "InsufficientFollowers"
@@ -485,7 +499,7 @@ describe("LSP8ClaimableNFT", function () {
       await nft.setClaimEnabled(true);
       const addr1 = await mockToken.getAddress();
       const addr2 = await mockToken2.getAddress();
-      await nft.setRequirements([addr1, addr2], [100n, 200n], 0n);
+      await nft.setRequirements([addr1, addr2], [100n, 200n], 0n, ethers.ZeroAddress);
       await mockToken.setBalance(await claimer1.getAddress(), 100n);
       // claimer1 has token1 but not token2
       await expect(claimer1.doClaim(await nft.getAddress())).to.be.revertedWithCustomError(
@@ -536,7 +550,7 @@ describe("LSP8ClaimableNFT", function () {
       const claimerAddr = await claimer1.getAddress();
       const addr1 = await mockToken.getAddress();
       const addr2 = await mockToken2.getAddress();
-      await nft.setRequirements([addr1, addr2], [100n, 200n], 0n);
+      await nft.setRequirements([addr1, addr2], [100n, 200n], 0n, ethers.ZeroAddress);
       await mockToken.setBalance(claimerAddr, 100n);
       await mockToken2.setBalance(claimerAddr, 200n);
       await expect(claimer1.doClaim(await nft.getAddress())).to.not.be.reverted;
@@ -716,31 +730,31 @@ describe("LSP8ClaimableNFT", function () {
 
   describe("meetsRequirements()", function () {
     it("(true, true) when no requirements", async function () {
-      const [tok, fol] = await nft.meetsRequirements(await claimer1.getAddress());
+      const [tok, fol, follow] = await nft.meetsRequirements(await claimer1.getAddress());
       expect(tok).to.be.true;
       expect(fol).to.be.true;
     });
 
     it("(false, true) when token balance insufficient", async function () {
-      await nft.setRequirements([await mockToken.getAddress()], [100n], 0n);
-      const [tok, fol] = await nft.meetsRequirements(await claimer1.getAddress());
+      await nft.setRequirements([await mockToken.getAddress()], [100n], 0n, ethers.ZeroAddress);
+      const [tok, fol, follow] = await nft.meetsRequirements(await claimer1.getAddress());
       expect(tok).to.be.false;
       expect(fol).to.be.true;
     });
 
     it("(true, false) when follower count insufficient", async function () {
-      await nft.setRequirements([], [], 50n);
-      const [tok, fol] = await nft.meetsRequirements(await claimer1.getAddress());
+      await nft.setRequirements([], [], 50n, ethers.ZeroAddress);
+      const [tok, fol, follow] = await nft.meetsRequirements(await claimer1.getAddress());
       expect(tok).to.be.true;
       expect(fol).to.be.false;
     });
 
     it("(true, true) when both requirements met", async function () {
       const claimerAddr = await claimer1.getAddress();
-      await nft.setRequirements([await mockToken.getAddress()], [100n], 50n);
+      await nft.setRequirements([await mockToken.getAddress()], [100n], 50n, ethers.ZeroAddress);
       await mockToken.setBalance(claimerAddr, 100n);
       await mockLSP26.setFollowerCount(claimerAddr, 50n);
-      const [tok, fol] = await nft.meetsRequirements(claimerAddr);
+      const [tok, fol, follow] = await nft.meetsRequirements(claimerAddr);
       expect(tok).to.be.true;
       expect(fol).to.be.true;
     });
@@ -753,8 +767,8 @@ describe("LSP8ClaimableNFT", function () {
       const claimerAddr = await claimer1.getAddress();
       const addr1 = await mockToken.getAddress();
       const addr2 = await mockToken2.getAddress();
-      await nft.setRequirements([addr1, addr2], [100n, 200n], 0n);
-      const [tok, fol] = await nft.meetsRequirements(claimerAddr);
+      await nft.setRequirements([addr1, addr2], [100n, 200n], 0n, ethers.ZeroAddress);
+      const [tok, fol, follow] = await nft.meetsRequirements(claimerAddr);
       expect(tok).to.be.false;
       expect(fol).to.be.true;
     });
@@ -763,9 +777,9 @@ describe("LSP8ClaimableNFT", function () {
       const claimerAddr = await claimer1.getAddress();
       const addr1 = await mockToken.getAddress();
       const addr2 = await mockToken2.getAddress();
-      await nft.setRequirements([addr1, addr2], [100n, 200n], 0n);
+      await nft.setRequirements([addr1, addr2], [100n, 200n], 0n, ethers.ZeroAddress);
       await mockToken.setBalance(claimerAddr, 100n);
-      const [tok, fol] = await nft.meetsRequirements(claimerAddr);
+      const [tok, fol, follow] = await nft.meetsRequirements(claimerAddr);
       expect(tok).to.be.false;
       expect(fol).to.be.true;
     });
@@ -774,10 +788,10 @@ describe("LSP8ClaimableNFT", function () {
       const claimerAddr = await claimer1.getAddress();
       const addr1 = await mockToken.getAddress();
       const addr2 = await mockToken2.getAddress();
-      await nft.setRequirements([addr1, addr2], [100n, 200n], 0n);
+      await nft.setRequirements([addr1, addr2], [100n, 200n], 0n, ethers.ZeroAddress);
       await mockToken.setBalance(claimerAddr, 100n);
       await mockToken2.setBalance(claimerAddr, 200n);
-      const [tok, fol] = await nft.meetsRequirements(claimerAddr);
+      const [tok, fol, follow] = await nft.meetsRequirements(claimerAddr);
       expect(tok).to.be.true;
       expect(fol).to.be.true;
     });
@@ -789,14 +803,14 @@ describe("LSP8ClaimableNFT", function () {
       const cAddr2 = await claimer2.getAddress();
       const cAddr3 = await claimer3.getAddress();
 
-      await nft.setRequirements([addr1, addr2], [100n, 200n], 0n);
+      await nft.setRequirements([addr1, addr2], [100n, 200n], 0n, ethers.ZeroAddress);
       // claimer2: has token1 only
       await mockToken.setBalance(cAddr2, 100n);
       // claimer3: has both
       await mockToken.setBalance(cAddr3, 100n);
       await mockToken2.setBalance(cAddr3, 200n);
 
-      const [tok, fol] = await nft.batchMeetsRequirements([cAddr1, cAddr2, cAddr3]);
+      const [tok, fol, follow] = await nft.batchMeetsRequirements([cAddr1, cAddr2, cAddr3]);
       expect(tok[0]).to.be.false;  // claimer1 fails
       expect(tok[1]).to.be.false;  // claimer2 fails (missing token2)
       expect(tok[2]).to.be.true;   // claimer3 passes
@@ -861,7 +875,7 @@ describe("LSP8ClaimableNFT", function () {
 
   describe("batchMeetsRequirements()", function () {
     it("returns empty arrays for empty input", async function () {
-      const [tok, fol] = await nft.batchMeetsRequirements([]);
+      const [tok, fol, follow] = await nft.batchMeetsRequirements([]);
       expect(tok).to.deep.equal([]);
       expect(fol).to.deep.equal([]);
     });
@@ -871,11 +885,11 @@ describe("LSP8ClaimableNFT", function () {
       const addr2 = await claimer2.getAddress();
       const tokenAddr = await mockToken.getAddress();
 
-      await nft.setRequirements([tokenAddr], [100n], 20n);
+      await nft.setRequirements([tokenAddr], [100n], 20n, ethers.ZeroAddress);
       await mockToken.setBalance(addr2, 100n);
       await mockLSP26.setFollowerCount(addr2, 20n);
 
-      const [tok, fol] = await nft.batchMeetsRequirements([addr1, addr2]);
+      const [tok, fol, follow] = await nft.batchMeetsRequirements([addr1, addr2]);
 
       expect(tok[0]).to.be.false;
       expect(fol[0]).to.be.false;

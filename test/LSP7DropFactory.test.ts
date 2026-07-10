@@ -21,10 +21,11 @@ import type { LSP7DropFactory, LSP7ClaimableToken } from "../typechain-types";
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const AMOUNT_PER_CLAIM = ethers.parseEther("10");
+const LSP26_REGISTRY = "0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA";
 
 async function deployFactory(): Promise<LSP7DropFactory> {
   const Factory = await ethers.getContractFactory("LSP7DropFactory");
-  return (await Factory.deploy()) as LSP7DropFactory;
+  return (await Factory.deploy(LSP26_REGISTRY)) as LSP7DropFactory;
 }
 
 // ── Suite ──────────────────────────────────────────────────────────────────

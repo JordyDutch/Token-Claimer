@@ -16,6 +16,7 @@ import { useWallet } from "../../components/WalletProvider";
 import { useNetwork } from "../../components/NetworkProvider";
 import { useUPProvider } from "../../components/UPProviderInit";
 import TokenSearchInput from "../../components/TokenSearchInput";
+import UPSearchInput from "../../components/UPSearchInput";
 
 type Status = { message: string; type: "success" | "error" | "loading"; link?: string } | null;
 
@@ -40,6 +41,7 @@ export default function ManagePage() {
   const [maxSupply, setMaxSupply] = useState("0");
   const [tokenReqs, setTokenReqs] = useState<{ addr: string; amount: string }[]>([]);
   const [reqFollowers, setReqFollowers] = useState("");
+  const [reqFollowAddress, setReqFollowAddress] = useState("");
   const [linkCopied, setLinkCopied] = useState(false);
   const [exploreVisible, setExploreVisible] = useState(true);
   const [visibilitySaving, setVisibilitySaving] = useState(false);
@@ -93,7 +95,7 @@ export default function ManagePage() {
       const owner = await c.owner();
       setIsOwner(owner.toLowerCase() === userAddr.toLowerCase());
       const safe = (p: Promise<any>, fallback: any = null) => p.catch(() => fallback);
-      const [nameRaw, enabled, start, end, amount, supply, reqResult, rF, codeEnabled] = await Promise.all([
+      const [nameRaw, enabled, start, end, amount, supply, reqResult, rF, codeEnabled, followAddr] = await Promise.all([
         safe(c.getData(LSP4_TOKEN_NAME_KEY), null),
         safe(c.claimEnabled(), false),
         safe(c.startTime(), BigInt(0)),
@@ -104,6 +106,7 @@ export default function ManagePage() {
         safe(c.getTokenRequirements(), { tokens: [], minBalances: [] }),
         safe(c.requiredFollowers(), BigInt(0)),
         safe(c.codewordEnabled(), false),
+        safe(c.requiredFollowAddress(), null),
       ]);
       setCodewordEnabled(Boolean(codeEnabled));
       setDropName(nameRaw && nameRaw !== "0x" ? Buffer.from(nameRaw.replace(/^0x/, ""), "hex").toString("utf8") : "");
@@ -123,6 +126,9 @@ export default function ManagePage() {
         amount: balancesArr[i]?.toString() ?? "0",
       })));
       setReqFollowers(rF > BigInt(0) ? rF.toString() : "");
+      if (followAddr && followAddr !== "0x0000000000000000000000000000000000000000") {
+        setReqFollowAddress(followAddr);
+      }
       if (start > BigInt(0)) setStartTime(new Date(Number(start) * 1000).toISOString().slice(0, 16));
       if (end > BigInt(0)) setEndTime(new Date(Number(end) * 1000).toISOString().slice(0, 16));
       try {
@@ -602,17 +608,35 @@ export default function ManagePage() {
                     className={inp + " mt-1"}
                   />
                 </div>
+                <div>
+                  <label className={lbl}>Must follow UP <span className="text-faint">(optional — claimer must follow this profile)</span></label>
+                  <UPSearchInput
+                    value={reqFollowAddress}
+                    onChange={setReqFollowAddress}
+                    placeholder="Search by name or paste 0x address…"
+                  />
+                  {reqFollowAddress && (
+                    <button
+                      type="button"
+                      onClick={() => setReqFollowAddress("")}
+                      className="text-[10px] text-faint hover:text-red-400 transition-colors mt-1 cursor-pointer"
+                    >
+                      Clear follow requirement
+                    </button>
+                  )}
+                </div>
                 <button
                   onClick={() => {
-                    const invalidTokenReqs = tokenReqs.filter(r => r.addr && r.addr !== ZERO && (!r.amount || Number(r.amount) < 1));
+                    const activeTokenReqs = tokenReqs.filter((r) => r.addr && r.addr !== ZERO);
+                    const invalidTokenReqs = activeTokenReqs.filter((r) => !r.amount || Number(r.amount) < 1);
                     if (invalidTokenReqs.length > 0) {
                       setStatus({ message: "Token requirements must have a minimum balance of at least 1", type: "error" });
                       return;
                     }
-                    const tokens = tokenReqs.map((r) => r.addr || ZERO);
-                    const amounts = tokenReqs.map((r) => r.amount || "0");
+                    const tokens = activeTokenReqs.map((r) => r.addr);
+                    const amounts = activeTokenReqs.map((r) => r.amount);
                     sendTx(
-                      (c) => c.setRequirements(tokens, amounts, reqFollowers || "0"),
+                      (c) => c.setRequirements(tokens, amounts, reqFollowers || "0", reqFollowAddress || ZERO),
                       "Updating requirements..."
                     );
                   }}
@@ -626,7 +650,7 @@ export default function ManagePage() {
             <div className={card}>
               <h2 className="text-xs font-semibold text-tertiary mb-1">Codeword</h2>
               <p className="text-[10px] text-faint mb-3">
-                Require claimers to enter a secret word — say it in a livestream. Only the keccak256 hash is stored on-chain, not the plaintext.
+                Require claimers to enter a livestream phrase. Only the keccak256 hash is stored, but the plaintext is revealed in claim calldata — not for high-value secrets.
               </p>
               <div className="flex items-center gap-2 mb-3">
                 <span className={`text-xs font-semibold ${codewordEnabled ? "text-green-600 dark:text-green-400" : "text-label"}`}>
@@ -644,7 +668,7 @@ export default function ManagePage() {
                   spellCheck={false}
                 />
                 <p className="text-[10px] text-faint">
-                  Use a longer passphrase for better security. Empty = clear codeword.
+                  Use this as a lightweight access gate. For private links/codes, use Secret Drops instead.
                 </p>
                 <div className="flex gap-2">
                   <button

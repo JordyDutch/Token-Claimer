@@ -236,7 +236,7 @@ export default function DevelopersPage() {
                   <p className="text-sm font-medium mb-1">Creator configures the drop</p>
                   <p className="text-xs text-label">
                     Enable claiming, set a time window, add token-gating requirements (hold LSP7/LSP8 tokens),
-                    require a minimum follower count via LSP26, or set a secret codeword.
+                    require a minimum follower count or follow-address via LSP26, or set a lightweight codeword gate.
                   </p>
                 </div>
               </div>
@@ -312,17 +312,20 @@ function setAmountPerClaim(uint256 amount)
 function setRequirements(
   address[] tokens,
   uint256[] minBalances,
-  uint256 minFollowers     // LSP26 follower count
+  uint256 minFollowers,    // LSP26 follower count
+  address followAddress    // UP the claimer must follow, or 0x0
 )
-function setCodeword(string word)  // stored as keccak256 hash
-function clearCodeword()`}</CodeBlock>
+function setCodeword(string word)  // hash stored; plaintext appears in claim calldata`}</CodeBlock>
               </div>
 
               {/* Claiming */}
               <div>
                 <h3 className="text-sm font-semibold mb-2">Drop — Claiming</h3>
                 <CodeBlock>{`function claim()
-function claimWithCode(string codeword)`}</CodeBlock>
+function claimWithCode(string codeword)
+
+// Codeword is a low-risk access phrase, not strong secrecy.
+// The plaintext is revealed in claim transaction calldata.`}</CodeBlock>
               </div>
 
               {/* Views */}
@@ -332,10 +335,11 @@ function claimWithCode(string codeword)`}</CodeBlock>
 function isClaimActive() view returns (bool)
 function hasClaimed(address) view returns (bool)
 function meetsRequirements(address)
-  view returns (bool tokenOk, bool followersOk)
+  view returns (bool tokenOk, bool followersOk, bool followOk)
 function getTokenRequirements()
   view returns (address[] tokens, uint256[] minBalances)
 function requiredFollowers() view returns (uint256)
+function requiredFollowAddress() view returns (address)
 function maxSupply() view returns (uint256)
 function amountPerClaim() view returns (uint256)
 function codewordEnabled() view returns (bool)
@@ -359,6 +363,7 @@ OutsideClaimWindow()
 MaxSupplyReached()
 InsufficientTokenBalance()
 InsufficientFollowers()
+NotFollowingRequired()
 WrongCodeword()
 ReentrancyGuard()`}</CodeBlock>
               </div>
@@ -394,7 +399,7 @@ ReentrancyGuard()`}</CodeBlock>
                 <div>
                   <p className="text-sm font-medium">Follower System</p>
                   <p className="text-xs text-label">
-                    On-chain social graph. Drops can require claimers to have a minimum number of followers.
+                    On-chain social graph. Drops can require claimers to have a minimum number of followers and/or follow a specific UP.
                     Registry is at <code className="text-pink-500 dark:text-pink-400 break-all">{contracts.lsp26}</code>.
                   </p>
                 </div>
@@ -448,16 +453,16 @@ campaigns.forEach(c => {
   "function isClaimActive() view returns (bool)",
   "function hasClaimed(address) view returns (bool)",
   "function meetsRequirements(address) view returns " +
-    "(bool tokenOk, bool followersOk)",
+    "(bool tokenOk, bool followersOk, bool followOk)",
 ], rpc);
 
 const active = await drop.isClaimActive();
 const claimed = await drop.hasClaimed(userAddress);
-const { tokenOk, followersOk } = await drop.meetsRequirements(
+const { tokenOk, followersOk, followOk } = await drop.meetsRequirements(
   userAddress
 );
 
-const canClaim = active && !claimed && tokenOk && followersOk;`}</CodeBlock>
+const canClaim = active && !claimed && tokenOk && followersOk && followOk;`}</CodeBlock>
               </div>
 
               <div>

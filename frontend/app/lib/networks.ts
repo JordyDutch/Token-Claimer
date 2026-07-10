@@ -24,12 +24,16 @@ export interface NetworkConfig {
 // Mainnet LSP7 factory history:
 //   v3  (codeword support)  : 0x9b132E764f92c6E6F5E91E276E310758C33dB08F
 //   v4  (multi-creator)     : 0xE618ddD88869E43E433eD103b0d896E1a05d5b40
-//   v5  (EIP-1167 proxies)  : 0xE2932677195f46341c9d13dD0BBa016ac19B4E05  ← active
+//   v5  (EIP-1167 proxies)  : 0xE2932677195f46341c9d13dD0BBa016ac19B4E05
+//   v6  (LSP7-NFT support)  : 0xF1b5FfA5A82Cee28eaC551165102a1e62fBef7Ab
+//   v7  (audit fixes)       : 0x0B38Ca584553Ec7dA412403c9537B2C0Cd094bf0  ← active
 //
 // Mainnet LSP8 factory history:
 //   v3  (codeword support)  : 0xBd545E98F133282bD79dc4a6ac422437478A58b6
 //   v4  (multi-creator)     : 0x9bc9e8D57a94E0F88ab32CDC1865c3fdeF86f72E
-//   v5  (constructor pattern, OWASP fixes) : 0x649Ccee0D46283102De6fEef3456c2e0a6c37461  ← active
+//   v5  (constructor pattern, OWASP fixes) : 0x649Ccee0D46283102De6fEef3456c2e0a6c37461
+//   v6  (LSP7-NFT compat)                  : 0xA373f07E94496A4509c30DcB27b431c541b87FbF
+//   v7  (audit fixes)                      : 0xdcA867387df33b9ce08B706fdb91FB2e8C4bEB74  ← active
 
 export const NETWORKS: Record<NetworkId, NetworkConfig> = {
   mainnet: {

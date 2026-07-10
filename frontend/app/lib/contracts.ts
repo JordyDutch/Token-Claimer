@@ -5,9 +5,9 @@ export const LUKSO_CHAIN_ID = "0x2a";
 export const ZERO = "0x0000000000000000000000000000000000000000";
 
 export const LSP7_FACTORY =
-  process.env.NEXT_PUBLIC_LSP7_FACTORY ?? "0xF1b5FfA5A82Cee28eaC551165102a1e62fBef7Ab";
+  process.env.NEXT_PUBLIC_LSP7_FACTORY ?? "0x0B38Ca584553Ec7dA412403c9537B2C0Cd094bf0";
 export const LSP8_FACTORY =
-  process.env.NEXT_PUBLIC_LSP8_FACTORY ?? "0xA373f07E94496A4509c30DcB27b431c541b87FbF";
+  process.env.NEXT_PUBLIC_LSP8_FACTORY ?? "0xdcA867387df33b9ce08B706fdb91FB2e8C4bEB74";
 
 // LSP7DropFactory ABI
 // Includes both old (`totalTokenCampaigns`) and new (`totalCampaigns`) names —
@@ -59,12 +59,13 @@ export const CLAIM_ABI = [
   "function amountPerClaim() view returns (uint256)",
   "function getTokenRequirements() view returns (address[] tokens, uint256[] minBalances)",
   "function requiredFollowers() view returns (uint256)",
-  "function meetsRequirements(address) view returns (bool tokenOk, bool followersOk)",
-  "function batchMeetsRequirements(address[]) view returns (bool[] tokenOk, bool[] followersOk)",
+  "function meetsRequirements(address) view returns (bool tokenOk, bool followersOk, bool followOk)",
+  "function requiredFollowAddress() view returns (address)",
+  "function batchMeetsRequirements(address[]) view returns (bool[] tokenOk, bool[] followersOk, bool[] followOk)",
   "function setClaimEnabled(bool)",
   "function setClaimWindow(uint256,uint256)",
   "function setAmountPerClaim(uint256)",
-  "function setRequirements(address[],uint256[],uint256)",
+  "function setRequirements(address[],uint256[],uint256,address)",
   "function claimWithCode(string calldata codeword) external",
   "function setCodeword(string calldata word) external",
   "function codewordEnabled() view returns (bool)",
@@ -167,6 +168,7 @@ const REVERT_ERRORS: Record<string, string> = {
   "0xd05cb609": "Max supply has been reached",
   "0xe4455cae": "You don't hold enough required tokens",
   "0x94303d52": "You don't have enough followers",
+  "0x0775b056": "You must follow the required profile to claim",
   "0x4aa20f9c": "Wrong code — check the codeword and try again",
   "0x8beb9d16": "Transaction failed, please try again",
   "0xb8eaf7a1": "Rescue failed",

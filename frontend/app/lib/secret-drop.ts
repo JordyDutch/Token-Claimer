@@ -1,5 +1,9 @@
 /**
- * Secret Drop — off-chain codes/links with on-chain UP access control.
+ * Secret Drop — separate off-chain codes/links module with signed UP challenges
+ * and optional on-chain eligibility checks.
+ *
+ * This is intentionally not a token/NFT drop contract and is not created by
+ * LSP7DropFactory or LSP8DropFactory. Keep it isolated from on-chain minting.
  *
  * Storage layout in Vercel KV:
  *   sdrop:{id}           → SecretDropConfig JSON (no codes)

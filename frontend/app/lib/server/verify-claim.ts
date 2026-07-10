@@ -8,7 +8,7 @@ import { TokenReq, FollowerReq } from "../secret-drop";
 
 const MAINNET_RPC = "https://rpc.mainnet.lukso.network";
 const TESTNET_RPC = "https://rpc.testnet.lukso.network";
-const LSP26_REGISTRY = "0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA";
+const DEFAULT_LSP26_REGISTRY = "0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA";
 
 const EIP1271_MAGIC = "0x1626ba7e";
 const EIP1271_ABI = [
@@ -23,6 +23,13 @@ const LSP26_ABI = [
 const TOKEN_ABI = [
   "function balanceOf(address account) view returns (uint256)",
 ];
+
+function getLsp26Registry(network: "mainnet" | "testnet"): string {
+  if (network === "testnet") {
+    return process.env.TESTNET_LSP26_REGISTRY || process.env.LSP26_REGISTRY || DEFAULT_LSP26_REGISTRY;
+  }
+  return process.env.LSP26_REGISTRY || DEFAULT_LSP26_REGISTRY;
+}
 
 /**
  * Verify a signature against an expected address.
@@ -131,7 +138,7 @@ export async function checkOnChainRequirements(
   // LSP26 follower checks
   if (followerRequirement || minFollowers > 0) {
     try {
-      const lsp26 = new Contract(LSP26_REGISTRY, LSP26_ABI, rpc);
+      const lsp26 = new Contract(getLsp26Registry(network), LSP26_ABI, rpc);
 
       if (minFollowers > 0) {
         const count: bigint = await lsp26.followerCount(address);

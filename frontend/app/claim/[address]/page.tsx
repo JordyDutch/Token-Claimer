@@ -61,8 +61,9 @@ export default function ClaimPage() {
   const [reqInfo, setReqInfo] = useState<{
     tokens: { addr: string; amount: bigint; name: string; symbol: string; icon: string | null }[];
     followers: bigint;
+    followAddress: string | null;
   } | null>(null);
-  const [eligibility, setEligibility] = useState<{ tokenOk: boolean; followersOk: boolean } | null>(null);
+  const [eligibility, setEligibility] = useState<{ tokenOk: boolean; followersOk: boolean; followOk: boolean } | null>(null);
   const [tokenMet, setTokenMet] = useState<boolean[]>([]);
   const [owner, setOwner] = useState<string | null>(null);
   const [startTime, setStartTime] = useState<number>(0);
@@ -100,7 +101,7 @@ export default function ClaimPage() {
           return new TextDecoder().decode(bytes);
         } catch { return ""; }
       };
-      const [nameRaw, symbolRaw, supply, active, enabled, amount, reqResult, rFollowers, ownerAddr, start, end, codeEnabled] = await Promise.all([
+      const [nameRaw, symbolRaw, supply, active, enabled, amount, reqResult, rFollowers, ownerAddr, start, end, codeEnabled, followAddr] = await Promise.all([
         safe(c.getData(LSP4_TOKEN_NAME_KEY), null),
         safe(c.getData(LSP4_TOKEN_SYMBOL_KEY), null),
         // v5 proxy tokens use tokenSupplyCap(), v3/v4 use maxSupply()
@@ -114,6 +115,7 @@ export default function ClaimPage() {
         safe(c.startTime(), BigInt(0)),
         safe(c.endTime(), BigInt(0)),
         safe(c.codewordEnabled(), false),
+        safe(c.requiredFollowAddress(), null),
       ]);
       setCodewordRequired(Boolean(codeEnabled));
       setDropName(decodeBytes(nameRaw) || "Unknown");
@@ -173,8 +175,9 @@ export default function ClaimPage() {
         })
       );
 
-      const hasReqs = enrichedTokens.length > 0 || rFollowers > BigInt(0);
-      setReqInfo(hasReqs ? { tokens: enrichedTokens, followers: rFollowers } : null);
+      const reqFollowAddress = followAddr && followAddr !== "0x0000000000000000000000000000000000000000" ? followAddr : null;
+      const hasReqs = enrichedTokens.length > 0 || rFollowers > BigInt(0) || reqFollowAddress !== null;
+      setReqInfo(hasReqs ? { tokens: enrichedTokens, followers: rFollowers, followAddress: reqFollowAddress } : null);
 
       const MAX_UINT256 = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
       if (type === "LSP7" || type === "LSP7-NFT") {
@@ -208,10 +211,10 @@ export default function ClaimPage() {
       if (userAddr) {
         const [claimed, meets] = await Promise.all([
           c.hasClaimed(userAddr),
-          hasReqs ? c.meetsRequirements(userAddr) : Promise.resolve({ tokenOk: true, followersOk: true } as any),
+          hasReqs ? c.meetsRequirements(userAddr) : Promise.resolve({ tokenOk: true, followersOk: true, followOk: true } as any),
         ]);
         setAlreadyClaimed(claimed);
-        setEligibility({ tokenOk: meets.tokenOk, followersOk: meets.followersOk });
+        setEligibility({ tokenOk: meets.tokenOk, followersOk: meets.followersOk, followOk: meets.followOk ?? true });
 
         // Check each token requirement individually
         if (enrichedTokens.length > 0) {
@@ -406,7 +409,7 @@ export default function ClaimPage() {
   }
 
   const codewordOk = !codewordRequired || codewordInput.trim().length > 0;
-  const canClaim = isActive && !alreadyClaimed && !claiming && codewordOk && (!eligibility || (eligibility.tokenOk && eligibility.followersOk));
+  const canClaim = isActive && !alreadyClaimed && !claiming && codewordOk && (!eligibility || (eligibility.tokenOk && eligibility.followersOk && eligibility.followOk));
   const explorerUrl = `${networkConfig.explorerBase}/address/${contractAddress}`;
   const hasTimeWindow = startTime > 0 || endTime > 0;
 
@@ -641,6 +644,26 @@ export default function ClaimPage() {
                   )}
                 </div>
               )}
+              {reqInfo.followAddress && (
+                <div className={`flex items-center justify-between ${inIframe ? "py-1" : "py-1.5"}`}>
+                  <span className="text-tertiary text-xs">
+                    Follow{" "}
+                    <a
+                      href={`https://universaleverything.io/${reqInfo.followAddress}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-pink-500 hover:underline"
+                    >
+                      {reqInfo.followAddress.slice(0, 6)}…{reqInfo.followAddress.slice(-4)}
+                    </a>
+                  </span>
+                  {eligibility && (
+                    <span className={eligibility.followOk ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                      {eligibility.followOk ? "✓" : "✗"}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -750,12 +773,12 @@ export default function ClaimPage() {
             >
               {claiming
                 ? "Claiming..."
-                : !eligibility || (eligibility.tokenOk && eligibility.followersOk)
+                : !eligibility || (eligibility.tokenOk && eligibility.followersOk && eligibility.followOk)
                 ? isNftStyle ? "Claim NFT" : "Claim Tokens"
                 : "Requirements not met"}
             </button>
               {/* Bug #12: Inline explanation when requirements not met */}
-              {eligibility && (!eligibility.tokenOk || !eligibility.followersOk) && (
+              {eligibility && (!eligibility.tokenOk || !eligibility.followersOk || !eligibility.followOk) && (
                 <div className="mt-2 text-xs text-left space-y-1">
                   {reqInfo?.tokens.map((t, i) =>
                     tokenMet.length > i && !tokenMet[i] ? (
@@ -769,6 +792,19 @@ export default function ClaimPage() {
                   {eligibility && !eligibility.followersOk && reqInfo && reqInfo.followers > BigInt(0) && (
                     <div className="text-red-500 dark:text-red-400">
                       ✗ Need {reqInfo.followers.toString()}+ followers
+                    </div>
+                  )}
+                  {eligibility && !eligibility.followOk && reqInfo?.followAddress && (
+                    <div className="text-red-500 dark:text-red-400">
+                      ✗ Must follow{" "}
+                      <a
+                        href={`https://universaleverything.io/${reqInfo.followAddress}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline"
+                      >
+                        {reqInfo.followAddress.slice(0, 6)}…{reqInfo.followAddress.slice(-4)}
+                      </a>
                     </div>
                   )}
                 </div>

@@ -18,11 +18,13 @@ import { ethers } from "hardhat";
 import type { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import type { LSP8DropFactory, LSP8ClaimableNFT } from "../typechain-types";
 
+const LSP26_REGISTRY = "0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA";
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 async function deployFactory(): Promise<LSP8DropFactory> {
   const Factory = await ethers.getContractFactory("LSP8DropFactory");
-  return (await Factory.deploy()) as LSP8DropFactory;
+  return (await Factory.deploy(LSP26_REGISTRY)) as LSP8DropFactory;
 }
 
 // ── Suite ──────────────────────────────────────────────────────────────────
