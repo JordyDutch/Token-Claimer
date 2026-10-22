@@ -2,6 +2,9 @@
   "name": "lukso-token-claimer",
   "version": "1.0.0",
   "description": "Claimable NFT drops for LUKSO — built for artists, livestreams, and events",
+  "engines": {
+    "node": ">=22.23.4 <23"
+  },
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",
